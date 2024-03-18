@@ -30,6 +30,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
+#include <pthread.h>
+#endif
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -422,6 +425,63 @@ static inline uint32_t vkd3d_atomic_decrement_u32(uint32_t volatile *x)
 static inline uint32_t vkd3d_atomic_increment_u32(uint32_t volatile *x)
 {
     return vkd3d_atomic_add_fetch_u32(x, 1);
+}
+
+struct vkd3d_mutex
+{
+#ifdef _WIN32
+    CRITICAL_SECTION lock;
+#else
+    pthread_mutex_t lock;
+#endif
+};
+
+static inline void vkd3d_mutex_init(struct vkd3d_mutex *lock)
+{
+#ifdef _WIN32
+    InitializeCriticalSection(&lock->lock);
+#else
+    int ret;
+
+    if ((ret = pthread_mutex_init(&lock->lock, NULL)))
+        ERR("Failed to initialise the mutex, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_mutex_lock(struct vkd3d_mutex *lock)
+{
+#ifdef _WIN32
+    EnterCriticalSection(&lock->lock);
+#else
+    int ret;
+
+    if ((ret = pthread_mutex_lock(&lock->lock)))
+        ERR("Failed to lock the mutex, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_mutex_unlock(struct vkd3d_mutex *lock)
+{
+#ifdef _WIN32
+    LeaveCriticalSection(&lock->lock);
+#else
+    int ret;
+
+    if ((ret = pthread_mutex_unlock(&lock->lock)))
+        ERR("Failed to unlock the mutex, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
+{
+#ifdef _WIN32
+    DeleteCriticalSection(&lock->lock);
+#else
+    int ret;
+
+    if ((ret = pthread_mutex_destroy(&lock->lock)))
+        ERR("Failed to destroy the mutex, ret %d.\n", ret);
+#endif
 }
 
 static inline void vkd3d_parse_version(const char *version, int *major, int *minor)

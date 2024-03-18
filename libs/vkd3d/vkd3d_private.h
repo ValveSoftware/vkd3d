@@ -203,35 +203,10 @@ union vkd3d_thread_handle
     void *handle;
 };
 
-struct vkd3d_mutex
-{
-    CRITICAL_SECTION lock;
-};
-
 struct vkd3d_cond
 {
     CONDITION_VARIABLE cond;
 };
-
-static inline void vkd3d_mutex_init(struct vkd3d_mutex *lock)
-{
-    InitializeCriticalSection(&lock->lock);
-}
-
-static inline void vkd3d_mutex_lock(struct vkd3d_mutex *lock)
-{
-    EnterCriticalSection(&lock->lock);
-}
-
-static inline void vkd3d_mutex_unlock(struct vkd3d_mutex *lock)
-{
-    LeaveCriticalSection(&lock->lock);
-}
-
-static inline void vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
-{
-    DeleteCriticalSection(&lock->lock);
-}
 
 static inline void vkd3d_cond_init(struct vkd3d_cond *cond)
 {
@@ -288,52 +263,10 @@ union vkd3d_thread_handle
     void *handle;
 };
 
-struct vkd3d_mutex
-{
-    pthread_mutex_t lock;
-};
-
 struct vkd3d_cond
 {
     pthread_cond_t cond;
 };
-
-
-static inline void vkd3d_mutex_init(struct vkd3d_mutex *lock)
-{
-    int ret;
-
-    ret = pthread_mutex_init(&lock->lock, NULL);
-    if (ret)
-        ERR("Could not initialize the mutex, error %d.\n", ret);
-}
-
-static inline void vkd3d_mutex_lock(struct vkd3d_mutex *lock)
-{
-    int ret;
-
-    ret = pthread_mutex_lock(&lock->lock);
-    if (ret)
-        ERR("Could not lock the mutex, error %d.\n", ret);
-}
-
-static inline void vkd3d_mutex_unlock(struct vkd3d_mutex *lock)
-{
-    int ret;
-
-    ret = pthread_mutex_unlock(&lock->lock);
-    if (ret)
-        ERR("Could not unlock the mutex, error %d.\n", ret);
-}
-
-static inline void vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
-{
-    int ret;
-
-    ret = pthread_mutex_destroy(&lock->lock);
-    if (ret)
-        ERR("Could not destroy the mutex, error %d.\n", ret);
-}
 
 static inline void vkd3d_cond_init(struct vkd3d_cond *cond)
 {
