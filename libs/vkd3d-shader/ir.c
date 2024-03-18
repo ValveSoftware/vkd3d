@@ -2986,6 +2986,8 @@ struct vsir_cfg_structure
         {
             struct vsir_cfg_structure_list body;
             unsigned idx;
+            bool needs_trampoline;
+            struct vsir_cfg_structure *outer_loop;
         } loop;
         struct vsir_cfg_structure_selection
         {
@@ -3257,7 +3259,8 @@ static void vsir_cfg_structure_dump(struct vsir_cfg *cfg, struct vsir_cfg_struct
 
             vsir_cfg_structure_list_dump(cfg, &structure->u.loop.body);
 
-            TRACE("%s}  # %u\n", cfg->debug_buffer.buffer, structure->u.loop.idx);
+            TRACE("%s}  # %u%s\n", cfg->debug_buffer.buffer, structure->u.loop.idx,
+                    structure->u.loop.needs_trampoline ? ", tramp" : "");
             break;
 
         case STRUCTURE_TYPE_SELECTION:
@@ -4503,6 +4506,51 @@ static void vsir_cfg_count_targets(struct vsir_cfg *cfg, struct vsir_cfg_structu
     }
 }
 
+/* Trampolines are code gadgets used to emulate multilevel jumps (which are not natively supported
+ * by SPIR-V). A trampoline is inserted just after a loop and checks whether control has reached the
+ * intended site (i.e., we just jumped out of the target block) or if other levels of jumping are
+ * needed. For each jump a trampoline is required for all the loops between the jump itself and the
+ * target loop, excluding the target loop itself. */
+static void vsir_cfg_mark_trampolines(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list,
+        struct vsir_cfg_structure *loop)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+    {
+        struct vsir_cfg_structure *structure = &list->structures[i];
+
+        switch (structure->type)
+        {
+            case STRUCTURE_TYPE_BLOCK:
+                break;
+
+            case STRUCTURE_TYPE_LOOP:
+                structure->u.loop.outer_loop = loop;
+                vsir_cfg_mark_trampolines(cfg, &structure->u.loop.body, structure);
+                break;
+
+            case STRUCTURE_TYPE_SELECTION:
+                vsir_cfg_mark_trampolines(cfg, &structure->u.selection.if_body, loop);
+                vsir_cfg_mark_trampolines(cfg, &structure->u.selection.else_body, loop);
+                break;
+
+            case STRUCTURE_TYPE_JUMP:
+            {
+                struct vsir_cfg_structure *l;
+                if (structure->u.jump.type != JUMP_BREAK && structure->u.jump.type != JUMP_CONTINUE)
+                    break;
+                for (l = loop; l && l->u.loop.idx != structure->u.jump.target; l = l->u.loop.outer_loop)
+                {
+                    assert(l->type == STRUCTURE_TYPE_LOOP);
+                    l->u.loop.needs_trampoline = true;
+                }
+                break;
+            }
+        }
+    }
+}
+
 static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
 {
     enum vkd3d_result ret;
@@ -4510,6 +4558,8 @@ static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
     vsir_cfg_count_targets(cfg, &cfg->structured_program);
 
     ret = vsir_cfg_optimize_recurse(cfg, &cfg->structured_program);
+
+    vsir_cfg_mark_trampolines(cfg, &cfg->structured_program, NULL);
 
     if (TRACE_ON())
         vsir_cfg_dump_structured_program(cfg);
@@ -4559,7 +4609,7 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_loop(struct vsir_cfg *cfg,
 
     /* Add a trampoline to implement multilevel jumping depending on the stored
      * jump_target value. */
-    if (loop_idx != UINT_MAX)
+    if (loop->needs_trampoline)
     {
         /* If the multilevel jump is a `continue' and the target is the loop we're inside
          * right now, then we can finally do the `continue'. */
