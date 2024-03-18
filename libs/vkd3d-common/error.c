@@ -17,7 +17,6 @@
  */
 
 #include "vkd3d_common.h"
-#include "vkd3d_debug.h"
 
 HRESULT hresult_from_vkd3d_result(int vkd3d_result)
 {

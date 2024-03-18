@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vkd3d_debug.h"
+#include "vkd3d_common.h"
 
 static inline void *vkd3d_malloc(size_t size)
 {

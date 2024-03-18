@@ -250,7 +250,6 @@ BUILT_SOURCES = $(widl_headers) \
 
 noinst_LTLIBRARIES = libvkd3d-common.la
 libvkd3d_common_la_SOURCES = \
-	include/private/vkd3d_debug.h \
 	libs/vkd3d-common/blob.c \
 	libs/vkd3d-common/debug.c \
 	libs/vkd3d-common/error.c \
@@ -306,7 +305,6 @@ libvkd3d_shader_la_SOURCES = \
 	include/private/list.h \
 	include/private/rbtree.h \
 	include/private/vkd3d_common.h \
-	include/private/vkd3d_debug.h \
 	include/private/vkd3d_memory.h \
 	include/vkd3d_shader.h \
 	libs/vkd3d-shader/checksum.c \
@@ -344,7 +342,6 @@ EXTRA_DIST = \
 libvkd3d_la_SOURCES = \
 	include/private/vkd3d_blob.h \
 	include/private/vkd3d_common.h \
-	include/private/vkd3d_debug.h \
 	include/private/vkd3d_memory.h \
 	include/private/vkd3d_shader_utils.h \
 	include/private/vkd3d_test.h \
