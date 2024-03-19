@@ -115,6 +115,9 @@ static uint32_t write_string(const char *string, struct fx_write_context *fx)
 
 static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
+    if (var->state_block_count)
+        hlsl_fixme(fx->ctx, &var->loc, "Write state block assignments.");
+
     fx->ops->write_pass(var, fx);
 }
 

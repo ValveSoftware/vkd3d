@@ -7,14 +7,14 @@ shader model < 6.0
 technique10 t1 < int a = 1; > {}
 technique10 t2 < int a = 2; int t1 = 3; int t2 = 4; > {}
 
-[effect]
+[effect todo]
 // Annotations on passes
 technique10 t1 < int a = 1; >
 {
     pass < int t1 = 2; > {}
 }
 
-[effect]
+[effect todo]
 // Using names from the global scope
 float a;
 

@@ -1,5 +1,5 @@
 % Test complex effect groups syntax
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 fxgroup group1
 {
     technique10

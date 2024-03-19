@@ -426,6 +426,7 @@ struct hlsl_ir_var
 
     /* A dynamic array containing the state block on the variable's declaration, if any.
      * An array variable may contain multiple state blocks.
+     * A technique pass will always contain one.
      * These are only really used for effect profiles. */
     struct hlsl_state_block **state_blocks;
     unsigned int state_block_count;
