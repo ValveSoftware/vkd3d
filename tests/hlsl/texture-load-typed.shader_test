@@ -48,7 +48,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.8, -3.0, 4294967295.0, 123.0)
 
 % lowercase 'texture2D'
@@ -65,5 +65,5 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.8, -3.0, 4294967295.0, 123.0)

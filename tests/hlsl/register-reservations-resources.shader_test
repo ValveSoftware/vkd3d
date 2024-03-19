@@ -34,7 +34,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (41.0, 41.0, 41.0, 1089.0)
 
 
@@ -50,7 +50,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 
@@ -65,7 +65,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
@@ -84,7 +84,7 @@ shader model >= 4.0
 shader model < 6.0
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 [require]
@@ -110,7 +110,7 @@ float4 main() : sv_target
 
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 [pixel shader]
@@ -123,7 +123,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (4.0, 4.0, 4.0, 99.0)
 
 
@@ -139,7 +139,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
@@ -154,7 +154,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (2.0, 2.0, 2.0, 99.0)
 
 
@@ -168,7 +168,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (2.0, 2.0, 2.0, 99.0)
 
 
@@ -241,5 +241,5 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 todo(sm<6) probe all rgba (1.0, 1.0, 1.0, 99.0)

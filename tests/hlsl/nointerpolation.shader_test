@@ -23,7 +23,7 @@ float4 main(nointerpolation float4 t : texcoord) : sv_target
 }
 
 [test]
-draw triangle list 3
+todo(glsl) draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -50,7 +50,7 @@ float4 main(ps_input input) : sv_target
 }
 
 [test]
-draw triangle list 3
+todo(glsl) draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -77,7 +77,7 @@ float4 main(nointerpolation ps_input input) : sv_target
 }
 
 [test]
-draw triangle list 3
+todo(glsl) draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -104,7 +104,7 @@ float4 main(centroid ps_input input) : sv_target
 }
 
 [test]
-draw triangle list 3
+todo(glsl) draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -135,7 +135,7 @@ shader model >= 4.0
 shader model < 6.0
 
 [test]
-draw triangle list 3
+todo(glsl) draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 % Centroid for SM 6.

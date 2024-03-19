@@ -31,6 +31,12 @@
 
 static PFNGLSPECIALIZESHADERPROC p_glSpecializeShader;
 
+enum shading_language
+{
+    GLSL,
+    SPIR_V,
+};
+
 struct format_info
 {
     enum DXGI_FORMAT f;
@@ -68,6 +74,7 @@ struct gl_runner
 
     struct vkd3d_shader_combined_resource_sampler *combined_samplers;
     unsigned int combined_sampler_count;
+    enum shading_language language;
 };
 
 static struct gl_runner *gl_runner(struct shader_runner *r)
@@ -102,13 +109,16 @@ static bool check_gl_extensions(struct gl_runner *runner)
     {
         "GL_ARB_clip_control",
         "GL_ARB_compute_shader",
-        "GL_ARB_gl_spirv",
         "GL_ARB_sampler_objects",
         "GL_ARB_shader_image_load_store",
         "GL_ARB_texture_storage",
     };
 
     glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+
+    if (runner->language == SPIR_V && !check_gl_extension("GL_ARB_gl_spirv", count))
+        return false;
+
     for (unsigned int i = 0; i < ARRAY_SIZE(required_extensions); ++i)
     {
         if (!check_gl_extension(required_extensions[i], count))
@@ -145,15 +155,21 @@ static bool check_egl_client_extension(const char *extension)
     return false;
 }
 
-static bool gl_runner_init(struct gl_runner *runner)
+static bool gl_runner_init(struct gl_runner *runner, enum shading_language language)
 {
     PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT;
+    const char *glsl_version = NULL;
     EGLDeviceEXT *devices;
     EGLContext context;
     EGLDisplay display;
     EGLBoolean ret;
     EGLint count;
     GLuint vao;
+
+    static const char *const tags[] =
+    {
+        "glsl",
+    };
 
     static const EGLint attributes[] =
     {
@@ -165,6 +181,7 @@ static bool gl_runner_init(struct gl_runner *runner)
     };
 
     memset(runner, 0, sizeof(*runner));
+    runner->language = language;
 
     if (!check_egl_client_extension("EGL_EXT_device_enumeration")
             || !(eglQueryDevicesEXT = (void *)eglGetProcAddress("eglQueryDevicesEXT")))
@@ -216,6 +233,18 @@ static bool gl_runner_init(struct gl_runner *runner)
             continue;
         }
 
+        glsl_version = (const char *)glGetString(GL_SHADING_LANGUAGE_VERSION);
+        if (language == GLSL)
+        {
+            unsigned int major, minor;
+            sscanf(glsl_version, "%u.%u", &major, &minor);
+            if (major < 4 || (major == 4 && minor < 40))
+            {
+                trace("Device %u does not support GLSL 4.40.\n", i);
+                continue;
+            }
+        }
+
         memset(&runner->caps, 0, sizeof(runner->caps));
         if (!check_gl_extensions(runner))
         {
@@ -225,7 +254,9 @@ static bool gl_runner_init(struct gl_runner *runner)
             eglTerminate(display);
             continue;
         }
-        runner->caps.runner = "OpenGL";
+        runner->caps.runner = language == SPIR_V ? "OpenGL/SPIR-V" : "OpenGL/GLSL";
+        runner->caps.tags = tags;
+        runner->caps.tag_count = runner->language == GLSL;
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
@@ -243,9 +274,10 @@ static bool gl_runner_init(struct gl_runner *runner)
         return false;
     }
 
-    trace("  GL_VENDOR: %s\n", glGetString(GL_VENDOR));
-    trace("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
-    trace(" GL_VERSION: %s\n", glGetString(GL_VERSION));
+    trace("                  GL_VENDOR: %s\n", glGetString(GL_VENDOR));
+    trace("                GL_RENDERER: %s\n", glGetString(GL_RENDERER));
+    trace("                 GL_VERSION: %s\n", glGetString(GL_VERSION));
+    trace("GL_SHADING_LANGUAGE_VERSION: %s\n", glsl_version);
 
     p_glSpecializeShader = (void *)eglGetProcAddress("glSpecializeShader");
 
@@ -455,7 +487,7 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     info.source.code = ID3D10Blob_GetBufferPointer(blob);
     info.source.size = ID3D10Blob_GetBufferSize(blob);
     info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
-    info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
+    info.target_type = runner->language == SPIR_V ? VKD3D_SHADER_TARGET_SPIRV_BINARY : VKD3D_SHADER_TARGET_GLSL;
     info.options = options;
     info.option_count = ARRAY_SIZE(options);
     info.log_level = VKD3D_SHADER_LOG_WARNING;
@@ -494,9 +526,16 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     }
     vkd3d_shader_free_scan_combined_resource_sampler_info(&combined_sampler_info);
 
-    info.next = &spirv_info;
-    spirv_info.next = &interface_info;
-    spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5;
+    if (runner->language == SPIR_V)
+    {
+        info.next = &spirv_info;
+        spirv_info.next = &interface_info;
+        spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5;
+    }
+    else
+    {
+        info.next = &interface_info;
+    }
 
     if (runner->r.uniform_count)
     {
@@ -592,8 +631,9 @@ static GLuint compile_compute_shader_program(struct gl_runner *runner)
 {
     struct vkd3d_shader_code cs_code;
     GLuint program_id, cs_id;
+    const GLchar *source;
     ID3D10Blob *cs_blob;
-    GLint status;
+    GLint status, size;
     bool ret;
 
     reset_combined_samplers(runner);
@@ -605,9 +645,20 @@ static GLuint compile_compute_shader_program(struct gl_runner *runner)
         return false;
 
     cs_id = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderBinary(1, &cs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, cs_code.code, cs_code.size);
+    if (runner->language == SPIR_V)
+    {
+        glShaderBinary(1, &cs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, cs_code.code, cs_code.size);
+    }
+    else
+    {
+        source = cs_code.code;
+        size = cs_code.size;
+        glShaderSource(cs_id, 1, &source, &size);
+        glCompileShader(cs_id);
+    }
     vkd3d_shader_free_shader_code(&cs_code);
-    p_glSpecializeShader(cs_id, "main", 0, NULL, NULL);
+    if (runner->language == SPIR_V)
+        p_glSpecializeShader(cs_id, "main", 0, NULL, NULL);
     glGetShaderiv(cs_id, GL_COMPILE_STATUS, &status);
     ok(status, "Failed to compile compute shader.\n");
     trace_info_log(cs_id, false);
@@ -752,8 +803,9 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
 {
     struct vkd3d_shader_code vs_code, fs_code;
     GLuint program_id, vs_id, fs_id;
+    const GLchar *source;
     ID3D10Blob *fs_blob;
-    GLint status;
+    GLint status, size;
 
     reset_combined_samplers(runner);
 
@@ -783,17 +835,39 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
     ID3D10Blob_Release(fs_blob);
 
     vs_id = glCreateShader(GL_VERTEX_SHADER);
-    glShaderBinary(1, &vs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, vs_code.code, vs_code.size);
+    if (runner->language == SPIR_V)
+    {
+        glShaderBinary(1, &vs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, vs_code.code, vs_code.size);
+    }
+    else
+    {
+        source = vs_code.code;
+        size = vs_code.size;
+        glShaderSource(vs_id, 1, &source, &size);
+        glCompileShader(vs_id);
+    }
     vkd3d_shader_free_shader_code(&vs_code);
-    p_glSpecializeShader(vs_id, "main", 0, NULL, NULL);
+    if (runner->language == SPIR_V)
+        p_glSpecializeShader(vs_id, "main", 0, NULL, NULL);
     glGetShaderiv(vs_id, GL_COMPILE_STATUS, &status);
     ok(status, "Failed to compile vertex shader.\n");
     trace_info_log(vs_id, false);
 
     fs_id = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, fs_code.code, fs_code.size);
+    if (runner->language == SPIR_V)
+    {
+        glShaderBinary(1, &fs_id, GL_SHADER_BINARY_FORMAT_SPIR_V, fs_code.code, fs_code.size);
+    }
+    else
+    {
+        source = fs_code.code;
+        size = fs_code.size;
+        glShaderSource(fs_id, 1, &source, &size);
+        glCompileShader(fs_id);
+    }
     vkd3d_shader_free_shader_code(&fs_code);
-    p_glSpecializeShader(fs_id, "main", 0, NULL, NULL);
+    if (runner->language == SPIR_V)
+        p_glSpecializeShader(fs_id, "main", 0, NULL, NULL);
     glGetShaderiv(fs_id, GL_COMPILE_STATUS, &status);
     ok(status, "Failed to compile fragment shader.\n");
     trace_info_log(fs_id, false);
@@ -1056,19 +1130,24 @@ static const struct shader_runner_ops gl_runner_ops =
     .release_readback = gl_runner_release_readback,
 };
 
-void run_shader_tests_gl(void)
+static void run_tests(enum shading_language language)
 {
     struct gl_runner runner;
+
+    if (!gl_runner_init(&runner, language))
+        return;
+    run_shader_tests(&runner.r, &runner.caps, &gl_runner_ops, NULL);
+    gl_runner_cleanup(&runner);
+}
+
+void run_shader_tests_gl(void)
+{
     const char *test_name;
 
     test_name = vkd3d_test_name;
     vkd3d_test_name = "shader_runner_gl";
-    if (!gl_runner_init(&runner))
-        goto done;
-
-    run_shader_tests(&runner.r, &runner.caps, &gl_runner_ops, NULL);
-    gl_runner_cleanup(&runner);
-done:
+    run_tests(SPIR_V);
+    run_tests(GLSL);
     vkd3d_test_name = test_name;
 }
 

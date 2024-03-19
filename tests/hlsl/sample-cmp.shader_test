@@ -27,7 +27,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 1.0)
 
 [sampler 0]
@@ -36,7 +36,7 @@ address clamp clamp clamp
 comparison less
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 0.0, 0.0, 1.0)
 
 [sampler 0]
@@ -45,7 +45,7 @@ address clamp clamp clamp
 comparison equal
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [sampler 0]
@@ -54,7 +54,7 @@ address clamp clamp clamp
 comparison less equal
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 0.0, 1.0)
 
 [sampler 0]
@@ -63,7 +63,7 @@ address clamp clamp clamp
 comparison greater
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 1.0, 1.0)
 
 [sampler 0]
@@ -72,7 +72,7 @@ address clamp clamp clamp
 comparison not equal
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 0.0, 1.0, 1.0)
 
 [sampler 0]
@@ -81,7 +81,7 @@ address clamp clamp clamp
 comparison greater equal
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 1.0)
 
 [sampler 0]
@@ -90,7 +90,7 @@ address clamp clamp clamp
 comparison always
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 
 
@@ -118,7 +118,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float 0.5
 uniform 1 float 0.00000007
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 1.0, 1.0)
 
 
@@ -140,5 +140,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 0.5
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 1.0, 1.0)

@@ -11,7 +11,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 0.1 0.3 0.0 0.0
 uniform 4 float4 0.2 0.4 0.0 0.0
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.1, 0.3, 0.2, 0.4)
 
 [pixel shader fail(sm<6)]

@@ -37,7 +37,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (2.0, 3.0, 4.0, 5.0)
 
 % The "dword" alias is pre-defined as lowercase

@@ -9,7 +9,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 % The uint value is never casted to int on SM1-3, just casted to float and treated as such
@@ -21,7 +21,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 if(sm<4) todo probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
 if(sm>=4) probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
 
@@ -35,7 +35,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 if(sm>=4) probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 [pixel shader]
@@ -46,7 +46,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
 
 [pixel shader]
@@ -56,7 +56,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 % Unsuffixed literals can instead be considered unsigned on SM6
@@ -67,7 +67,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 if(sm<6) probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
 if(sm>=6) probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
 
@@ -81,7 +81,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.70503270e+009, 0.0, 0.0, 0.0)
 
 % SM1-3 complains that uint values must be positive, but it's not clear why this is a problem here:
@@ -96,7 +96,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 todo probe all rgba (2.14748365e+009, 0.0, 0.0, 0.0)
 
 % Again, no idea of what's happening here
@@ -108,7 +108,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 todo probe all rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
 
 % This makes sense
@@ -119,7 +119,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1.70503270e+009, 0.0, 0.0, 0.0)
 
 % This does not again
@@ -130,7 +130,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 todo probe all rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
 
 % Explicit float literals use float semantics, at least
@@ -142,5 +142,5 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (6.0e+009, 0.0, 0.0, 0.0)

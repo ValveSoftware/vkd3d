@@ -185,7 +185,7 @@ void main(uint2 id : sv_dispatchthreadid)
 }
 
 [test]
-todo(sm>=6) dispatch 1 1 1
+todo(sm>=6 | glsl) dispatch 1 1 1
 probe uav 0 (0, 0) r (2.0)
 probe uav 0 (0, 1) r (1.0)
 probe uav 0 (1, 0) r (2.0)

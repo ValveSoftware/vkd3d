@@ -45,7 +45,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0, 0, 0, 1)
 
 
@@ -60,7 +60,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (10, 10, 10, 11)
 
 
@@ -74,7 +74,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (21, 21, 21, 11)
 
 
@@ -90,7 +90,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (12, 12, 12, 111)
 
 
@@ -105,7 +105,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (104, 104, 104, 111)
 
 
@@ -129,7 +129,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (1, 1, 1, 11)
 
 

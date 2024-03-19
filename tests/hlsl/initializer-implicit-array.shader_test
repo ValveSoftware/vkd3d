@@ -7,7 +7,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (50, 60, 70, 80)
 
 
@@ -21,7 +21,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 % dxcompiler emits a nop shader which returns immediately.
 if(sm<6) probe all rgba (5.0, 6.0, 7.0, 8.0)
 
@@ -35,7 +35,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (7.0, 8.0, 9.0, 10.0)
 
 
@@ -63,7 +63,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (318.0, 320.0, 322.0, 324.0)
 
 

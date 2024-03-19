@@ -18,7 +18,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 5.0
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (50.0, 50.0, 50.0, 50.0)
 
 
@@ -41,7 +41,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (20.0, 20.0, 20.0, 20.0)
 
 [pixel shader todo(sm<4)]
@@ -70,7 +70,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (409.1, 409.1, 409.1, 409.1)
 
 [pixel shader todo(sm<4)]
@@ -100,7 +100,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (410.1, 410.1, 410.1, 410.1)
 
 % loop attribute by itself
@@ -118,7 +118,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 [pixel shader todo(sm<4)]
@@ -137,7 +137,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 [pixel shader todo(sm<4)]
@@ -156,7 +156,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 % unroll can't be used with fastopt or loop

@@ -10,7 +10,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 1.0, 1.0)
 
 
@@ -27,7 +27,7 @@ float4 main() : SV_TARGET
 uniform 0 float4 0.0 0.0 2.0 4.0
 if(sm<4)  uniform 4 float4 0 1 0 10
 if(sm>=4) uniform 4 int4 0 1 0 10
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (0.0, 10.0, 1.0, 11.0)
 
 
@@ -42,5 +42,5 @@ float4 main() : sv_target
 [test]
 if(sm<4)  uniform 0 float4 1.0 1.0 1.0 0.0
 if(sm>=4) uniform 0 uint4 0x00000001 0x00000002 0x80000000 0x00000000
-todo(sm<4) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (2.0, 2.0, 2.0, 0.0)

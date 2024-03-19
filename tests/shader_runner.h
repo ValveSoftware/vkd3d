@@ -125,6 +125,8 @@ struct input_element
 struct shader_runner_caps
 {
     const char *runner;
+    const char *const *tags;
+    size_t tag_count;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
     bool float64;
@@ -147,6 +149,7 @@ static inline unsigned int shader_runner_caps_get_feature_flags(const struct sha
 struct shader_runner
 {
     const struct shader_runner_ops *ops;
+    const struct shader_runner_caps *caps;
 
     bool is_todo;
 

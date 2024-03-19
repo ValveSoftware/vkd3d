@@ -6,7 +6,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (7.0, 7.0, 7.0, 7.0)
 
 
@@ -22,5 +22,5 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (7.0, 7.0, 7.0, 8.0)

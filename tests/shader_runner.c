@@ -110,8 +110,18 @@ enum parse_state
     STATE_TEST,
 };
 
-static bool check_qualifier_args_conjunction(const char *line,
-        const char **const rest, enum shader_model sm)
+static bool match_tag(struct shader_runner *runner, const char *tag)
+{
+    for (size_t i = 0; i < runner->caps->tag_count; ++i)
+    {
+        if (!strcmp(tag, runner->caps->tags[i]))
+            return true;
+    }
+
+    return false;
+}
+
+static bool check_qualifier_args_conjunction(struct shader_runner *runner, const char *line, const char **const rest)
 {
     bool holds = true;
     unsigned int i;
@@ -120,6 +130,7 @@ static bool check_qualifier_args_conjunction(const char *line,
     {
         const char *text;
         enum shader_model sm_min, sm_max;
+        bool tag;
     }
     valid_args[] =
     {
@@ -127,6 +138,7 @@ static bool check_qualifier_args_conjunction(const char *line,
         {"sm>=6", SHADER_MODEL_6_0, SHADER_MODEL_6_0},
         {"sm<4",  SHADER_MODEL_2_0, SHADER_MODEL_4_0 - 1},
         {"sm<6",  SHADER_MODEL_2_0, SHADER_MODEL_6_0 - 1},
+        {"glsl", 0, 0, true},
     };
 
     while (*line != ')' && *line != '|')
@@ -139,18 +151,20 @@ static bool check_qualifier_args_conjunction(const char *line,
         for (i = 0; i < ARRAY_SIZE(valid_args); ++i)
         {
             const char *option_text = valid_args[i].text;
+            size_t option_len = strlen(option_text);
 
-            if (!strncmp(line, option_text, strlen(option_text)))
-            {
-                line += strlen(option_text);
-                if (sm < valid_args[i].sm_min)
-                    holds = false;
-                if (sm > valid_args[i].sm_max)
-                    holds = false;
+            if (strncmp(line, option_text, option_len))
+                continue;
 
-                match = true;
-                break;
-            }
+            match = true;
+            line += option_len;
+            if (valid_args[i].tag)
+                holds = match_tag(runner, option_text);
+            else if (runner->minimum_shader_model < valid_args[i].sm_min
+                    || runner->minimum_shader_model > valid_args[i].sm_max)
+                holds = false;
+
+            break;
         }
 
         while (isspace(*line))
@@ -173,7 +187,7 @@ static bool check_qualifier_args_conjunction(const char *line,
     return holds;
 }
 
-static bool check_qualifier_args(const char *line, const char **const rest, enum shader_model sm)
+static bool check_qualifier_args(struct shader_runner *runner, const char *line, const char **const rest)
 {
     bool first = true;
     bool holds = false;
@@ -187,7 +201,7 @@ static bool check_qualifier_args(const char *line, const char **const rest, enum
             ++line;
         first = false;
 
-        holds = check_qualifier_args_conjunction(line, &line, sm) || holds;
+        holds = check_qualifier_args_conjunction(runner, line, &line) || holds;
     }
 
     assert(*line == ')');
@@ -197,8 +211,8 @@ static bool check_qualifier_args(const char *line, const char **const rest, enum
     return holds;
 }
 
-static bool match_string_generic(const char *line, const char *token, const char **const rest,
-    bool exclude_bracket, bool allow_qualifier_args, enum shader_model sm)
+static bool match_string_generic(struct shader_runner *runner, const char *line, const char *token,
+        const char **const rest, bool exclude_bracket, bool allow_qualifier_args)
 {
     size_t len = strlen(token);
     bool holds = true;
@@ -212,7 +226,7 @@ static bool match_string_generic(const char *line, const char *token, const char
     line += len;
 
     if (allow_qualifier_args && *line == '(')
-        holds = check_qualifier_args(line, &line, sm);
+        holds = check_qualifier_args(runner, line, &line);
 
     if (rest)
     {
@@ -223,26 +237,26 @@ static bool match_string_generic(const char *line, const char *token, const char
     return holds;
 }
 
-static bool match_string_with_args(const char *line, const char *token, const char **const rest,
-    enum shader_model sm)
+static bool match_string_with_args(struct shader_runner *runner,
+        const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(line, token, rest, false, true, sm);
+    return match_string_generic(runner, line, token, rest, false, true);
 }
 
 static bool match_string(const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(line, token, rest, false, false, 0);
+    return match_string_generic(NULL, line, token, rest, false, false);
 }
 
-static bool match_directive_substring_with_args(const char *line, const char *token,
-        const char **const rest, enum shader_model sm)
+static bool match_directive_substring_with_args(struct shader_runner *runner,
+        const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(line, token, rest, true, true, sm);
+    return match_string_generic(runner, line, token, rest, true, true);
 }
 
 static bool match_directive_substring(const char *line, const char *token, const char **const rest)
 {
-    return match_string_generic(line, token, rest, true, false, 0);
+    return match_string_generic(NULL, line, token, rest, true, false);
 }
 
 static const char *close_parentheses(const char *line)
@@ -743,14 +757,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         match = false;
 
-        if (match_string_with_args(line, "todo", &line, runner->minimum_shader_model))
+        if (match_string_with_args(runner, line, "todo", &line))
         {
             runner->is_todo = true;
             match = true;
         }
 
         line_ini = line;
-        if (match_string_with_args(line, "if", &line, runner->minimum_shader_model))
+        if (match_string_with_args(runner, line, "if", &line))
         {
             match = true;
         }
@@ -1389,18 +1403,18 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
     {
         const char *src_start = src;
 
-        if (match_directive_substring_with_args(src, "todo", &src, runner->minimum_shader_model))
+        if (match_directive_substring_with_args(runner, src, "todo", &src))
         {
             /* 'todo' is not meaningful when dxcompiler is in use. */
             if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
                 continue;
             state = get_parse_state_todo(state);
         }
-        else if (match_directive_substring_with_args(src, "fail", &src, runner->minimum_shader_model))
+        else if (match_directive_substring_with_args(runner, src, "fail", &src))
         {
             *expect_hr = E_FAIL;
         }
-        else if (match_directive_substring_with_args(src, "notimpl", &src, runner->minimum_shader_model))
+        else if (match_directive_substring_with_args(runner, src, "notimpl", &src))
         {
             *expect_hr = E_NOTIMPL;
         }
@@ -1431,6 +1445,37 @@ static bool check_requirements(const struct shader_runner *runner, const struct 
     return true;
 }
 
+static void trace_tags(const struct shader_runner_caps *caps)
+{
+    char tags[80], *p;
+    size_t rem;
+    int rc;
+
+    p = tags;
+    rem = ARRAY_SIZE(tags);
+    rc = snprintf(p, rem, "      tags:");
+    p += rc;
+    rem -= rc;
+
+    for (size_t i = 0; i < caps->tag_count; ++i)
+    {
+        rc = snprintf(p, rem, " \"%s\"%s", caps->tags[i], i == caps->tag_count - 1 ? "" : ",");
+        if (!(rc >= 0 && (size_t)rc < rem))
+        {
+            *p = 0;
+            trace("%s\n", tags);
+
+            p = tags;
+            rem = ARRAY_SIZE(tags);
+            rc = snprintf(p, rem, "           ");
+            --i;
+        }
+        p += rc;
+        rem -= rc;
+    }
+    trace("%s.\n", tags);
+}
+
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
         const struct shader_runner_ops *ops, void *dxc_compiler)
 {
@@ -1449,6 +1494,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     trace("Compiling SM%s-SM%s shaders with %s and executing with %s.\n",
             model_strings[caps->minimum_shader_model], model_strings[caps->maximum_shader_model],
             dxc_compiler ? "dxcompiler" : HLSL_COMPILER, caps->runner);
+    if (caps->tag_count)
+        trace_tags(caps);
     trace("   float64: %u.\n", caps->float64);
     trace("     int64: %u.\n", caps->int64);
     trace("       rov: %u.\n", caps->rov);
@@ -1461,6 +1508,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
 
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
+    runner->caps = caps;
     runner->minimum_shader_model = caps->minimum_shader_model;
     runner->maximum_shader_model = caps->maximum_shader_model;
 

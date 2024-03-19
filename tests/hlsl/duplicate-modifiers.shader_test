@@ -7,6 +7,6 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 if(sm<6)  probe all rgba (0.1, 0.2, 0.3, 0.4)
 if(sm>=6) probe all rgba (0.1, 0.3, 0.2, 0.4)

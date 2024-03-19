@@ -15,7 +15,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.5, 0.7, 0.6, 0.8)
 probe (0, 1) rgba (0.6, 0.5, 0.2, 0.1)
@@ -30,7 +30,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
@@ -46,7 +46,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
@@ -70,7 +70,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)

@@ -11,7 +11,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 163840.0, 480.0)
 
 [pixel shader]
@@ -26,7 +26,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (-2147483648.0, 4.0, 2147483650.0, 4.0)
 
 [pixel shader]
@@ -41,7 +41,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 536870912.0, 1.0, 1073741824.0)
 
 [pixel shader]
@@ -54,7 +54,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (5.0, 15.0, 10.0, -6.0)
 
 [pixel shader]
@@ -67,7 +67,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 1.0)
 
 [pixel shader]
@@ -80,7 +80,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 1.0)
 
 [pixel shader]
@@ -93,7 +93,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
 
 [pixel shader]
@@ -106,7 +106,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 163840.0, 480.0)
 
 [pixel shader]
@@ -119,7 +119,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (5.0, 15.0, 10.0, 4294967296.0)
 
 [pixel shader]
@@ -132,7 +132,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 1.0)
 
 [pixel shader]
@@ -145,7 +145,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 1.0)
 
 [pixel shader]
@@ -158,7 +158,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
 
 [pixel shader todo]

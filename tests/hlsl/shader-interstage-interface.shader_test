@@ -52,5 +52,5 @@ void main(float4 position : SV_Position, float2 t0 : TEXCOORD0,
 }
 
 [test]
-draw triangle strip 4
+todo(glsl) draw triangle strip 4
 probe all rgba (10.0, 8.0, 7.0, 3.0)
