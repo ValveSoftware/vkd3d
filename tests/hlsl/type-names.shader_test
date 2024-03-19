@@ -112,3 +112,15 @@ float4 main() : sv_target
 {
     return float4(0, 0, 0, 0);
 }
+
+[pixel shader fail(sm>=6)]
+typedef float4 texturE;
+Texture tex1;
+texture tex2;
+teXture tex3;
+texturE var;
+
+float4 main() : sv_target
+{
+    return var;
+}
