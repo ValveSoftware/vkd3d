@@ -194,7 +194,7 @@ float4 main() : sv_target { return 0; }
 
 
 % State blocks can be empty
-[pixel shader todo]
+[pixel shader]
 sampler sams[2]
 {
     {
@@ -207,7 +207,7 @@ float4 main() : sv_target { return 0; }
 
 
 % Multiple state blocks for array variables, as a list, are a thing.
-[pixel shader todo]
+[pixel shader]
 sampler sams[2]
 {
     {
@@ -222,7 +222,7 @@ float4 main() : sv_target { return 0; }
 
 
 % Multiple state blocks for multi-component variables, as a list, are a thing.
-[pixel shader todo]
+[pixel shader]
 float2 val
 {
     {
@@ -270,7 +270,7 @@ float2 arr[2]
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader todo]
+[pixel shader]
 float3 arr[2]
 {
     {
@@ -305,7 +305,7 @@ float4 main() : sv_target { return 0; }
 
 
 % Multiple state blocks for multi-dimensional array variables are a thing.
-[pixel shader todo]
+[pixel shader]
 sampler sams[2][2]
 {
     {
@@ -359,7 +359,7 @@ sampler sams[1]
 
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 sampler sam
 {
     {

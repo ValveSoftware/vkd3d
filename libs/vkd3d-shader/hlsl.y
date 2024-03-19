@@ -78,7 +78,9 @@ struct parse_variable_def
     uint32_t modifiers;
     struct vkd3d_shader_location modifiers_loc;
 
-    struct hlsl_state_block *state_block;
+    struct hlsl_state_block **state_blocks;
+    unsigned int state_block_count;
+    size_t state_block_capacity;
 };
 
 struct parse_function
@@ -939,8 +941,7 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
     hlsl_cleanup_semantic(&v->semantic);
-    if (v->state_block)
-        hlsl_free_state_block(v->state_block);
+    assert(!v->state_blocks);
     vkd3d_free(v);
 }
 
@@ -2359,9 +2360,23 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             continue;
         }
 
-        var->state_block = v->state_block;
-        v->state_block = NULL;
         type = var->data_type;
+
+        var->state_blocks = v->state_blocks;
+        var->state_block_count = v->state_block_count;
+        var->state_block_capacity = v->state_block_capacity;
+        v->state_block_count = 0;
+        v->state_block_capacity = 0;
+        v->state_blocks = NULL;
+
+        if (var->state_blocks && hlsl_type_component_count(type) != var->state_block_count)
+        {
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Expected %u state blocks, but got %u.",
+                    hlsl_type_component_count(type), var->state_block_count);
+            free_parse_variable_def(v);
+            continue;
+        }
 
         if (v->initializer.args_count)
         {
@@ -5546,6 +5561,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %type <type> type_no_void
 %type <type> typedef_type
 
+%type <variable_def> state_block_list
 %type <variable_def> type_spec
 %type <variable_def> variable_decl
 %type <variable_def> variable_def
@@ -6729,6 +6745,27 @@ state_block:
             state_block_add_entry($$, entry);
         }
 
+state_block_list:
+      '{' state_block '}'
+        {
+            if (!($$ = hlsl_alloc(ctx, sizeof(*$$))))
+                YYABORT;
+
+            if(!(vkd3d_array_reserve((void **)&$$->state_blocks, &$$->state_block_capacity,
+                    $$->state_block_count + 1, sizeof(*$$->state_blocks))))
+                YYABORT;
+            $$->state_blocks[$$->state_block_count++] = $2;
+        }
+    | state_block_list ',' '{' state_block '}'
+        {
+            $$ = $1;
+
+            if(!(vkd3d_array_reserve((void **)&$$->state_blocks, &$$->state_block_capacity,
+                    $$->state_block_count + 1, sizeof(*$$->state_blocks))))
+                YYABORT;
+            $$->state_blocks[$$->state_block_count++] = $4;
+        }
+
 variable_def:
       variable_decl
     | variable_decl '=' complex_initializer
@@ -6739,8 +6776,25 @@ variable_def:
     | variable_decl '{' state_block_start state_block '}'
         {
             $$ = $1;
-            $$->state_block = $4;
             ctx->in_state_block = 0;
+
+            if(!(vkd3d_array_reserve((void **)&$$->state_blocks, &$$->state_block_capacity,
+                    $$->state_block_count + 1, sizeof(*$$->state_blocks))))
+                YYABORT;
+            $$->state_blocks[$$->state_block_count++] = $4;
+        }
+    | variable_decl '{' state_block_start state_block_list '}'
+        {
+            $$ = $1;
+            ctx->in_state_block = 0;
+
+            $$->state_blocks = $4->state_blocks;
+            $$->state_block_count = $4->state_block_count;
+            $$->state_block_capacity = $4->state_block_capacity;
+            $4->state_blocks = NULL;
+            $4->state_block_count = 0;
+            $4->state_block_capacity = 0;
+            free_parse_variable_def($4);
         }
 
 variable_def_typed:

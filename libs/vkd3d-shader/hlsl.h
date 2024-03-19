@@ -424,9 +424,12 @@ struct hlsl_ir_var
     /* Scope that contains annotations for this variable. */
     struct hlsl_scope *annotations;
 
-    /* The state block on the variable's declaration, if any.
+    /* A dynamic array containing the state block on the variable's declaration, if any.
+     * An array variable may contain multiple state blocks.
      * These are only really used for effect profiles. */
-    struct hlsl_state_block *state_block;
+    struct hlsl_state_block **state_blocks;
+    unsigned int state_block_count;
+    size_t state_block_capacity;
 
     /* Indexes of the IR instructions where the variable is first written and last read (liveness
      *   range). The IR instructions are numerated starting from 2, because 0 means unused, and 1

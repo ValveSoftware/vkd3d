@@ -156,17 +156,17 @@ void hlsl_free_state_block(struct hlsl_state_block *state_block)
 
 void hlsl_free_var(struct hlsl_ir_var *decl)
 {
-    unsigned int k;
+    unsigned int k, i;
 
     vkd3d_free((void *)decl->name);
     hlsl_cleanup_semantic(&decl->semantic);
     for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
         vkd3d_free((void *)decl->objects_usage[k]);
-    if (decl->state_block)
-    {
-        hlsl_free_state_block(decl->state_block);
-        decl->state_block = NULL;
-    }
+
+    for (i = 0; i < decl->state_block_count; ++i)
+        hlsl_free_state_block(decl->state_blocks[i]);
+    vkd3d_free(decl->state_blocks);
+
     vkd3d_free(decl);
 }
 
@@ -3740,11 +3740,12 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     {
         LIST_FOR_EACH_ENTRY_SAFE(var, next_var, &scope->vars, struct hlsl_ir_var, scope_entry)
         {
-            if (var->state_block)
-            {
-                hlsl_free_state_block(var->state_block);
-                var->state_block = NULL;
-            }
+            for (i = 0; i < var->state_block_count; ++i)
+                hlsl_free_state_block(var->state_blocks[i]);
+            vkd3d_free(var->state_blocks);
+            var->state_blocks = NULL;
+            var->state_block_count = 0;
+            var->state_block_capacity = 0;
         }
     }
 
