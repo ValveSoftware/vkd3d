@@ -647,6 +647,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
         case HLSL_TYPE_VOID:
             break;
         default:
