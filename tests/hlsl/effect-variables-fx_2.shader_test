@@ -1,0 +1,11 @@
+[require]
+shader model < 3.0
+
+[effect]
+bool _bool;
+float _float;
+half _half;
+
+technique
+{
+}

@@ -643,6 +643,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
 
     switch (type->base_type)
     {
+        case HLSL_TYPE_HALF:
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:

@@ -96,6 +96,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/effect-technique-fx_2.shader_test \
 	tests/hlsl/effect-technique-fx_4.shader_test \
 	tests/hlsl/effect-technique-fx_5.shader_test \
+	tests/hlsl/effect-variables-fx_2.shader_test \
 	tests/hlsl/entry-point-semantics.shader_test \
 	tests/hlsl/exp.shader_test \
 	tests/hlsl/expr-indexing.shader_test \
