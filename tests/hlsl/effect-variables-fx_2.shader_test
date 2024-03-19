@@ -11,3 +11,16 @@ uint _uint;
 technique
 {
 }
+
+[effect]
+Texture tex1;
+texture tex2;
+teXture tex3;
+Texture2DMS<float4, 4> tex4;
+Texture1D tex5;
+Texture2D tex6;
+Texture3D tex7;
+
+technique
+{
+}

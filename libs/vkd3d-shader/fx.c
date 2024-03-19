@@ -649,6 +649,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
         case HLSL_TYPE_INT:
         case HLSL_TYPE_UINT:
         case HLSL_TYPE_VOID:
+        case HLSL_TYPE_TEXTURE:
             break;
         default:
             hlsl_fixme(ctx, &ctx->location, "Writing parameter type %u is not implemented.",
@@ -772,6 +773,46 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
     return offset;
 }
 
+static bool is_type_supported_fx_2(const struct hlsl_type *type)
+{
+    type = hlsl_get_multiarray_element_type(type);
+
+    if (type->class == HLSL_CLASS_STRUCT)
+        return true;
+
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+        case HLSL_TYPE_DOUBLE:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_PIXELSHADER:
+        case HLSL_TYPE_VERTEXSHADER:
+        case HLSL_TYPE_STRING:
+            return true;
+        case HLSL_TYPE_TEXTURE:
+        case HLSL_TYPE_SAMPLER:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                case HLSL_SAMPLER_DIM_2D:
+                case HLSL_SAMPLER_DIM_3D:
+                case HLSL_SAMPLER_DIM_CUBE:
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return true;
+                default:
+                    ;
+            }
+            break;
+        default:
+            return false;
+    }
+
+    return false;
+}
+
 static void write_fx_2_parameters(struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
@@ -785,6 +826,9 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        if (!is_type_supported_fx_2(var->data_type))
+            continue;
+
         desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
         value_offset = write_fx_2_initial_value(var, fx);
 
