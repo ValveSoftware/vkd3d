@@ -769,18 +769,26 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
 static void write_fx_2_parameters(struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t desc_offset, value_offset;
+    uint32_t desc_offset, value_offset, flags;
     struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_var *var;
+    enum fx_2_parameter_flags
+    {
+        IS_SHARED = 0x1,
+    };
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
         value_offset = write_fx_2_initial_value(var, fx);
 
+        flags = 0;
+        if (var->storage_modifiers & HLSL_STORAGE_SHARED)
+            flags |= IS_SHARED;
+
         put_u32(buffer, desc_offset); /* Parameter description */
         put_u32(buffer, value_offset); /* Value */
-        put_u32(buffer, 0); /* Flags */
+        put_u32(buffer, flags); /* Flags */
 
         put_u32(buffer, 0); /* Annotations count */
         if (has_annotations(var))
