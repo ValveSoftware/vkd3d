@@ -3629,26 +3629,10 @@ struct vsir_cfg_node_sorter
 
 static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cfg_node_sorter *sorter, struct vsir_block *block)
 {
-    struct vsir_block_list *loop = NULL;
-    struct vsir_cfg_node_sorter_stack_item *item;
     enum vkd3d_result ret;
-
-    if (sorter->cfg->loops_by_header[block->label - 1] != SIZE_MAX)
-        loop = &sorter->cfg->loops[sorter->cfg->loops_by_header[block->label - 1]];
 
     if ((ret = vsir_block_list_add_checked(&sorter->available_blocks, block)) < 0)
         return ret;
-
-    if (!loop)
-        return VKD3D_OK;
-
-    if (!vkd3d_array_reserve((void **)&sorter->stack, &sorter->stack_capacity, sorter->stack_count + 1, sizeof(*sorter->stack)))
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-    item = &sorter->stack[sorter->stack_count++];
-    item->loop = loop;
-    item->seen_count = 0;
-    item->begin = sorter->cfg->order.count;
 
     return VKD3D_OK;
 }
@@ -3752,6 +3736,24 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
             if (!inner_stack_item || vsir_block_list_search(inner_stack_item->loop, block))
                 break;
+        }
+
+        /* If the node is a loop header, open the loop. */
+        if (sorter.cfg->loops_by_header[block->label - 1] != SIZE_MAX)
+        {
+            struct vsir_block_list *loop = &sorter.cfg->loops[sorter.cfg->loops_by_header[block->label - 1]];
+
+            if (loop)
+            {
+                if (!vkd3d_array_reserve((void **)&sorter.stack, &sorter.stack_capacity,
+                        sorter.stack_count + 1, sizeof(*sorter.stack)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                inner_stack_item = &sorter.stack[sorter.stack_count++];
+                inner_stack_item->loop = loop;
+                inner_stack_item->seen_count = 0;
+                inner_stack_item->begin = sorter.cfg->order.count;
+            }
         }
 
         vsir_block_list_remove_index(&sorter.available_blocks, i);
