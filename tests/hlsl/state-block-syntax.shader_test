@@ -442,7 +442,7 @@ float4 main() : sv_target { return 0; }
 
 
 % PixelShader and VertexShader are valid identifiers for the lhs
-[pixel shader todo]
+[pixel shader]
 sampler sam
 {
     pixelShader = 20;

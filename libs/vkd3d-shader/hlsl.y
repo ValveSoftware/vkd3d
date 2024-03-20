@@ -5537,8 +5537,8 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 
 %type <name> any_identifier
 %type <name> var_identifier
+%type <name> stateblock_lhs_identifier
 %type <name> name_opt
-
 
 %type <parameter> parameter
 
@@ -6707,6 +6707,22 @@ state_block_start:
             ctx->in_state_block = 1;
         }
 
+stateblock_lhs_identifier:
+      any_identifier
+        {
+            $$ = $1;
+        }
+    | KW_PIXELSHADER
+        {
+            if (!($$ = hlsl_strdup(ctx, "pixelshader")))
+                YYABORT;
+        }
+    | KW_VERTEXSHADER
+        {
+            if (!($$ = hlsl_strdup(ctx, "vertexshader")))
+                YYABORT;
+        }
+
 state_block_index_opt:
       %empty
         {
@@ -6731,7 +6747,7 @@ state_block:
             if (!($$ = hlsl_alloc(ctx, sizeof(*$$))))
                 YYABORT;
         }
-    | state_block any_identifier state_block_index_opt '=' complex_initializer ';'
+    | state_block stateblock_lhs_identifier state_block_index_opt '=' complex_initializer ';'
         {
             struct hlsl_state_block_entry *entry;
 
