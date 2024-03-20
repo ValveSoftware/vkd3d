@@ -8007,8 +8007,9 @@ static void spirv_compiler_emit_discard(struct spirv_compiler *compiler,
      * a mismatch between the VSIR structure and the SPIR-V one, which would cause problems if
      * structurisation is necessary. Therefore we emit it as a function call. */
     condition_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
-    condition_id = spirv_compiler_emit_int_to_bool(compiler,
-            instruction->flags, src->reg.data_type, 1, condition_id);
+    if (src->reg.data_type != VKD3D_DATA_BOOL)
+        condition_id = spirv_compiler_emit_int_to_bool(compiler,
+                instruction->flags, src->reg.data_type, 1, condition_id);
     void_id = vkd3d_spirv_get_op_type_void(builder);
     vkd3d_spirv_build_op_function_call(builder, void_id, spirv_compiler_get_discard_function_id(compiler),
             &condition_id, 1);
