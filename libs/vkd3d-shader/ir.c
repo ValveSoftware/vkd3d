@@ -3627,16 +3627,6 @@ struct vsir_cfg_node_sorter
     struct vsir_block_list available_blocks;
 };
 
-static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cfg_node_sorter *sorter, struct vsir_block *block)
-{
-    enum vkd3d_result ret;
-
-    if ((ret = vsir_block_list_add_checked(&sorter->available_blocks, block)) < 0)
-        return ret;
-
-    return VKD3D_OK;
-}
-
 /* Topologically sort the blocks according to the forward edges. By
  * definition if the input CFG is reducible then its forward edges
  * form a DAG, so a topological sorting exists. In order to compute it
@@ -3711,7 +3701,7 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
     vsir_block_list_init(&sorter.available_blocks);
 
-    if ((ret = vsir_cfg_node_sorter_make_node_available(&sorter, cfg->entry)) < 0)
+    if ((ret = vsir_block_list_add_checked(&sorter.available_blocks, cfg->entry)) < 0)
         goto fail;
 
     while (sorter.available_blocks.count != 0)
@@ -3797,7 +3787,7 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
             if (in_degrees[successor->label - 1] == 0)
             {
-                if ((ret = vsir_cfg_node_sorter_make_node_available(&sorter, successor)) < 0)
+                if ((ret = vsir_block_list_add_checked(&sorter.available_blocks, successor)) < 0)
                     goto fail;
             }
         }
