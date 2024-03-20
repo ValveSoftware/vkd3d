@@ -3,7 +3,8 @@ uniform float4 x;
 
 float4 main() : sv_target
 {
-    if (x.x == 9.0f) discard;
+    if (x.x == 9.0f)
+        discard;
     return x;
 }
 
@@ -14,3 +15,50 @@ probe all rgba (1, 2, 3, 4)
 uniform 0 float4 9 8 7 6
 todo(sm<4 | glsl) draw quad
 probe all rgba (1, 2, 3, 4)
+
+[require]
+shader model >= 5.0
+
+[uav 0]
+format r32 float
+size (2d, 2, 1)
+
+0.0 0.0
+
+[uav 1]
+format r32 float
+size (2d, 2, 1)
+
+0.0 0.0
+
+% Check that side effects stop happening after discard
+[pixel shader]
+uniform float4 x;
+RWTexture2D<float> y;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    if (pos.x == 0.5 && pos.y == 0.5)
+        y[uint2(0, 0)] += 1;
+    if (x.x == 9.0f)
+        discard;
+    if (pos.x == 0.5 && pos.y == 0.5)
+        y[uint2(1, 0)] += 1;
+    return x;
+}
+
+[test]
+uniform 0 float4 1 2 3 4
+todo(glsl) draw quad
+probe all rgba (1, 2, 3, 4)
+if(sm<6) probe uav 1 (0, 0) r (1.0)
+if(sm<6) probe uav 1 (1, 0) r (1.0)
+if(sm>=6) probe uav 0 (0, 0) r (1.0)
+if(sm>=6) probe uav 0 (1, 0) r (1.0)
+uniform 0 float4 9 8 7 6
+todo(glsl) draw quad
+probe all rgba (1, 2, 3, 4)
+if(sm<6) probe uav 1 (0, 0) r (2.0)
+if(sm<6) probe uav 1 (1, 0) r (1.0)
+if(sm>=6) probe uav 0 (0, 0) r (2.0)
+if(sm>=6) probe uav 0 (1, 0) r (1.0)
