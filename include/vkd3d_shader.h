@@ -310,6 +310,17 @@ enum vkd3d_shader_compile_option_name
      * \since 1.12
      */
     VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT = 0x0000000b,
+    /**
+     * If \a value is nonzero, emit a compile warning warn when vectors or
+     * matrices are truncated in an implicit conversion.
+     * If warnings are disabled, this option has no effect.
+     * This option has no effects for targets other than HLSL.
+     *
+     * The default value is nonzero, i.e. enable implicit truncation warnings.
+     *
+     * \since 1.12
+     */
+    VKD3D_SHADER_COMPILE_OPTION_WARN_IMPLICIT_TRUNCATION = 0x0000000c,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

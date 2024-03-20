@@ -3593,24 +3593,35 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
         return false;
     ctx->cur_buffer = ctx->globals_buffer;
 
+    ctx->warn_implicit_truncation = true;
+
     for (i = 0; i < compile_info->option_count; ++i)
     {
         const struct vkd3d_shader_compile_option *option = &compile_info->options[i];
 
-        if (option->name == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER)
+        switch (option->name)
         {
-            if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR)
-                ctx->matrix_majority = HLSL_MODIFIER_ROW_MAJOR;
-            else if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR)
-                ctx->matrix_majority = HLSL_MODIFIER_COLUMN_MAJOR;
-        }
-        else if (option->name == VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY)
-        {
-            ctx->semantic_compat_mapping = option->value & VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
-        }
-        else if (option->name == VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT)
-        {
-            ctx->child_effect = !!option->value;
+            case VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER:
+                if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR)
+                    ctx->matrix_majority = HLSL_MODIFIER_ROW_MAJOR;
+                else if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR)
+                    ctx->matrix_majority = HLSL_MODIFIER_COLUMN_MAJOR;
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY:
+                ctx->semantic_compat_mapping = option->value & VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT:
+                ctx->child_effect = option->value;
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_WARN_IMPLICIT_TRUNCATION:
+                ctx->warn_implicit_truncation = option->value;
+                break;
+
+            default:
+                break;
         }
     }
 

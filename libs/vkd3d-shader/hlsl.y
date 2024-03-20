@@ -413,7 +413,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
         return NULL;
     }
 
-    if (dst_type->dimx * dst_type->dimy < src_type->dimx * src_type->dimy)
+    if (dst_type->dimx * dst_type->dimy < src_type->dimx * src_type->dimy && ctx->warn_implicit_truncation)
         hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
                 src_type->class == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 

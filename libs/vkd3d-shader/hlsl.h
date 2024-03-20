@@ -925,6 +925,7 @@ struct hlsl_ctx
 
     bool semantic_compat_mapping;
     bool child_effect;
+    bool warn_implicit_truncation;
 };
 
 struct hlsl_resource_load_params

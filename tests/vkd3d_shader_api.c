@@ -1642,6 +1642,57 @@ static void test_emit_signature(void)
     }
 }
 
+static void test_warning_options(void)
+{
+    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
+    struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_compile_option options[1];
+    struct vkd3d_shader_code d3dbc;
+    char *messages;
+    int rc;
+
+    static const char ps_source[] =
+        "float4 main(uniform float4 u) : color\n"
+        "{\n"
+        "    float3 x = u;\n"
+        "    return 0;\n"
+        "}\n";
+
+    hlsl_info.profile = "ps_2_0";
+
+    info.next = &hlsl_info;
+    info.source.code = ps_source;
+    info.source.size = ARRAY_SIZE(ps_source);
+    info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    info.target_type = VKD3D_SHADER_TARGET_D3D_BYTECODE;
+    info.log_level = VKD3D_SHADER_LOG_INFO;
+
+    rc = vkd3d_shader_compile(&info, &d3dbc, &messages);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+    ok(messages, "Expected messages.\n");
+    vkd3d_shader_free_shader_code(&d3dbc);
+    vkd3d_shader_free_messages(messages);
+
+    info.options = options;
+    info.option_count = ARRAY_SIZE(options);
+    options[0].name = VKD3D_SHADER_COMPILE_OPTION_WARN_IMPLICIT_TRUNCATION;
+    options[0].value = 0;
+
+    rc = vkd3d_shader_compile(&info, &d3dbc, &messages);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+    ok(!messages, "Expected no messages.\n");
+    vkd3d_shader_free_shader_code(&d3dbc);
+    vkd3d_shader_free_messages(messages);
+
+    options[0].value = 1;
+
+    rc = vkd3d_shader_compile(&info, &d3dbc, &messages);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+    ok(messages, "Expected messages.\n");
+    vkd3d_shader_free_shader_code(&d3dbc);
+    vkd3d_shader_free_messages(messages);
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -1656,4 +1707,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_build_varying_map);
     run_test(test_scan_combined_resource_samplers);
     run_test(test_emit_signature);
+    run_test(test_warning_options);
 }
