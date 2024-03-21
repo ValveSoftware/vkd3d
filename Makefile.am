@@ -65,6 +65,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/bitwise.shader_test \
 	tests/hlsl/bool-cast.shader_test \
 	tests/hlsl/bool-semantics.shader_test \
+	tests/hlsl/calculate-lod.shader_test \
 	tests/hlsl/cast-64-bit.shader_test \
 	tests/hlsl/cast-broadcast.shader_test \
 	tests/hlsl/cast-componentwise-compatible.shader_test \

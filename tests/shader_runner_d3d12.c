@@ -104,7 +104,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
-    D3D12_SUBRESOURCE_DATA resource_data[2] = {0};
+    D3D12_SUBRESOURCE_DATA resource_data[3] = {0};
     struct d3d12_resource *resource;
     unsigned int buffer_offset = 0;
     D3D12_RESOURCE_STATES state;

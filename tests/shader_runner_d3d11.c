@@ -358,7 +358,7 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
 static void init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
-    D3D11_SUBRESOURCE_DATA resource_data[2];
+    D3D11_SUBRESOURCE_DATA resource_data[3];
     ID3D11Device *device = runner->device;
     D3D11_TEXTURE2D_DESC desc = {0};
     HRESULT hr;
