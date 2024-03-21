@@ -182,6 +182,15 @@ EOF
 
 details=$(awk "$awk_program" "$log_file")
 
+# In case of SIGABRT or SIGSEGV, add tag and print second to last line, containing the
+#   "(core dumped)" message.
+nxt_to_last_line=$(tail -n2 "$log_file" | head -n -1)
+if [ "$tweaked_estatus" -eq 134 ]; then
+  details="$details#   [SIGABRT] <fade>$nxt_to_last_line<reset>"
+elif [ "$tweaked_estatus" -eq 139 ]; then
+  details="$details#   [SIGSEGV] <fade>$nxt_to_last_line<reset>"
+fi
+
 # Count number of [XF] tags.
 xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{printf "%d", count}')
 
@@ -190,6 +199,8 @@ details=$(echo "$details" |\
     sed "s/\[XF\]/$color_yellow[XF]$color_reset/g" |\
     sed "s/\[XP\]/$color_dark_red[XP]$color_reset/g" |\
     sed "s/\[AF\]/$color_bright_purple[AF]$color_reset/g" |\
+    sed "s/\[SIGABRT\]/$color_bright_purple[SIGABRT]$color_reset/g" |\
+    sed "s/\[SIGSEGV\]/$color_bright_purple[SIGSEGV]$color_reset/g" |\
     sed "s/<fade>/$color_fade/g" |\
     sed "s/<reset>/$color_reset/g" |\
     tr '\n' ' ' |\
