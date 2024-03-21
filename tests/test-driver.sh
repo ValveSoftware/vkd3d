@@ -174,7 +174,11 @@ BEGIN {
 }
 
 /: Assertion .* failed\./ {
-    print "[AF]" $0
+    print "#    [AF] <fade>" $0 "<reset>"
+}
+
+/: Aborting, reached unreachable code\./ {
+    print "#   [AF] <fade>" $0 "<reset>"
 }
 
 EOF
