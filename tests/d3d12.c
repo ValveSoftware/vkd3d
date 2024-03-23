@@ -38264,6 +38264,187 @@ static void test_unused_interpolated_input(void)
     destroy_test_context(&context);
 }
 
+static void test_shader_cache(void)
+{
+    ID3D12ShaderCacheSession *session, *session2;
+    D3D12_SHADER_CACHE_SESSION_DESC desc = {0};
+    unsigned int refcount, base_refcount;
+    struct test_context context;
+    ID3D12Device9 *device;
+    IUnknown *unk, *unk2;
+    HRESULT hr;
+
+    static const GUID test_guid
+            = {0xfdb37466, 0x428f, 0x4edf, {0xa3, 0x7f, 0x9b, 0x1d, 0xf4, 0x88, 0xc5, 0xfc}};
+
+    if (!init_test_context(&context, NULL))
+        return;
+
+    hr = ID3D12Device_QueryInterface(context.device, &IID_ID3D12Device9, (void **)&device);
+    ok(hr == S_OK || broken(hr == E_NOINTERFACE), "Got unexpected hr %#x.\n", hr);
+    if (FAILED(hr))
+    {
+        skip("ID3D12Device9 not available, skipping shader cache tests.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
+    base_refcount = get_refcount(device);
+
+    /* The description needs to be non-NULL and have at least the identifier set. */
+    hr = ID3D12Device9_CreateShaderCacheSession(device, NULL, &IID_IUnknown, (void **)&unk);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, NULL, &IID_IUnknown, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, (void **)&unk);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, NULL, (void **)&unk);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    desc.Identifier = test_guid;
+    desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
+    if (0) /* This crashes on Windows. */
+    {
+        hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, NULL, (void **)&unk);
+        ok(0, "Expected to crash, hr %#x.\n", hr);
+    }
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, NULL);
+    ok(hr == S_FALSE, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, NULL, NULL);
+    ok(hr == S_FALSE, "Got unexpected hr %#x.\n", hr);
+
+    /* Default values for sizes and number of entries. */
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_ID3D12ShaderCacheSession,
+            (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    desc = ID3D12ShaderCacheSession_GetDesc(session);
+    ID3D12ShaderCacheSession_Release(session);
+    ok(desc.MaximumInMemoryCacheEntries == 128, "Got MaximumInMemoryCacheEntries %u.\n",
+            desc.MaximumInMemoryCacheEntries);
+    ok(!desc.Flags, "Got Flags %#x.\n", desc.Flags);
+    ok(!desc.Version, "Got Version %"PRId64".\n", desc.Version);
+    ok(desc.MaximumInMemoryCacheSizeBytes == 1024 * 1024, "Got MaximumInMemoryCacheSizeBytes %u.\n",
+            desc.MaximumInMemoryCacheSizeBytes);
+    ok(desc.MaximumValueFileSizeBytes == 128 * 1024 * 1024, "Got MaximumValueFileSizeBytes %u.\n",
+            desc.MaximumValueFileSizeBytes);
+
+    /* A memory size larger than disk size is valid. UINT_MAX is OK for memory size. */
+    memset(&desc, 0, sizeof(desc));
+    desc.Identifier = test_guid;
+    desc.MaximumInMemoryCacheSizeBytes = UINT_MAX;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_ID3D12ShaderCacheSession,
+            (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    desc = ID3D12ShaderCacheSession_GetDesc(session);
+    ID3D12ShaderCacheSession_Release(session);
+    ok(desc.MaximumInMemoryCacheSizeBytes == UINT_MAX, "Got MaximumInMemoryCacheSizeBytes %u.\n",
+            desc.MaximumInMemoryCacheSizeBytes);
+    ok(desc.MaximumValueFileSizeBytes == 128 * 1024 * 1024, "Got MaximumValueFileSizeBytes %u.\n",
+            desc.MaximumValueFileSizeBytes);
+
+    /* MaximumValueFileSizeBytes is limited to 1 GiB regardless of cache type. */
+    desc.MaximumValueFileSizeBytes = 1024 * 1024 * 1024;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_ID3D12ShaderCacheSession,
+            (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ID3D12ShaderCacheSession_Release(session);
+    desc.MaximumValueFileSizeBytes = 1024 * 1024 * 1024 + 1;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_ID3D12ShaderCacheSession,
+            (void **)&session);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    memset(&desc, 0, sizeof(desc));
+    desc.Identifier = test_guid;
+    desc.MaximumValueFileSizeBytes = 1;
+    desc.MaximumInMemoryCacheSizeBytes = 1;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    desc = ID3D12ShaderCacheSession_GetDesc(session);
+    ID3D12ShaderCacheSession_Release(session);
+    ok(desc.MaximumInMemoryCacheSizeBytes == 1, "Got MaximumInMemoryCacheSizeBytes %u.\n",
+            desc.MaximumInMemoryCacheSizeBytes);
+    ok(desc.MaximumValueFileSizeBytes == 1, "Got MaximumValueFileSizeBytes %u.\n",
+            desc.MaximumValueFileSizeBytes);
+
+    /* Invalid flags and mode are rejected. */
+    memset(&desc, 0, sizeof(desc));
+    desc.Identifier = test_guid;
+    desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
+    desc.Flags = 0x1245670;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    desc.Flags = 0;
+    desc.Mode = 9876; /* Same for Mode=2, but 2 is more likely to mean something in the future. */
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    memset(&desc, 0, sizeof(desc));
+    desc.Identifier = test_guid;
+    desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
+    desc.Version = 12344;
+    desc.MaximumInMemoryCacheSizeBytes = 32 * 1024;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, (void **)&unk);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    refcount = get_refcount(device);
+    ok(refcount == base_refcount + 1, "Got unexpected refcount %u.\n", refcount);
+
+    refcount = get_refcount(unk);
+    ok(refcount == 1, "Got unexpected refcount %u.\n", refcount);
+
+    hr = IUnknown_QueryInterface(unk, &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    todo ok((IUnknown *)session != unk, "Expected different interface pointers, got %p for both.\n",
+            session);
+    hr = ID3D12ShaderCacheSession_QueryInterface(session, &IID_IUnknown, (void **)&unk2);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(unk2 == unk, "Got different interface pointers %p and %p.\n", session, unk);
+
+    /* The S_FALSE for CreateSession(session = NULL) does not come from QI. */
+    hr = ID3D12ShaderCacheSession_QueryInterface(session, &IID_IUnknown, NULL);
+    ok(hr == E_POINTER, "Got unexpected hr %#x.\n", hr);
+
+    refcount = get_refcount(unk);
+    ok(refcount == 3, "Got unexpected refcount %u.\n", refcount);
+    refcount = get_refcount(session);
+    ok(refcount == 3, "Got unexpected refcount %u.\n", refcount);
+
+    IUnknown_Release(unk);
+    IUnknown_Release(unk2);
+
+    /* Ad-hoc testing shows that in-memory sessions are per-process. They are not magically
+     * shared between processes. If a disk cache is accessed by two processes, it will fail
+     * with E_INVALIDARG, regardless of version compatibility. */
+    desc.Version = 12345;
+    session2 = (void *)0xdeadbeef;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session2);
+    todo ok(hr == DXGI_ERROR_ALREADY_EXISTS, "Got unexpected hr %#x.\n", hr);
+    todo ok(!session2, "Got unexpected pointer %p.\n", session2);
+    if (session2)
+        ID3D12ShaderCacheSession_Release(session2);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, NULL);
+    ok(hr == S_FALSE, "NULL outptr: Got hr %#x.\n", hr);
+
+    ID3D12ShaderCacheSession_Release(session);
+
+    refcount = get_refcount(device);
+    ok(refcount == base_refcount, "Got unexpected refcount %u.\n", refcount);
+
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ID3D12ShaderCacheSession_Release(session);
+
+    ID3D12Device9_Release(device);
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -38448,4 +38629,5 @@ START_TEST(d3d12)
     run_test(test_get_resource_tiling);
     run_test(test_hull_shader_punned_array);
     run_test(test_unused_interpolated_input);
+    run_test(test_shader_cache);
 }
