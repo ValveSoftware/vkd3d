@@ -2531,6 +2531,7 @@ struct d3d12_cache_session
 
     struct d3d12_device *device;
     struct vkd3d_private_store private_store;
+    D3D12_SHADER_CACHE_SESSION_DESC desc;
 };
 
 static inline struct d3d12_cache_session *impl_from_ID3D12ShaderCacheSession(ID3D12ShaderCacheSession *iface)
@@ -2676,7 +2677,10 @@ static void STDMETHODCALLTYPE d3d12_cache_session_SetDeleteOnDestroy(ID3D12Shade
 static D3D12_SHADER_CACHE_SESSION_DESC * STDMETHODCALLTYPE d3d12_cache_session_GetDesc(
         ID3D12ShaderCacheSession *iface, D3D12_SHADER_CACHE_SESSION_DESC *desc)
 {
-    FIXME("stub %p!\n", iface);
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p.\n", iface);
+    *desc = session->desc;
     return desc;
 }
 
@@ -2707,6 +2711,14 @@ static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
 
     session->ID3D12ShaderCacheSession_iface.lpVtbl = &d3d12_cache_session_vtbl;
     session->refcount = 1;
+    session->desc = *desc;
+
+    if (!session->desc.MaximumValueFileSizeBytes)
+        session->desc.MaximumValueFileSizeBytes = 128 * 1024 * 1024;
+    if (!session->desc.MaximumInMemoryCacheSizeBytes)
+        session->desc.MaximumInMemoryCacheSizeBytes = 1024 * 1024;
+    if (!session->desc.MaximumInMemoryCacheEntries)
+        session->desc.MaximumInMemoryCacheEntries = 128;
 
     if (FAILED(hr = vkd3d_private_store_init(&session->private_store)))
         return hr;
@@ -4829,9 +4841,39 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateShaderCacheSession(ID3D12Dev
 {
     struct d3d12_device *device = impl_from_ID3D12Device9(iface);
     struct d3d12_cache_session *object;
+    static const GUID guid_null = {0};
     HRESULT hr;
 
+    static const UINT valid_flags = D3D12_SHADER_CACHE_FLAG_DRIVER_VERSIONED
+            | D3D12_SHADER_CACHE_FLAG_USE_WORKING_DIR;
+
     TRACE("iface %p, desc %p, iid %s, session %p.\n", iface, desc, debugstr_guid(iid), session);
+
+    if (!desc || !memcmp(&desc->Identifier, &guid_null, sizeof(desc->Identifier)))
+    {
+        WARN("No description or identifier, returning E_INVALIDARG.\n");
+        return E_INVALIDARG;
+    }
+    if (desc->MaximumValueFileSizeBytes > 1024 * 1024 * 1024)
+    {
+        WARN("Requested size is larger than 1GiB, returning E_INVALIDARG.\n");
+        return E_INVALIDARG;
+    }
+    if (desc->Flags & ~valid_flags)
+    {
+        WARN("Invalid flags %#x, returning E_INVALIDARG.\n", desc->Flags);
+        return E_INVALIDARG;
+    }
+    if (desc->Mode != D3D12_SHADER_CACHE_MODE_MEMORY && desc->Mode != D3D12_SHADER_CACHE_MODE_DISK)
+    {
+        WARN("Invalid mode %#x, returning E_INVALIDARG.\n", desc->Mode);
+        return E_INVALIDARG;
+    }
+    if (!session)
+    {
+        WARN("No output pointer, returning S_FALSE.\n");
+        return S_FALSE;
+    }
 
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
