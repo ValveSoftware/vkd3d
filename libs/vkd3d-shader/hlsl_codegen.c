@@ -3834,6 +3834,22 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
     }
 }
 
+static void deref_mark_last_read(struct hlsl_deref *deref, unsigned int last_read)
+{
+    unsigned int i;
+
+    if (hlsl_deref_is_lowered(deref))
+    {
+        if (deref->rel_offset.node)
+            deref->rel_offset.node->last_read = last_read;
+    }
+    else
+    {
+        for (i = 0; i < deref->path_len; ++i)
+            deref->path[i].node->last_read = last_read;
+    }
+}
+
 /* Compute the earliest and latest liveness for each variable. In the case that
  * a variable is accessed inside of a loop, we promote its liveness to extend
  * to at least the range of the entire loop. We also do this for nodes, so that
@@ -3862,8 +3878,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             if (!var->first_write)
                 var->first_write = loop_first ? min(instr->index, loop_first) : instr->index;
             store->rhs.node->last_read = last_read;
-            if (store->lhs.rel_offset.node)
-                store->lhs.rel_offset.node->last_read = last_read;
+            deref_mark_last_read(&store->lhs, last_read);
             break;
         }
         case HLSL_IR_EXPR:
@@ -3890,8 +3905,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = load->src.var;
             var->last_read = max(var->last_read, last_read);
-            if (load->src.rel_offset.node)
-                load->src.rel_offset.node->last_read = last_read;
+            deref_mark_last_read(&load->src, last_read);
             break;
         }
         case HLSL_IR_LOOP:
@@ -3908,14 +3922,12 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = load->resource.var;
             var->last_read = max(var->last_read, last_read);
-            if (load->resource.rel_offset.node)
-                load->resource.rel_offset.node->last_read = last_read;
+            deref_mark_last_read(&load->resource, last_read);
 
             if ((var = load->sampler.var))
             {
                 var->last_read = max(var->last_read, last_read);
-                if (load->sampler.rel_offset.node)
-                    load->sampler.rel_offset.node->last_read = last_read;
+                deref_mark_last_read(&load->sampler, last_read);
             }
 
             if (load->coords.node)
@@ -3940,8 +3952,7 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = store->resource.var;
             var->last_read = max(var->last_read, last_read);
-            if (store->resource.rel_offset.node)
-                store->resource.rel_offset.node->last_read = last_read;
+            deref_mark_last_read(&store->resource, last_read);
             store->coords.node->last_read = last_read;
             store->value.node->last_read = last_read;
             break;
@@ -5449,6 +5460,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     lower_ir(ctx, validate_nonconstant_vector_store_derefs, body);
+
+    do
+        compute_liveness(ctx, entry_func);
+    while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     /* TODO: move forward, remove when no longer needed */
     transform_derefs(ctx, replace_deref_path_with_offset, body);
