@@ -2614,12 +2614,12 @@ static void write_sm1_swizzle(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer
     write_sm1_instruction(ctx, buffer, &sm1_instr);
 }
 
-static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_function_decl *entry_func)
+static void write_sm1_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_block *block)
 {
     const struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, &entry_func->body.instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         if (instr->data_type)
         {
@@ -2680,7 +2680,7 @@ int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     write_sm1_constant_defs(ctx, &buffer);
     write_sm1_semantic_dcls(ctx, &buffer);
     write_sm1_sampler_dcls(ctx, &buffer);
-    write_sm1_instructions(ctx, &buffer, entry_func);
+    write_sm1_block(ctx, &buffer, &entry_func->body);
 
     put_u32(&buffer, D3DSIO_END);
 
