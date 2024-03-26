@@ -1,0 +1,99 @@
+% Unlike assignment syntax, only these names are allowed.
+% The parameter count is also checked.
+[pixel shader todo]
+sampler sam
+{
+    SetBlendState(foo, bar, baz);      // 3 parameters
+    SetDepthStencilState(foo, 2);      // 2 parameters
+    SetRasterizerState(foo);           // 1 parameter
+    SetVertexShader(vs);               // 1 parameter
+    SetDomainShader(ds);               // 1 paramter
+    SetHullShader(100);                // 1 parameter
+    SetGeometryShader(foo + bar);      // 1 parameter
+    SetPixelShader(ps1);               // 1 parameter
+    SetComputeShader("random string"); // 1 parameter
+    OMSetRenderTargets(RTV0, RTV1, RTV2, RTV3, RTV4, RTV5, RTV6, RTV7, DSV); // 2 to 9 parameters
+};
+
+float4 main() : sv_target { return 0; }
+
+
+[pixel shader fail(sm<6)]
+sampler sam
+{
+    SetSomeotherState();
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% It is allowed to use functions together with assignment syntax.
+[pixel shader todo]
+sampler sam
+{
+    SetDepthStencilState(foo, bar);
+    arbitrary_field = 42;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Test complex expression on the arguments, including function calls.
+[pixel shader todo]
+float4 addition(float4 a, float4 b)
+{
+    return a + b;
+}
+
+sampler sam
+{
+    SetBlendState(addition(foo, bar), p + q, p / q);
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Test the same thing on technique passes
+[pixel shader todo]
+technique tech1
+{
+    pass pass1
+    {
+        SetBlendState(foo, bar, baz);
+        SetDepthStencilState(foo, 2);
+        SetRasterizerState(foo);
+        SetVertexShader(vs);
+    }
+}
+
+float4 main() : sv_target { return 0; }
+
+
+% It is not allowed to call the functions to set state blocks on the rhs using the assignment syntax
+% for state groups or passes.
+[pixel shader fail(sm<6)]
+float4 main() : sv_target { return 0; }
+
+technique
+{
+    pass
+    {
+        cat = SetPixelShader(foobar);
+    }
+}
+
+
+% It not allowed to call the functions to set states outside state blocks or passes.
+[pixel shader fail]
+DepthStencilState dss1
+{
+    DepthEnable = false;
+    DepthWriteMask = Zero;
+    DepthFunc = Less;
+};
+
+float4 main() : sv_target
+{
+    SetDepthStencilState(NULL, dss1);
+    return 0;
+}
