@@ -75,7 +75,7 @@ float main() : sv_target
 shader model >= 3.0
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 uniform float a;
 
 float4 main() : sv_target
@@ -87,14 +87,14 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float -2
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1, 2, 3, 4)
 uniform 0 float 10
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (10, 20, 30, 40)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 uniform float4 u;
 
 float4 main() : sv_target
@@ -108,7 +108,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.9, 0.8, 0.7, 0.6)
 
 [pixel shader]
@@ -129,7 +129,7 @@ todo(glsl) draw quad
 probe all rgba (9.0, 10.0, 11.0, 12.0)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 int a, b;
 
 float4 main() : sv_target
@@ -145,23 +145,23 @@ if(sm<4)  uniform 0 float 8
 if(sm<4)  uniform 4 float 9
 if(sm>=4) uniform 0 int 8
 if(sm>=4) uniform 1 int 9
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-1.0, -1.0, -1.0, -1.0)
 if(sm<4)  uniform 0 float -3
 if(sm<4)  uniform 4 float -4
 if(sm>=4) uniform 0 int -3
 if(sm>=4) uniform 1 int -4
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 if(sm<4)  uniform 0 float 7
 if(sm<4)  uniform 4 float 7
 if(sm>=4) uniform 0 int 7
 if(sm>=4) uniform 1 int 7
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 int a, b;
 
 float4 main() : sv_target
@@ -177,23 +177,23 @@ if(sm<4)  uniform 0 float 8
 if(sm<4)  uniform 4 float 9
 if(sm>=4) uniform 0 int 8
 if(sm>=4) uniform 1 int 9
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-1.0, -1.0, -1.0, -1.0)
 if(sm<4)  uniform 0 float -3
 if(sm<4)  uniform 4 float -4
 if(sm>=4) uniform 0 int -3
 if(sm>=4) uniform 1 int -4
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 if(sm<4)  uniform 0 float 7
 if(sm<4)  uniform 4 float 7
 if(sm>=4) uniform 0 int 7
 if(sm>=4) uniform 1 int 7
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-1.0, -1.0, -1.0, -1.0)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 int a, b;
 
 float4 main() : sv_target
@@ -209,13 +209,13 @@ if(sm<4)  uniform 0 float -3
 if(sm<4)  uniform 4 float -2
 if(sm>=4) uniform 0 int -3
 if(sm>=4) uniform 1 int -2
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-1.0, -1.0, -1.0, -1.0)
 if(sm<4)  uniform 0 float 4
 if(sm<4)  uniform 4 float 4
 if(sm>=4) uniform 0 int 4
 if(sm>=4) uniform 1 int 4
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 
 

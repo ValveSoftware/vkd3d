@@ -1813,6 +1813,7 @@ static uint32_t sm1_encode_register_type(D3DSHADER_PARAM_REGISTER_TYPE type)
 struct sm1_instruction
 {
     D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode;
+    unsigned int flags;
 
     struct sm1_dst_register
     {
@@ -1851,6 +1852,8 @@ static void write_sm1_instruction(struct hlsl_ctx *ctx, struct vkd3d_bytecode_bu
 {
     uint32_t token = instr->opcode;
     unsigned int i;
+
+    token |= VKD3D_SM1_INSTRUCTION_FLAGS_MASK & (instr->flags << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT);
 
     if (ctx->profile->major_version > 1)
         token |= (instr->has_dst + instr->src_count) << D3DSI_INSTLENGTH_SHIFT;
@@ -2414,6 +2417,49 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     }
 }
 
+static void write_sm1_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_block *block);
+
+static void write_sm1_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+    const struct hlsl_ir_node *condition;
+    struct sm1_instruction sm1_ifc, sm1_else, sm1_endif;
+
+    condition = iff->condition.node;
+    assert(condition->data_type->dimx == 1 && condition->data_type->dimy == 1);
+
+    sm1_ifc = (struct sm1_instruction)
+    {
+        .opcode = D3DSIO_IFC,
+        .flags = VKD3D_SHADER_REL_OP_NE, /* Make it a "if_ne" instruction. */
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].swizzle = hlsl_swizzle_from_writemask(condition->reg.writemask),
+        .srcs[0].reg = condition->reg.id,
+        .srcs[0].mod = 0,
+
+        .srcs[1].type = D3DSPR_TEMP,
+        .srcs[1].swizzle = hlsl_swizzle_from_writemask(condition->reg.writemask),
+        .srcs[1].reg = condition->reg.id,
+        .srcs[1].mod = D3DSPSM_NEG,
+
+        .src_count = 2,
+    };
+    write_sm1_instruction(ctx, buffer, &sm1_ifc);
+    write_sm1_block(ctx, buffer, &iff->then_block);
+
+    if (!list_empty(&iff->else_block.instrs))
+    {
+        sm1_else = (struct sm1_instruction){.opcode = D3DSIO_ELSE};
+        write_sm1_instruction(ctx, buffer, &sm1_else);
+        write_sm1_block(ctx, buffer, &iff->else_block);
+    }
+
+    sm1_endif = (struct sm1_instruction){.opcode = D3DSIO_ENDIF};
+    write_sm1_instruction(ctx, buffer, &sm1_endif);
+}
+
 static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
@@ -2641,6 +2687,13 @@ static void write_sm1_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
             case HLSL_IR_EXPR:
                 write_sm1_expr(ctx, buffer, instr);
+                break;
+
+            case HLSL_IR_IF:
+                if (hlsl_version_ge(ctx, 2, 1))
+                    write_sm1_if(ctx, buffer, instr);
+                else
+                    hlsl_fixme(ctx, &instr->loc, "Flatten \"if\" conditionals branches.");
                 break;
 
             case HLSL_IR_JUMP:
