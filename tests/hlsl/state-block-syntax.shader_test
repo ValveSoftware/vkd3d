@@ -171,3 +171,454 @@ float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 probe all rgba (0, 1, 0, 1)
+
+
+% Arbitrary names are allowed in the lhs of state block entries.
+[pixel shader]
+sampler sam
+{
+    Foobar = 3;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Undefined identifiers are allowed in state blocks.
+[pixel shader]
+sampler sam
+{
+    Filter = arbitrary_identifier;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks can be empty
+[pixel shader todo]
+sampler sams[2]
+{
+    {
+    },
+    {
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Multiple state blocks for array variables, as a list, are a thing.
+[pixel shader todo]
+sampler sams[2]
+{
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Multiple state blocks for multi-component variables, as a list, are a thing.
+[pixel shader todo]
+float2 val
+{
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% The number of state blocks in the state block list must match the number of components.
+[pixel shader fail(sm<6)]
+sampler sams[2]
+{
+    {
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail(sm<6)]
+sampler sams[2][2]
+{
+    {
+    },
+    {
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+[pixel shader fail(sm<6)]
+float2 arr[2]
+{
+    {
+    },
+    {
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+[pixel shader todo]
+float3 arr[2]
+{
+    {
+    },
+    {
+    },
+    {
+    },
+    {
+    },
+    {
+    },
+    {
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+[pixel shader fail(sm<6)]
+sampler sams[2]
+{
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    }, //  trailing comma not allowed.
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Multiple state blocks for multi-dimensional array variables are a thing.
+[pixel shader todo]
+sampler sams[2][2]
+{
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    },
+    {
+        Filter = ANISOTROPIC;
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks cannot be nested further than one level, regardless of multi-dimensionality.
+[pixel shader fail(sm<6)]
+sampler sams[2][2]
+{
+    {
+        {
+            Filter = ANISOTROPIC;
+        },
+        {
+            Filter = ANISOTROPIC;
+        }
+    },
+    {
+        {
+            Filter = ANISOTROPIC;
+        },
+        {
+            Filter = ANISOTROPIC;
+        }
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Variables of 1 component can still use a single state block without the need to put it inside a list.
+[pixel shader]
+sampler sams[1]
+{
+    Filter = ANISOTROPIC;
+};
+
+float4 main() : sv_target { return 0; }
+
+[pixel shader todo]
+sampler sam
+{
+    {
+        Filter = ANISOTROPIC;
+    }
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% It is possible to declare an empty state block
+[pixel shader]
+float f
+{
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State block entries may have indexes.
+[pixel shader todo]
+sampler sam
+{
+    dogs[3] = 5;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State block entry indexes can only be integers, not even constant expressions are allowed.
+[pixel shader fail(sm<6)]
+sampler sam
+{
+    dogs[3 + 4] = 10;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State block entry indexes can not be negative integers.
+[pixel shader fail(sm<6)]
+sampler sam
+{
+    dogs[-2] = 10;
+};
+
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail(sm<6)]
+static const int a = 5;
+
+sampler sam
+{
+    dogs[a] = 5;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks may have bracket initializers on the rhs.
+[pixel shader todo]
+sampler sam
+{
+    MaxAnisotropy = 3;
+    cat = {1, 2, {3, "string"}};
+    dogs[3] = {1, {2, {4}}, 3, any_identifier};
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Even though using undefined identifiers is allowed, calls to undefined functions are not.
+[pixel shader fail(sm<6)]
+sampler sam
+{
+    cat = fun();
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% PixelShader and VertexShader are valid identifiers for the lhs
+[pixel shader todo]
+sampler sam
+{
+    pixelShader = 20;
+    PixelShader = 25;
+    VertexShader = 30;
+    vertexshader = 35;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for numeric types.
+[pixel shader]
+float f
+{
+    MaxAnisotropy = 3;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for texture types.
+[pixel shader]
+Texture2D tex
+{
+    MaxAnisotropy = 3;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Same rules apply for technique passes
+[pixel shader todo]
+technique
+{
+    pass
+    {
+        cat = {1, 2, {3, "string"}};
+        dogs[3] = {1, {2, {4}}, 3, any_identifier};
+    }
+}
+
+float4 main() : sv_target { return 0; }
+
+
+% Multi-dimensional arrays on the lhs on state blocks are syntax errors.
+[pixel shader fail(sm<6)]
+sampler sam
+{
+    dogs[1][1] = 1;
+};
+
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail(sm<6)]
+technique
+{
+    pass
+    {
+        dogs[1][1] = 1;
+    }
+}
+
+float4 main() : sv_target { return 0; }
+
+
+% Test complex expression on the rhs, including function calls.
+[pixel shader]
+float4 addition(float4 a, float4 b)
+{
+    return a + b;
+}
+
+sampler sam
+{
+    cat = addition(foo, bar) + p * q;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for DepthStencilState
+[pixel shader todo]
+DepthStencilState dss1
+{
+    DepthEnable = false;
+    DepthWriteMask = Zero;
+    DepthFunc = Less;
+    random_field = 12;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for BlendState.
+[pixel shader todo]
+BlendState bs1
+{
+    random_field = 1;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for VertexShader and PixelShader
+[pixel shader]
+PixelShader ps1
+{
+    random_field = 1;
+};
+
+VertexShader vs1
+{
+    random_field = 1;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% State blocks are valid for RasterizerState
+[pixel shader todo]
+RasterizerState rs
+{
+    random_field = 1;
+};
+
+float4 main() : sv_target { return 0; }
+
+
+% Undefined identifiers cannot be indexed.
+[pixel shader fail(sm<6)]
+float4 main() : sv_target { return 0; }
+
+DepthStencilState dss1
+{
+    RandomField = foobar[2];
+};
+
+
+% Undefined identifiers can be swizzled with .x which proves that they are considered scalar
+[pixel shader todo]
+float4 main() : sv_target { return 0; }
+
+DepthStencilState dss1
+{
+    RandomField = foobar.x;
+};
+
+[pixel shader fail(sm<6)]
+float4 main() : sv_target { return 0; }
+
+DepthStencilState dss1
+{
+    RandomField = foobar.y;
+};
+
+
+% The type of previously defined variables is respected, but array indexes are not checked.
+[pixel shader todo]
+float4 arr[3];
+
+float4 main() : sv_target { return 0; }
+
+DepthStencilState dss1
+{
+    RandomField = arr[90];
+};
+
+
+% The type of previously defined variables is respected, and swizzles are checked.
+[pixel shader fail(sm<6)]
+float3 vec;
+
+float4 main() : sv_target { return 0; }
+
+DepthStencilState dss1
+{
+    RandomField = vec.w;
+};
