@@ -1,0 +1,39 @@
+% Test complex effect groups syntax
+[pixel shader fail(sm>=6) todo]
+fxgroup group1
+{
+    technique10
+    {
+        pass
+        {
+            TurboEncabulator = prefabulated + aluminite;
+            malleable = logarithmic - casing;
+        }
+        pass pass1
+        {
+            spurving_bearings = pentametric_fan;
+            hydrocoptic = marzlevanes;
+        }
+    }
+    technique11 tech1
+    {
+        pass
+        {
+            Lunar = Waneshaft;
+        }
+    }
+}
+
+float4 main() : sv_target { return 0; }
+
+
+% Effect groups cannot have a "technique" without version
+[pixel shader fail]
+fxgroup group1
+{
+    technique
+    {
+    }
+}
+
+float4 main() : sv_target { return 0; }
