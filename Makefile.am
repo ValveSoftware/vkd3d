@@ -91,6 +91,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/distance.shader_test \
 	tests/hlsl/dot.shader_test \
 	tests/hlsl/duplicate-modifiers.shader_test \
+	tests/hlsl/effect-compile.shader_test \
 	tests/hlsl/effect-shader-objects-fx_2.shader_test \
 	tests/hlsl/effect-shader-objects-fx_5.shader_test \
 	tests/hlsl/effect-technique-fx_2.shader_test \
