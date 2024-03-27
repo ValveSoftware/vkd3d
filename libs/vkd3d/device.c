@@ -2529,11 +2529,16 @@ struct d3d12_cache_session
     ID3D12ShaderCacheSession ID3D12ShaderCacheSession_iface;
     unsigned int refcount;
 
+    struct list cache_list_entry;
+
     struct d3d12_device *device;
     struct vkd3d_private_store private_store;
     D3D12_SHADER_CACHE_SESSION_DESC desc;
     struct vkd3d_shader_cache *cache;
 };
+
+static struct vkd3d_mutex cache_list_mutex = VKD3D_MUTEX_INITIALIZER;
+static struct list cache_list = LIST_INIT(cache_list);
 
 static inline struct d3d12_cache_session *impl_from_ID3D12ShaderCacheSession(ID3D12ShaderCacheSession *iface)
 {
@@ -2582,6 +2587,10 @@ static void d3d12_cache_session_destroy(struct d3d12_cache_session *session)
     struct d3d12_device *device = session->device;
 
     TRACE("Destroying cache session %p.\n", session);
+
+    vkd3d_mutex_lock(&cache_list_mutex);
+    list_remove(&session->cache_list_entry);
+    vkd3d_mutex_unlock(&cache_list_mutex);
 
     vkd3d_shader_cache_decref(session->cache);
     vkd3d_private_store_destroy(&session->private_store);
@@ -2709,12 +2718,14 @@ static const struct ID3D12ShaderCacheSessionVtbl d3d12_cache_session_vtbl =
 static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
         struct d3d12_device *device, const D3D12_SHADER_CACHE_SESSION_DESC *desc)
 {
+    struct d3d12_cache_session *i;
     enum vkd3d_result ret;
     HRESULT hr;
 
     session->ID3D12ShaderCacheSession_iface.lpVtbl = &d3d12_cache_session_vtbl;
     session->refcount = 1;
     session->desc = *desc;
+    session->cache = NULL;
 
     if (!session->desc.MaximumValueFileSizeBytes)
         session->desc.MaximumValueFileSizeBytes = 128 * 1024 * 1024;
@@ -2726,20 +2737,56 @@ static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
     if (FAILED(hr = vkd3d_private_store_init(&session->private_store)))
         return hr;
 
-    if (session->desc.Mode == D3D12_SHADER_CACHE_MODE_DISK)
-        FIXME("Disk caches are not yet implemented.\n");
+    vkd3d_mutex_lock(&cache_list_mutex);
 
-    ret = vkd3d_shader_open_cache(&session->cache);
-    if (ret)
+    /* We expect the number of open caches to be small. */
+    LIST_FOR_EACH_ENTRY(i, &cache_list, struct d3d12_cache_session, cache_list_entry)
     {
-        WARN("Failed to open shader cache.\n");
-        vkd3d_private_store_destroy(&session->private_store);
-        return hresult_from_vkd3d_result(ret);
+        if (!memcmp(&i->desc.Identifier, &desc->Identifier, sizeof(desc->Identifier)))
+        {
+            TRACE("Found an existing cache %p from session %p.\n", i->cache, i);
+            if (desc->Version == i->desc.Version)
+            {
+                session->desc = i->desc;
+                vkd3d_shader_cache_incref(session->cache = i->cache);
+                break;
+            }
+            else
+            {
+                WARN("version mismatch: Existing %"PRIu64" new %"PRIu64".\n",
+                        i->desc.Version, desc->Version);
+                hr = DXGI_ERROR_ALREADY_EXISTS;
+                goto error;
+            }
+        }
     }
 
+    if (!session->cache)
+    {
+        if (session->desc.Mode == D3D12_SHADER_CACHE_MODE_DISK)
+            FIXME("Disk caches are not yet implemented.\n");
+
+        ret = vkd3d_shader_open_cache(&session->cache);
+        if (ret)
+        {
+            WARN("Failed to open shader cache.\n");
+            hr = hresult_from_vkd3d_result(ret);
+            goto error;
+        }
+    }
+
+    /* Add it to the list even if we reused an existing cache. The other session might be destroyed,
+     * but the cache stays alive and can be opened a third time. */
+    list_add_tail(&cache_list, &session->cache_list_entry);
     d3d12_device_add_ref(session->device = device);
 
+    vkd3d_mutex_unlock(&cache_list_mutex);
     return S_OK;
+
+error:
+    vkd3d_private_store_destroy(&session->private_store);
+    vkd3d_mutex_unlock(&cache_list_mutex);
+    return hr;
 }
 
 /* ID3D12Device */
@@ -4888,6 +4935,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateShaderCacheSession(ID3D12Dev
         WARN("No output pointer, returning S_FALSE.\n");
         return S_FALSE;
     }
+    *session = NULL;
 
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;

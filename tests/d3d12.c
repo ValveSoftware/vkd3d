@@ -38477,10 +38477,8 @@ static void test_shader_cache(void)
     session2 = (void *)0xdeadbeef;
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
             &IID_ID3D12ShaderCacheSession, (void **)&session2);
-    todo ok(hr == DXGI_ERROR_ALREADY_EXISTS, "Got unexpected hr %#x.\n", hr);
-    todo ok(!session2, "Got unexpected pointer %p.\n", session2);
-    if (session2)
-        ID3D12ShaderCacheSession_Release(session2);
+    ok(hr == DXGI_ERROR_ALREADY_EXISTS, "Got unexpected hr %#x.\n", hr);
+    ok(!session2, "Got unexpected pointer %p.\n", session2);
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_IUnknown, NULL);
     ok(hr == S_FALSE, "NULL outptr: Got hr %#x.\n", hr);
 
@@ -38489,9 +38487,16 @@ static void test_shader_cache(void)
     refcount = get_refcount(device);
     ok(refcount == base_refcount, "Got unexpected refcount %u.\n", refcount);
 
+    /* Create two sessions with the same cache GUID. */
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
             &IID_ID3D12ShaderCacheSession, (void **)&session);
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session2);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(session2 != session, "Expected different interface pointers, got %p for both.\n",
+            session);
+    ID3D12ShaderCacheSession_Release(session2);
     ID3D12ShaderCacheSession_Release(session);
 
     ID3D12Device9_Release(device);
