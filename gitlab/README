@@ -8,7 +8,22 @@ the vkd3d tests on each merge request.
 The CI target image-linux, in the file image.yml, builds a Docker
 image based on Debian bookworm with all the packages required for
 testing, and uploads it to the GitLab container registry. The Docker
-script is in the file image.docker.
+script is in the file image.docker. Most of the dependencies are
+installed directly from the Debian repositories, with a few
+exceptions:
+
+ * widl is compiled from Wine sources, because installing it from the
+   Debian repositories would carry all the rest of Wine and make the
+   Docker image quite larger;
+
+ * SPIRV-Tools are recompiled from sources, because the packages in
+   Debian do not ship shared objects and are not multiarch-compatible;
+   in order to make the packages multiarch-compatible, the utilities
+   are dropped (they're not used by the CI anyway);
+
+ * llvmpipe from Mesa 24.0.1 is compiled (in addition to version
+   22.3.6 available in Debian bookworm), because some Vulkan features
+   required by vkd3d are not available in Mesa 22.3.6.
 
 The file build.yml contains the actual testing targets. Currently
 vkd3d is tested on Linux, on x86-64 and i386, each architecture with

@@ -23,6 +23,8 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     apt-get install -y build-essential pkg-config gcc-mingw-w64 crossbuild-essential-i386 \
                        autoconf automake libtool flex bison curl \
                        git ca-certificates rsync \
+                       llvm-15-dev meson ninja-build python3-mako \
+                       zlib1g-dev libexpat-dev libdrm-dev libglvnd-dev \
                        doxygen doxygen-latex graphviz \
                        mesa-vulkan-drivers mesa-vulkan-drivers:i386 \
                        vulkan-tools spirv-headers \
@@ -36,6 +38,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
                        libxcb-keysyms1-dev libxcb-keysyms1-dev:i386 && \
     apt-get build-dep -y spirv-tools && \
     apt-get build-dep -y -ai386 spirv-tools && \
+
     git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git && \
     cd wine && \
     mkdir build && \
@@ -45,6 +48,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     cp tools/widl/widl /usr/local/bin && \
     cd ../.. && \
     rm -rf wine && \
+
     apt-get source spirv-tools && \
     cd spirv-tools-* && \
     sed -i -e 's|-DBUILD_SHARED_LIBS=OFF|-DBUILD_SHARED_LIBS=ON|g' debian/rules && \
@@ -55,6 +59,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     rm -f spirv-tools-dbgsym_*.deb && \
     dpkg -i spirv-tools_*.deb && \
     rm -fr * && \
+
     apt-get source spirv-tools && \
     cd spirv-tools-* && \
     sed -i -e 's|-DBUILD_SHARED_LIBS=OFF|-DBUILD_SHARED_LIBS=ON|g' debian/rules && \
@@ -65,6 +70,16 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     rm -f spirv-tools-dbgsym_*.deb && \
     dpkg -i spirv-tools_*.deb && \
     rm -fr * && \
+
+    git clone --depth 1 --branch mesa-24.0.3 https://gitlab.freedesktop.org/mesa/mesa.git && \
+    cd mesa && \
+    mkdir build && \
+    cd build && \
+    meson setup -Dprefix=/opt/mesa24 -Dplatforms= -Dvideo-codecs= -Dvulkan-drivers=swrast -Dgallium-drivers=swrast -Dopengl=true -Degl=enabled -Dglvnd=true -Dshared-glapi=enabled -Dglx=disabled -Dgles1=disabled -Dgles2=disabled .. && \
+    meson install && \
+    cd ../.. && \
+    rm -fr mesa && \
+
     apt-get clean && \
     curl -L -s https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2308/linux_dxc_2023_08_14.x86_64.tar.gz | tar zx -C /usr/local ./lib/libdxcompiler.so ./lib/libdxil.so && \
     groupadd host-render -g 800 && \
