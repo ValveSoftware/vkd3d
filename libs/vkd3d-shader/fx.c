@@ -1038,7 +1038,8 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     put_u32(buffer, bind_point); /* Bind point */
 
     put_u32(buffer, 0); /* Annotations count */
-    /* FIXME: write annotations */
+    if (b->annotations)
+        hlsl_fixme(ctx, &b->loc, "Writing annotations for buffers is not implemented.");
 
     count = 0;
     size = 0;

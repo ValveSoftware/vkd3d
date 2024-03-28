@@ -2031,7 +2031,8 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 }
 
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
-        uint32_t modifiers, const struct hlsl_reg_reservation *reservation, const struct vkd3d_shader_location *loc)
+        uint32_t modifiers, const struct hlsl_reg_reservation *reservation, struct hlsl_scope *annotations,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_buffer *buffer;
 
@@ -2042,6 +2043,7 @@ struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type 
     buffer->modifiers = modifiers;
     if (reservation)
         buffer->reservation = *reservation;
+    buffer->annotations = annotations;
     buffer->loc = *loc;
     list_add_tail(&ctx->buffers, &buffer->entry);
     return buffer;
@@ -3586,10 +3588,10 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
     list_init(&ctx->buffers);
 
     if (!(ctx->globals_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
-            hlsl_strdup(ctx, "$Globals"), 0, NULL, &ctx->location)))
+            hlsl_strdup(ctx, "$Globals"), 0, NULL, NULL, &ctx->location)))
         return false;
     if (!(ctx->params_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
-            hlsl_strdup(ctx, "$Params"), 0, NULL, &ctx->location)))
+            hlsl_strdup(ctx, "$Params"), 0, NULL, NULL, &ctx->location)))
         return false;
     ctx->cur_buffer = ctx->globals_buffer;
 

@@ -16,6 +16,24 @@ uniform 0 float4 1.0 2.0 3.0 4.0
 todo(glsl) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
+[pixel shader fail(sm>=6)]
+// Annotations
+cbuffer cb : register(b1) < int i = 1; >
+{
+    float4 m1;
+};
+
+cbuffer cb < int i = 2; >
+{
+    float4 m2;
+};
+
+float4 main() : sv_target
+{
+    return m1 + m2;
+}
+
+
 [pixel shader]
 // Test empty constant buffer.
 cbuffer Constants : register(b1)
