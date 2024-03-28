@@ -11,7 +11,7 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-export LD_LIBRARY_PATH=/usr/local/lib
+export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH-}"
 if ../configure --enable-demos --with-spirv-tools DXCOMPILER_LIBS="-L/usr/local/lib" CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL -DVKD3D_SHADER_UNSUPPORTED_GLSL" && \
         make -j$(nproc) ; then
     make -j$(nproc) AM_COLOR_TESTS=always check || \

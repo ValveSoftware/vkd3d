@@ -61,6 +61,17 @@ build-llvmpipe-32:
     CC: 'i686-linux-gnu-gcc'
     VKD3D_SHADER_CONFIG: 'force_validation'
 
+build-llvmpipe-64-mesa24:
+  extends: .build-linux
+  allow_failure:
+    exit_codes:
+      - 2
+  variables:
+    VK_DRIVER_FILES: '/opt/mesa24/share/vulkan/icd.d/lvp_icd.x86_64.json'
+    LD_LIBRARY_PATH: '/opt/mesa24/lib/x86_64-linux-gnu'
+    __EGL_VENDOR_LIBRARY_FILENAMES: '/opt/mesa24/share/glvnd/egl_vendor.d/50_mesa.json'
+    VKD3D_SHADER_CONFIG: 'force_validation'
+
 build-crosstest:
   stage: build
   rules:
