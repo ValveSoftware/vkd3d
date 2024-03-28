@@ -42,6 +42,7 @@ enum
     OPTION_CHILD_EFFECT,
     OPTION_ENTRY,
     OPTION_FRAGMENT_COORDINATE_ORIGIN,
+    OPTION_INCLUDE_EMPTY_BUFFERS,
     OPTION_MATRIX_STORAGE_ORDER,
     OPTION_OUTPUT,
     OPTION_PRINT_SOURCE_TYPES,
@@ -202,6 +203,9 @@ static void print_usage(const char *program_name)
         "                        targets. Valid values are 'upper-left' (default) and\n"
         "                        'lower-left'. The only value supported by Vulkan\n"
         "                        environments is 'upper-left'.\n"
+        "  --fx-include-empty-buffers\n"
+        "                        Write empty constant buffers descriptions. This option\n"
+        "                        is only meaningful for fx_4_0 and fx_4_1 profiles.\n"
         "  --matrix-storage-order=<order>\n"
         "                        Specify the default matrix storage order. Valid values\n"
         "                        are 'column' (default) and 'row'.\n"
@@ -485,6 +489,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         {"child-effect",               no_argument,       NULL, OPTION_CHILD_EFFECT},
         {"entry",                      required_argument, NULL, OPTION_ENTRY},
         {"fragment-coordinate-origin", required_argument, NULL, OPTION_FRAGMENT_COORDINATE_ORIGIN},
+        {"fx-include-empty-buffers",   no_argument,       NULL, OPTION_INCLUDE_EMPTY_BUFFERS},
         {"matrix-storage-order",       required_argument, NULL, OPTION_MATRIX_STORAGE_ORDER},
         {"output",                     required_argument, NULL, OPTION_OUTPUT},
         {"formatting",                 required_argument, NULL, OPTION_TEXT_FORMATTING},
@@ -557,6 +562,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
             case OPTION_OUTPUT:
             case 'o':
                 options->output_filename = optarg;
+                break;
+
+            case OPTION_INCLUDE_EMPTY_BUFFERS:
+                add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_INCLUDE_EMPTY_BUFFERS_IN_EFFECTS, 1);
                 break;
 
             case OPTION_MATRIX_STORAGE_ORDER:

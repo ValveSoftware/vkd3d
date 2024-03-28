@@ -322,6 +322,14 @@ enum vkd3d_shader_compile_option_name
      * \since 1.12
      */
     VKD3D_SHADER_COMPILE_OPTION_WARN_IMPLICIT_TRUNCATION = 0x0000000c,
+    /**
+     * If \a value is nonzero, empty constant buffers descriptions are
+     * written out in the output effect binary. This option applies only
+     * to fx_4_0 and fx_4_1 profiles and is otherwise ignored.
+     *
+     * \since 1.12
+     */
+    VKD3D_SHADER_COMPILE_OPTION_INCLUDE_EMPTY_BUFFERS_IN_EFFECTS = 0x0000000d,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

@@ -90,6 +90,7 @@ struct fx_write_context
     int status;
 
     bool child_effect;
+    bool include_empty_buffers;
 
     const struct fx_write_context_ops *ops;
 };
@@ -191,6 +192,7 @@ static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_co
     list_init(&fx->types);
 
     fx->child_effect = fx->ops->are_child_effects_supported && ctx->child_effect;
+    fx->include_empty_buffers = version == 4 && ctx->include_empty_buffers;
 
     hlsl_block_init(&block);
     hlsl_prepend_global_uniform_copy(fx->ctx, &block);
@@ -1065,7 +1067,9 @@ static void write_buffers(struct fx_write_context *fx)
 
     LIST_FOR_EACH_ENTRY(buffer, &fx->ctx->buffers, struct hlsl_buffer, entry)
     {
-        if (!buffer->size)
+        if (!buffer->size && !fx->include_empty_buffers)
+            continue;
+        if (!strcmp(buffer->name, "$Params"))
             continue;
 
         write_fx_4_buffer(buffer, fx);

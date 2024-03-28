@@ -3622,6 +3622,10 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
                 ctx->warn_implicit_truncation = option->value;
                 break;
 
+            case VKD3D_SHADER_COMPILE_OPTION_INCLUDE_EMPTY_BUFFERS_IN_EFFECTS:
+                ctx->include_empty_buffers = option->value;
+                break;
+
             default:
                 break;
         }
