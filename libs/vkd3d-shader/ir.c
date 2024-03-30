@@ -127,6 +127,7 @@ static enum vkd3d_result vsir_program_lower_texkills(struct vsir_program *progra
         ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
 
         ins->src[0].reg = texkill_ins->dst[0].reg;
+        ins->src[0].swizzle = VKD3D_SHADER_NO_SWIZZLE;
         vsir_register_init(&ins->src[1].reg, VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
         ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
         ins->src[1].reg.u.immconst_f32[0] = 0.0f;

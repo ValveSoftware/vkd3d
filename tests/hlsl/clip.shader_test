@@ -22,7 +22,7 @@ todo(glsl) draw quad
 probe all rgba (9, 0, 7, 6)
 uniform 0 float4 3 -8 3 0
 todo(glsl) draw quad
-todo(sm<4) probe all rgba (9, 0, 7, 6)
+probe all rgba (9, 0, 7, 6)
 uniform 0 float4 3 3 3 -1
 todo(glsl) draw quad
-todo(sm<4) probe all rgba (9, 0, 7, 6)
+probe all rgba (9, 0, 7, 6)
