@@ -333,3 +333,15 @@ inline float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 probe all rgba (2.0, 3.0, 6.0, 7.0)
+
+% Export modifier
+
+[pixel shader]
+export float4 main() : sv_target
+{
+    return float4(1.0, 2.0, 3.0, 4.0);
+}
+
+[test]
+todo(glsl) draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)

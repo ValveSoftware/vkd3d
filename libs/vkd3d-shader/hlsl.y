@@ -5341,6 +5341,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_DOMAINSHADER
 %token KW_DOUBLE
 %token KW_ELSE
+%token KW_EXPORT
 %token KW_EXTERN
 %token KW_FALSE
 %token KW_FOR
@@ -5969,9 +5970,9 @@ func_prototype_no_attrs:
             /* Functions are unconditionally inlined. */
             modifiers &= ~HLSL_MODIFIER_INLINE;
 
-            if (modifiers & ~HLSL_MODIFIERS_MAJORITY_MASK)
+            if (modifiers & ~(HLSL_MODIFIERS_MAJORITY_MASK | HLSL_MODIFIER_EXPORT))
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Only majority modifiers are allowed on functions.");
+                        "Unexpected modifier used on a function.");
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
             if ((var = hlsl_get_var(ctx->globals, $3)))
@@ -6867,6 +6868,10 @@ var_modifiers:
     | KW_INLINE var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_INLINE, &@1);
+        }
+    | KW_EXPORT var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_EXPORT, &@1);
         }
     | var_identifier var_modifiers
         {
