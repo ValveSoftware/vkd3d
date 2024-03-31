@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "vkd3d_test.h"
+#include "vkd3d_d3d12.h"
 
 struct vec2
 {
