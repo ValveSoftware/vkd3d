@@ -74,6 +74,26 @@ float main() : sv_target
 [require]
 shader model >= 3.0
 
+
+[pixel shader todo(sm<4)]
+uniform float a;
+
+float4 main() : sv_target
+{
+    if (a < 4)
+        return float4(1, 2, 3, 4);
+    return float4(10, 20, 30, 40);
+}
+
+[test]
+uniform 0 float -2
+todo(sm<4 | glsl) draw quad
+probe all rgba (1, 2, 3, 4)
+uniform 0 float 10
+todo(sm<4 | glsl) draw quad
+probe all rgba (10, 20, 30, 40)
+
+
 [pixel shader todo(sm<4)]
 uniform float4 u;
 
@@ -107,3 +127,151 @@ float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 probe all rgba (9.0, 10.0, 11.0, 12.0)
+
+
+[pixel shader todo(sm<4)]
+int a, b;
+
+float4 main() : sv_target
+{
+    if (a < b)
+        return -1.0;
+    else
+        return 1.0;
+}
+
+[test]
+if(sm<4)  uniform 0 float 8
+if(sm<4)  uniform 4 float 9
+if(sm>=4) uniform 0 int 8
+if(sm>=4) uniform 1 int 9
+todo(sm<4 | glsl) draw quad
+probe all rgba (-1.0, -1.0, -1.0, -1.0)
+if(sm<4)  uniform 0 float -3
+if(sm<4)  uniform 4 float -4
+if(sm>=4) uniform 0 int -3
+if(sm>=4) uniform 1 int -4
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+if(sm<4)  uniform 0 float 7
+if(sm<4)  uniform 4 float 7
+if(sm>=4) uniform 0 int 7
+if(sm>=4) uniform 1 int 7
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+[pixel shader todo(sm<4)]
+int a, b;
+
+float4 main() : sv_target
+{
+    if (a <= b)
+        return -1.0;
+    else
+        return 1.0;
+}
+
+[test]
+if(sm<4)  uniform 0 float 8
+if(sm<4)  uniform 4 float 9
+if(sm>=4) uniform 0 int 8
+if(sm>=4) uniform 1 int 9
+todo(sm<4 | glsl) draw quad
+probe all rgba (-1.0, -1.0, -1.0, -1.0)
+if(sm<4)  uniform 0 float -3
+if(sm<4)  uniform 4 float -4
+if(sm>=4) uniform 0 int -3
+if(sm>=4) uniform 1 int -4
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+if(sm<4)  uniform 0 float 7
+if(sm<4)  uniform 4 float 7
+if(sm>=4) uniform 0 int 7
+if(sm>=4) uniform 1 int 7
+todo(sm<4 | glsl) draw quad
+probe all rgba (-1.0, -1.0, -1.0, -1.0)
+
+
+[pixel shader todo(sm<4)]
+int a, b;
+
+float4 main() : sv_target
+{
+    if (a != b)
+        return -1.0;
+    else
+        return 1.0;
+}
+
+[test]
+if(sm<4)  uniform 0 float -3
+if(sm<4)  uniform 4 float -2
+if(sm>=4) uniform 0 int -3
+if(sm>=4) uniform 1 int -2
+todo(sm<4 | glsl) draw quad
+probe all rgba (-1.0, -1.0, -1.0, -1.0)
+if(sm<4)  uniform 0 float 4
+if(sm<4)  uniform 4 float 4
+if(sm>=4) uniform 0 int 4
+if(sm>=4) uniform 1 int 4
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+% Test "if" conditionals, using resource loads to ensure we aren't removing these instruction with optimizations.
+[srv 0]
+size (2d, 2, 2)
+0.0 0.0 0.0 4.0     1.0 0.0 0.0 4.0
+0.0 1.0 0.0 4.0     1.0 1.0 0.0 4.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[pixel shader todo(sm<4)]
+Texture2D tex;
+sampler sam;
+float a;
+
+float4 main() : sv_target
+{
+    if (a < 4)
+        return tex.Sample(sam, float2(0, 0));
+    return float4(1, 2, 3, 4);
+}
+
+[test]
+uniform 0 float -2
+todo(sm<4 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 4.0)
+uniform 0 float 4
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+[pixel shader todo(sm<4)]
+Texture2D tex;
+sampler sam;
+float a;
+
+float4 main() : sv_target
+{
+    if (a >= 2)
+        return tex.Sample(sam, float2(0, 0));
+    else if (a >= 1)
+        return tex.Sample(sam, float2(1, 0));
+    else
+        return tex.Sample(sam, float2(1, 1));
+}
+
+[test]
+uniform 0 float 2
+todo(sm<4 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 4.0)
+uniform 0 float 1
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 0.0, 0.0, 4.0)
+uniform 0 float 0
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 0.0, 4.0)
