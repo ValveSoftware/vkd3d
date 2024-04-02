@@ -5418,13 +5418,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     remove_unreachable_code(ctx, body);
     hlsl_transform_ir(ctx, normalize_switch_cases, body, NULL);
 
-    if (profile-> major_version < 4)
-    {
-        lower_ir(ctx, lower_nonfloat_exprs, body);
-        /* Constants casted to float must be folded. */
-        hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
-    }
-
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
@@ -5439,6 +5432,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_ir(ctx, lower_ternary, body);
     if (profile->major_version < 4)
     {
+        lower_ir(ctx, lower_nonfloat_exprs, body);
+        /* Constants casted to float must be folded, and new casts to bool also need to be lowered. */
+        hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
+        lower_ir(ctx, lower_casts_to_bool, body);
+
         lower_ir(ctx, lower_casts_to_int, body);
         lower_ir(ctx, lower_division, body);
         lower_ir(ctx, lower_sqrt, body);
