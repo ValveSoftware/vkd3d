@@ -4393,106 +4393,6 @@ fail:
     return ret;
 }
 
-enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
-{
-    enum vkd3d_result result = VKD3D_OK;
-
-    remove_dcl_temps(program);
-
-    if ((result = vsir_program_lower_texkills(program)) < 0)
-        return result;
-
-    if (program->shader_version.major >= 6)
-    {
-        struct vsir_cfg cfg;
-
-        if ((result = lower_switch_to_if_ladder(program)) < 0)
-            return result;
-
-        if ((result = vsir_program_materialise_ssas_to_temps(program)) < 0)
-            return result;
-
-        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
-            return result;
-
-        vsir_cfg_compute_dominators(&cfg);
-
-        if ((result = vsir_cfg_compute_loops(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_sort_nodes(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_build_structured_program(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_emit_structured_program(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        vsir_cfg_cleanup(&cfg);
-    }
-    else
-    {
-        if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
-        {
-            if ((result = vsir_program_remap_output_signature(program, compile_info, message_context)) < 0)
-                return result;
-        }
-
-        if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
-        {
-            if ((result = instruction_array_flatten_hull_shader_phases(&program->instructions)) < 0)
-                return result;
-
-            if ((result = instruction_array_normalise_hull_shader_control_point_io(&program->instructions,
-                    &program->input_signature)) < 0)
-                return result;
-        }
-
-        if ((result = vsir_program_normalise_io_registers(program)) < 0)
-            return result;
-
-        if ((result = instruction_array_normalise_flat_constants(program)) < 0)
-            return result;
-
-        remove_dead_code(program);
-
-        if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
-            return result;
-    }
-
-    if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
-        return result;
-
-    if (TRACE_ON())
-        vkd3d_shader_trace(program);
-
-    if ((result = vsir_program_validate(program, config_flags,
-            compile_info->source_name, message_context)) < 0)
-        return result;
-
-    return result;
-}
-
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -5356,4 +5256,104 @@ fail:
     vkd3d_free(ctx.ssas);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
+}
+
+enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
+{
+    enum vkd3d_result result = VKD3D_OK;
+
+    remove_dcl_temps(program);
+
+    if ((result = vsir_program_lower_texkills(program)) < 0)
+        return result;
+
+    if (program->shader_version.major >= 6)
+    {
+        struct vsir_cfg cfg;
+
+        if ((result = lower_switch_to_if_ladder(program)) < 0)
+            return result;
+
+        if ((result = vsir_program_materialise_ssas_to_temps(program)) < 0)
+            return result;
+
+        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
+            return result;
+
+        vsir_cfg_compute_dominators(&cfg);
+
+        if ((result = vsir_cfg_compute_loops(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_sort_nodes(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_build_structured_program(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_emit_structured_program(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        vsir_cfg_cleanup(&cfg);
+    }
+    else
+    {
+        if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+        {
+            if ((result = vsir_program_remap_output_signature(program, compile_info, message_context)) < 0)
+                return result;
+        }
+
+        if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
+        {
+            if ((result = instruction_array_flatten_hull_shader_phases(&program->instructions)) < 0)
+                return result;
+
+            if ((result = instruction_array_normalise_hull_shader_control_point_io(&program->instructions,
+                    &program->input_signature)) < 0)
+                return result;
+        }
+
+        if ((result = vsir_program_normalise_io_registers(program)) < 0)
+            return result;
+
+        if ((result = instruction_array_normalise_flat_constants(program)) < 0)
+            return result;
+
+        remove_dead_code(program);
+
+        if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
+            return result;
+    }
+
+    if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
+        return result;
+
+    if (TRACE_ON())
+        vkd3d_shader_trace(program);
+
+    if ((result = vsir_program_validate(program, config_flags,
+            compile_info->source_name, message_context)) < 0)
+        return result;
+
+    return result;
 }
