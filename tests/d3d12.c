@@ -20302,6 +20302,7 @@ static void test_get_copyable_footprints(void)
         resource_desc1.Format = resource_desc.Format;
         resource_desc1.SampleDesc.Count = resource_desc.SampleDesc.Count;
         resource_desc1.SampleDesc.Quality = resource_desc.SampleDesc.Quality;
+        resource_desc1.Layout = resource_desc.Layout;
         resource_desc1.Flags = resource_desc.Flags;
         memset(&resource_desc1.SamplerFeedbackMipRegion, 0, sizeof(resource_desc1.SamplerFeedbackMipRegion));
         memset(layouts, 0, sizeof(layouts));
