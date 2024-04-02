@@ -9334,6 +9334,7 @@ static void spirv_compiler_emit_resinfo(struct spirv_compiler *compiler,
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t type_id, lod_id, val_id, miplevel_count_id;
+    enum vkd3d_shader_component_type component_type;
     uint32_t constituents[VKD3D_VEC4_SIZE];
     unsigned int i, size_component_count;
     struct vkd3d_shader_image image;
@@ -9370,10 +9371,16 @@ static void spirv_compiler_emit_resinfo(struct spirv_compiler *compiler,
     val_id = vkd3d_spirv_build_op_composite_construct(builder,
             type_id, constituents, i + 2);
 
+    component_type = VKD3D_SHADER_COMPONENT_FLOAT;
+
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
     if (instruction->flags == VKD3DSI_RESINFO_UINT)
     {
-        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        /* SSA registers must match the specified result type. */
+        if (!register_is_ssa(&dst->reg))
+            val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        else
+            component_type = VKD3D_SHADER_COMPONENT_UINT;
     }
     else
     {
@@ -9382,7 +9389,7 @@ static void spirv_compiler_emit_resinfo(struct spirv_compiler *compiler,
         val_id = vkd3d_spirv_build_op_convert_utof(builder, type_id, val_id);
     }
     val_id = spirv_compiler_emit_swizzle(compiler, val_id, VKD3DSP_WRITEMASK_ALL,
-            VKD3D_SHADER_COMPONENT_FLOAT, src[1].swizzle, dst->write_mask);
+            component_type, src[1].swizzle, dst->write_mask);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
