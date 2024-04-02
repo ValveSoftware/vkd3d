@@ -241,6 +241,9 @@ static bool gl_runner_init(struct gl_runner *runner, enum shading_language langu
             if (major < 4 || (major == 4 && minor < 40))
             {
                 trace("Device %u does not support GLSL 4.40.\n", i);
+                eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+                eglDestroyContext(display, context);
+                eglTerminate(display);
                 continue;
             }
         }
