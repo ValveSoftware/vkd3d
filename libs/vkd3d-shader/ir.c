@@ -2686,36 +2686,43 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
-static void materialize_ssas_to_temps_process_src_param(struct vsir_program *program,
-        struct vkd3d_shader_src_param *src);
+struct ssas_to_temps_alloc
+{
+    unsigned int *table;
+    unsigned int next_temp_idx;
+};
+
+static bool ssas_to_temps_alloc_init(struct ssas_to_temps_alloc *alloc, unsigned int ssa_count, unsigned int temp_count)
+{
+    size_t i = ssa_count * sizeof(*alloc->table);
+
+    if (!(alloc->table = vkd3d_malloc(i)))
+    {
+        ERR("Failed to allocate SSA table.\n");
+        return false;
+    }
+    memset(alloc->table, 0xff, i);
+
+    alloc->next_temp_idx = temp_count;
+    return true;
+}
 
 /* This is idempotent: it can be safely applied more than once on the
  * same register. */
-static void materialize_ssas_to_temps_process_reg(struct vsir_program *program, struct vkd3d_shader_register *reg)
+static void materialize_ssas_to_temps_process_reg(struct vsir_program *program, struct ssas_to_temps_alloc *alloc,
+        struct vkd3d_shader_register *reg)
 {
     unsigned int i;
 
-    if (reg->type == VKD3DSPR_SSA)
+    if (reg->type == VKD3DSPR_SSA && alloc->table[reg->idx[0].offset] != UINT_MAX)
     {
         reg->type = VKD3DSPR_TEMP;
-        reg->idx[0].offset += program->temp_count;
+        reg->idx[0].offset = alloc->table[reg->idx[0].offset];
     }
 
     for (i = 0; i < reg->idx_count; ++i)
         if (reg->idx[i].rel_addr)
-            materialize_ssas_to_temps_process_src_param(program, reg->idx[i].rel_addr);
-}
-
-static void materialize_ssas_to_temps_process_dst_param(struct vsir_program *program,
-        struct vkd3d_shader_dst_param *dst)
-{
-    materialize_ssas_to_temps_process_reg(program, &dst->reg);
-}
-
-static void materialize_ssas_to_temps_process_src_param(struct vsir_program *program,
-        struct vkd3d_shader_src_param *src)
-{
-    materialize_ssas_to_temps_process_reg(program, &src->reg);
+            materialize_ssas_to_temps_process_reg(program, alloc, &reg->idx[i].rel_addr->reg);
 }
 
 struct ssas_to_temps_block_info
@@ -2740,11 +2747,12 @@ static void ssas_to_temps_block_info_cleanup(struct ssas_to_temps_block_info *bl
     vkd3d_free(block_info);
 }
 
-static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_program *program)
+static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_program *program)
 {
     size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count, i;
     struct ssas_to_temps_block_info *info, *block_info = NULL;
     struct vkd3d_shader_instruction *instructions = NULL;
+    struct ssas_to_temps_alloc alloc = {0};
     unsigned int current_label = 0;
 
     if (!(block_info = vkd3d_calloc(program->block_count, sizeof(*block_info))))
@@ -2753,14 +2761,21 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
         goto fail;
     }
 
+    if (!ssas_to_temps_alloc_init(&alloc, program->ssa_count, program->temp_count))
+        goto fail;
+
     for (i = 0, phi_count = 0, incoming_count = 0; i < program->instructions.count; ++i)
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-        unsigned int j;
+        unsigned int j, temp_idx;
 
+        /* Only phi src/dst SSA values need be converted here. Structurisation may
+         * introduce new cases of undominated SSA use, which will be handled later. */
         if (ins->handler_idx != VKD3DSIH_PHI)
             continue;
         ++phi_count;
+
+        temp_idx = alloc.next_temp_idx++;
 
         for (j = 0; j < ins->src_count; j += 2)
         {
@@ -2780,11 +2795,16 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
             incoming->src = &ins->src[j];
             incoming->dst = ins->dst;
 
+            alloc.table[ins->dst->reg.idx[0].offset] = temp_idx;
+
             ++incoming_count;
         }
 
-        materialize_ssas_to_temps_process_dst_param(program, ins->dst);
+        materialize_ssas_to_temps_process_reg(program, &alloc, &ins->dst->reg);
     }
+
+    if (!phi_count)
+        goto done;
 
     if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count + incoming_count - phi_count))
         goto fail;
@@ -2795,10 +2815,10 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
         size_t j;
 
         for (j = 0; j < ins->dst_count; ++j)
-            materialize_ssas_to_temps_process_dst_param(program, &ins->dst[j]);
+            materialize_ssas_to_temps_process_reg(program, &alloc, &ins->dst[j].reg);
 
         for (j = 0; j < ins->src_count; ++j)
-            materialize_ssas_to_temps_process_src_param(program, &ins->src[j]);
+            materialize_ssas_to_temps_process_reg(program, &alloc, &ins->src[j].reg);
 
         switch (ins->handler_idx)
         {
@@ -2836,16 +2856,17 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
     program->instructions.elements = instructions;
     program->instructions.capacity = ins_capacity;
     program->instructions.count = ins_count;
-    program->temp_count += program->ssa_count;
-    program->ssa_count = 0;
-
+    program->temp_count = alloc.next_temp_idx;
+done:
     ssas_to_temps_block_info_cleanup(block_info, program->block_count);
+    vkd3d_free(alloc.table);
 
     return VKD3D_OK;
 
 fail:
     vkd3d_free(instructions);
     ssas_to_temps_block_info_cleanup(block_info, program->block_count);
+    vkd3d_free(alloc.table);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -4514,6 +4535,98 @@ fail:
     return ret;
 }
 
+static void register_map_undominated_use(struct vkd3d_shader_register *reg, struct ssas_to_temps_alloc *alloc,
+        struct vsir_block *block, struct vsir_block **origin_blocks)
+{
+    unsigned int i;
+
+    if (!register_is_ssa(reg))
+        return;
+
+    i = reg->idx[0].offset;
+    if (alloc->table[i] == UINT_MAX && !vsir_block_dominates(origin_blocks[i], block))
+        alloc->table[i] = alloc->next_temp_idx++;
+
+    for (i = 0; i < reg->idx_count; ++i)
+        if (reg->idx[i].rel_addr)
+            register_map_undominated_use(&reg->idx[i].rel_addr->reg, alloc, block, origin_blocks);
+}
+
+/* Drivers are not necessarily optimised to handle very large numbers of temps. For example,
+ * using them only where necessary fixes stuttering issues in Horizon Zero Dawn on RADV.
+ * This can also result in the backend emitting less code because temps typically need an
+ * access chain and a load/store. Conversion of phi SSA values to temps should eliminate all
+ * undominated SSA use, but structurisation may create new occurrences. */
+static enum vkd3d_result vsir_cfg_materialize_undominated_ssas_to_temps(struct vsir_cfg *cfg)
+{
+    struct vsir_program *program = cfg->program;
+    struct ssas_to_temps_alloc alloc = {0};
+    struct vsir_block **origin_blocks;
+    unsigned int j;
+    size_t i;
+
+    if (!(origin_blocks = vkd3d_calloc(program->ssa_count, sizeof(*origin_blocks))))
+    {
+        ERR("Failed to allocate origin block array.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    if (!ssas_to_temps_alloc_init(&alloc, program->ssa_count, program->temp_count))
+    {
+        vkd3d_free(origin_blocks);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+        struct vkd3d_shader_instruction *ins;
+
+        for (ins = block->begin; ins <= block->end; ++ins)
+        {
+            for (j = 0; j < ins->dst_count; ++j)
+            {
+                if (register_is_ssa(&ins->dst[j].reg))
+                    origin_blocks[ins->dst[j].reg.idx[0].offset] = block;
+            }
+        }
+    }
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+        struct vkd3d_shader_instruction *ins;
+
+        for (ins = block->begin; ins <= block->end; ++ins)
+        {
+            for (j = 0; j < ins->src_count; ++j)
+                register_map_undominated_use(&ins->src[j].reg, &alloc, block, origin_blocks);
+        }
+    }
+
+    if (alloc.next_temp_idx == program->temp_count)
+        goto done;
+
+    TRACE("Emitting temps for %u values with undominated usage.\n", alloc.next_temp_idx - program->temp_count);
+
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        for (j = 0; j < ins->dst_count; ++j)
+            materialize_ssas_to_temps_process_reg(program, &alloc, &ins->dst[j].reg);
+
+        for (j = 0; j < ins->src_count; ++j)
+            materialize_ssas_to_temps_process_reg(program, &alloc, &ins->src[j].reg);
+    }
+
+    program->temp_count = alloc.next_temp_idx;
+done:
+    vkd3d_free(origin_blocks);
+    vkd3d_free(alloc.table);
+
+    return VKD3D_OK;
+}
+
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -5396,7 +5509,7 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
 
-        if ((result = vsir_program_materialise_ssas_to_temps(program)) < 0)
+        if ((result = vsir_program_materialise_phi_ssas_to_temps(program)) < 0)
             return result;
 
         if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
@@ -5441,6 +5554,20 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         }
 
         vsir_cfg_cleanup(&cfg);
+
+        if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
+            return result;
+
+        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
+            return result;
+        vsir_cfg_compute_dominators(&cfg);
+
+        result = vsir_cfg_materialize_undominated_ssas_to_temps(&cfg);
+
+        vsir_cfg_cleanup(&cfg);
+
+        if (result < 0)
+            return result;
     }
     else
     {
@@ -5470,10 +5597,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
 
         if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
             return result;
-    }
 
-    if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
-        return result;
+        if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
+            return result;
+    }
 
     if (TRACE_ON())
         vkd3d_shader_trace(program);
