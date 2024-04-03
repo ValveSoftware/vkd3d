@@ -706,124 +706,129 @@ static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compil
     vkd3d_string_buffer_printf(&compiler->buffer, ")");
 }
 
-static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
-        const struct vkd3d_shader_semantic *semantic, uint32_t flags)
+static void shader_print_dcl_usage(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, const struct vkd3d_shader_semantic *semantic, uint32_t flags, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    unsigned int usage_idx;
+    const char *usage;
+    bool indexed;
 
     if (semantic->resource.reg.reg.type == VKD3DSPR_COMBINED_SAMPLER)
     {
         switch (semantic->resource_type)
         {
             case VKD3D_SHADER_RESOURCE_TEXTURE_2D:
-                shader_addline(buffer, "_2d");
+                usage = "2d";
                 break;
-
             case VKD3D_SHADER_RESOURCE_TEXTURE_3D:
-                shader_addline(buffer, "_volume");
+                usage = "volume";
                 break;
-
             case VKD3D_SHADER_RESOURCE_TEXTURE_CUBE:
-                shader_addline(buffer, "_cube");
+                usage = "cube";
                 break;
-
             default:
-                shader_addline(buffer, "_unknown_resource_type(%#x)", semantic->resource_type);
-                break;
+                vkd3d_string_buffer_printf(buffer, "%s%s<unhandled resource type %#x>%s%s",
+                        prefix, compiler->colours.error, semantic->resource_type, compiler->colours.reset, suffix);
+                return;
         }
-    }
-    else if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE || semantic->resource.reg.reg.type == VKD3DSPR_UAV)
-    {
-        if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE)
-            shader_addline(buffer, "_resource");
 
-        shader_addline(buffer, "_");
+        vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, usage, suffix);
+        return;
+    }
+
+    if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE || semantic->resource.reg.reg.type == VKD3DSPR_UAV)
+    {
+        vkd3d_string_buffer_printf(buffer, "%s", prefix);
+        if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE)
+            vkd3d_string_buffer_printf(buffer, "resource_");
+
         shader_dump_resource_type(compiler, semantic->resource_type);
         if (semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
                 || semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
         {
-            shader_addline(buffer, "(%u)", semantic->sample_count);
+            vkd3d_string_buffer_printf(buffer, "(%u)", semantic->sample_count);
         }
         if (semantic->resource.reg.reg.type == VKD3DSPR_UAV)
             shader_dump_uav_flags(compiler, flags);
-        shader_addline(buffer, " ");
+        vkd3d_string_buffer_printf(buffer, " ");
         shader_dump_resource_data_type(compiler, semantic->resource_data_type);
+        vkd3d_string_buffer_printf(buffer, "%s", suffix);
+        return;
     }
-    else
+
+    /* Pixel shaders 3.0 don't have usage semantics. */
+    if (!vkd3d_shader_ver_ge(&compiler->shader_version, 3, 0)
+            && compiler->shader_version.type == VKD3D_SHADER_TYPE_PIXEL)
+        return;
+
+    indexed = false;
+    usage_idx = semantic->usage_idx;
+    switch (semantic->usage)
     {
-        /* Pixel shaders 3.0 don't have usage semantics. */
-        if (!vkd3d_shader_ver_ge(&compiler->shader_version, 3, 0)
-                && compiler->shader_version.type == VKD3D_SHADER_TYPE_PIXEL)
+        case VKD3D_DECL_USAGE_POSITION:
+            usage = "position";
+            indexed = true;
+            break;
+        case VKD3D_DECL_USAGE_BLEND_INDICES:
+            usage = "blend";
+            break;
+        case VKD3D_DECL_USAGE_BLEND_WEIGHT:
+            usage = "weight";
+            break;
+        case VKD3D_DECL_USAGE_NORMAL:
+            usage = "normal";
+            indexed = true;
+            break;
+        case VKD3D_DECL_USAGE_PSIZE:
+            usage = "psize";
+            break;
+        case VKD3D_DECL_USAGE_COLOR:
+            if (semantic->usage_idx)
+            {
+                usage = "specular";
+                indexed = true;
+                --usage_idx;
+                break;
+            }
+            usage = "color";
+            break;
+        case VKD3D_DECL_USAGE_TEXCOORD:
+            usage = "texcoord";
+            indexed = true;
+            break;
+        case VKD3D_DECL_USAGE_TANGENT:
+            usage = "tangent";
+            break;
+        case VKD3D_DECL_USAGE_BINORMAL:
+            usage = "binormal";
+            break;
+        case VKD3D_DECL_USAGE_TESS_FACTOR:
+            usage = "tessfactor";
+            break;
+        case VKD3D_DECL_USAGE_POSITIONT:
+            usage = "positionT";
+            indexed = true;
+            break;
+        case VKD3D_DECL_USAGE_FOG:
+            usage = "fog";
+            break;
+        case VKD3D_DECL_USAGE_DEPTH:
+            usage = "depth";
+            break;
+        case VKD3D_DECL_USAGE_SAMPLE:
+            usage = "sample";
+            break;
+        default:
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled usage %#x, index %u>%s%s",
+                    prefix, compiler->colours.error, semantic->usage, usage_idx, compiler->colours.reset, suffix);
             return;
-        else
-            shader_addline(buffer, "_");
-
-        switch (semantic->usage)
-        {
-            case VKD3D_DECL_USAGE_POSITION:
-                shader_addline(buffer, "position%u", semantic->usage_idx);
-                break;
-
-            case VKD3D_DECL_USAGE_BLEND_INDICES:
-                shader_addline(buffer, "blend");
-                break;
-
-            case VKD3D_DECL_USAGE_BLEND_WEIGHT:
-                shader_addline(buffer, "weight");
-                break;
-
-            case VKD3D_DECL_USAGE_NORMAL:
-                shader_addline(buffer, "normal%u", semantic->usage_idx);
-                break;
-
-            case VKD3D_DECL_USAGE_PSIZE:
-                shader_addline(buffer, "psize");
-                break;
-
-            case VKD3D_DECL_USAGE_COLOR:
-                if (!semantic->usage_idx)
-                    shader_addline(buffer, "color");
-                else
-                    shader_addline(buffer, "specular%u", (semantic->usage_idx - 1));
-                break;
-
-            case VKD3D_DECL_USAGE_TEXCOORD:
-                shader_addline(buffer, "texcoord%u", semantic->usage_idx);
-                break;
-
-            case VKD3D_DECL_USAGE_TANGENT:
-                shader_addline(buffer, "tangent");
-                break;
-
-            case VKD3D_DECL_USAGE_BINORMAL:
-                shader_addline(buffer, "binormal");
-                break;
-
-            case VKD3D_DECL_USAGE_TESS_FACTOR:
-                shader_addline(buffer, "tessfactor");
-                break;
-
-            case VKD3D_DECL_USAGE_POSITIONT:
-                shader_addline(buffer, "positionT%u", semantic->usage_idx);
-                break;
-
-            case VKD3D_DECL_USAGE_FOG:
-                shader_addline(buffer, "fog");
-                break;
-
-            case VKD3D_DECL_USAGE_DEPTH:
-                shader_addline(buffer, "depth");
-                break;
-
-            case VKD3D_DECL_USAGE_SAMPLE:
-                shader_addline(buffer, "sample");
-                break;
-
-            default:
-                shader_addline(buffer, "<unknown_semantic(%#x)>", semantic->usage);
-                FIXME("Unrecognised semantic usage %#x.\n", semantic->usage);
-        }
     }
+
+    if (indexed)
+        vkd3d_string_buffer_printf(buffer, "%s%s%u%s", prefix, usage, usage_idx, suffix);
+    else
+        vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, usage, suffix);
 }
 
 static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1856,7 +1861,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_UAV_TYPED:
             vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.opcode);
-            shader_dump_decl_usage(compiler, &ins->declaration.semantic, ins->flags);
+            shader_print_dcl_usage(compiler, "_", &ins->declaration.semantic, ins->flags, "");
             shader_dump_ins_modifiers(compiler, &ins->declaration.semantic.resource.reg);
             vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
             shader_print_register(compiler, " ", &ins->declaration.semantic.resource.reg.reg, true, "");
