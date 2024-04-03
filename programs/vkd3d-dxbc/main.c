@@ -279,7 +279,13 @@ static void print_usage(const char *program_name)
         "  --colour                 Enable colour, even when not supported by the output.\n"
         "  -e, --emit               Emit the content of the DXBC blob.\n"
         "  -x, --extract=<section>  Extract the data contained in <section>.\n"
-        "                           <section> must be of the form 'i:<index>'.\n"
+        "                           <section> may either be of the form 'i:<index>' in\n"
+        "                           order to specify a section by its index or of the\n"
+        "                           form 't:<tag>' in order to specify a section by its\n"
+        "                           tag. <tag> may be either a four-character string or a\n"
+        "                           32-bit hexadecimal integer. For example: 'i:2',\n"
+        "                           't:SHDR', 't:52444853'. If multiple sections match\n"
+        "                           the same tag, the first matching section is used.\n"
         "  -h, --help               Display this information and exit.\n"
         "  --ignore-checksum        Do not validate the checksum when parsing the DXBC\n"
         "                           blob.\n"
@@ -428,6 +434,26 @@ static const char *dump_tag(char *out, uint32_t tag)
     return out;
 }
 
+static bool parse_tag(uint32_t *t, const char *s)
+{
+    char *end;
+
+    if (strlen(s) == 4)
+    {
+        *t = VKD3D_MAKE_TAG(s[0], s[1], s[2], s[3]);
+        return true;
+    }
+
+    if (strlen(s) == 8)
+    {
+        *t = strtoul(s, &end, 16);
+        if (!*end)
+            return true;
+    }
+
+    return false;
+}
+
 static void dump_line(const struct colours *colours, const char *prefix,
         const uint8_t *data, size_t offset, size_t count)
 {
@@ -561,6 +587,7 @@ static bool emit_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const stru
 static struct vkd3d_shader_dxbc_section_desc *get_section(size_t section_count,
         struct vkd3d_shader_dxbc_section_desc *sections, const char *s)
 {
+    uint32_t tag;
     size_t idx;
     char *end;
 
@@ -574,6 +601,23 @@ static struct vkd3d_shader_dxbc_section_desc *get_section(size_t section_count,
             return NULL;
         }
         return &sections[idx];
+    }
+
+    if (!strncmp("t:", s, 2))
+    {
+        s += 2;
+        if (!parse_tag(&tag, s))
+        {
+            fprintf(stderr, "Invalid section tag '%s' specified.\n", s);
+            return NULL;
+        }
+        for (idx = 0; idx < section_count; ++idx)
+        {
+            if (sections[idx].tag == tag)
+                return &sections[idx];
+        }
+        fprintf(stderr, "Section '%s' not found.\n", s);
+        return NULL;
     }
 
     fprintf(stderr, "Invalid section specifier '%s' specified.\n", s);
