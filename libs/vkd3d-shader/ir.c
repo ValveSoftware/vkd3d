@@ -2578,97 +2578,6 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vsir_program *program)
         }
     }
 
-    /* Second subpass: creating new blocks might have broken
-     * references in PHI instructions, so we use the block map to fix
-     * them. */
-    current_label = 0;
-    for (i = 0; i < ins_count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &instructions[i];
-        struct vkd3d_shader_src_param *new_src;
-        unsigned int j, l, new_src_count = 0;
-
-        switch (ins->handler_idx)
-        {
-            case VKD3DSIH_LABEL:
-                current_label = label_from_src_param(&ins->src[0]);
-                continue;
-
-            case VKD3DSIH_PHI:
-                break;
-
-            default:
-                continue;
-        }
-
-        /* First count how many source parameters we need. */
-        for (j = 0; j < ins->src_count; j += 2)
-        {
-            unsigned int source_label = label_from_src_param(&ins->src[j + 1]);
-            size_t k, match_count = 0;
-
-            for (k = 0; k < map_count; ++k)
-            {
-                struct lower_switch_to_if_ladder_block_mapping *mapping = &block_map[k];
-
-                if (mapping->switch_label == source_label && mapping->target_label == current_label)
-                    match_count += 1;
-            }
-
-            new_src_count += (match_count != 0) ? 2 * match_count : 2;
-        }
-
-        assert(new_src_count >= ins->src_count);
-
-        /* Allocate more source parameters if needed. */
-        if (new_src_count == ins->src_count)
-        {
-            new_src = ins->src;
-        }
-        else
-        {
-            if (!(new_src = vsir_program_get_src_params(program, new_src_count)))
-            {
-                ERR("Failed to allocate %u source parameters.\n", new_src_count);
-                goto fail;
-            }
-        }
-
-        /* Then do the copy. */
-        for (j = 0, l = 0; j < ins->src_count; j += 2)
-        {
-            unsigned int source_label = label_from_src_param(&ins->src[j + 1]);
-            size_t k, match_count = 0;
-
-            for (k = 0; k < map_count; ++k)
-            {
-                struct lower_switch_to_if_ladder_block_mapping *mapping = &block_map[k];
-
-                if (mapping->switch_label == source_label && mapping->target_label == current_label)
-                {
-                    match_count += 1;
-
-                    new_src[l] = ins->src[j];
-                    new_src[l + 1] = ins->src[j + 1];
-                    new_src[l + 1].reg.idx[0].offset = mapping->if_label;
-                    l += 2;
-                }
-            }
-
-            if (match_count == 0)
-            {
-                new_src[l] = ins->src[j];
-                new_src[l + 1] = ins->src[j + 1];
-                l += 2;
-            }
-        }
-
-        assert(l == new_src_count);
-
-        ins->src_count = new_src_count;
-        ins->src = new_src;
-    }
-
     vkd3d_free(program->instructions.elements);
     vkd3d_free(block_map);
     program->instructions.elements = instructions;
@@ -2827,6 +2736,7 @@ static enum vkd3d_result vsir_program_materialise_phi_ssas_to_temps(struct vsir_
                 break;
 
             case VKD3DSIH_BRANCH:
+            case VKD3DSIH_SWITCH_MONOLITHIC:
                 info = &block_info[current_label - 1];
 
                 for (j = 0; j < info->incoming_count; ++j)
@@ -5506,10 +5416,10 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
     {
         struct vsir_cfg cfg;
 
-        if ((result = lower_switch_to_if_ladder(program)) < 0)
+        if ((result = vsir_program_materialise_phi_ssas_to_temps(program)) < 0)
             return result;
 
-        if ((result = vsir_program_materialise_phi_ssas_to_temps(program)) < 0)
+        if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
 
         if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
