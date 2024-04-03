@@ -927,6 +927,16 @@ struct hlsl_ctx
     bool warn_implicit_truncation;
 };
 
+static inline bool hlsl_version_ge(const struct hlsl_ctx *ctx, unsigned int major, unsigned int minor)
+{
+    return ctx->profile->major_version > major || (ctx->profile->major_version == major && ctx->profile->minor_version >= minor);
+}
+
+static inline bool hlsl_version_lt(const struct hlsl_ctx *ctx, unsigned int major, unsigned int minor)
+{
+    return !hlsl_version_ge(ctx, major, minor);
+}
+
 struct hlsl_resource_load_params
 {
     struct hlsl_type *format;

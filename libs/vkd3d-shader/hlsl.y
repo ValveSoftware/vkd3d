@@ -939,16 +939,6 @@ static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
     return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
 }
 
-static bool shader_profile_version_ge(const struct hlsl_ctx *ctx, unsigned int major, unsigned int minor)
-{
-    return ctx->profile->major_version > major || (ctx->profile->major_version == major && ctx->profile->minor_version >= minor);
-}
-
-static bool shader_profile_version_lt(const struct hlsl_ctx *ctx, unsigned int major, unsigned int minor)
-{
-    return !shader_profile_version_ge(ctx, major, minor);
-}
-
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
         struct hlsl_type *type, uint32_t modifiers, struct list *defs)
 {
@@ -1216,7 +1206,7 @@ static struct hlsl_reg_reservation parse_packoffset(struct hlsl_ctx *ctx, const 
     struct hlsl_reg_reservation reservation = {0};
     char *endptr;
 
-    if (shader_profile_version_lt(ctx, 4, 0))
+    if (hlsl_version_lt(ctx, 4, 0))
         return reservation;
 
     reservation.offset_index = strtoul(reg_string + 1, &endptr, 10);
@@ -3939,7 +3929,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             return false;
         }
 
-        if (shader_profile_version_ge(ctx, 4, 0))
+        if (hlsl_version_ge(ctx, 4, 0))
         {
             unsigned int count = hlsl_sampler_dim_count(dim);
             struct hlsl_ir_node *divisor;
@@ -3986,7 +3976,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             return false;
 
         initialize_var_components(ctx, params->instrs, var, &idx, coords);
-        if (shader_profile_version_ge(ctx, 4, 0))
+        if (hlsl_version_ge(ctx, 4, 0))
         {
             if (!(half = hlsl_new_float_constant(ctx, 0.5f, loc)))
                 return false;
@@ -4172,7 +4162,7 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
     if (!(ret = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, c, loc)))
         return false;
 
-    if (shader_profile_version_ge(ctx, 4, 0))
+    if (hlsl_version_ge(ctx, 4, 0))
         return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_TRUNC, ret, loc);
 
     return true;
@@ -6461,7 +6451,7 @@ type_no_void:
         {
             validate_texture_format_type(ctx, $3, &@3);
 
-            if (shader_profile_version_lt(ctx, 4, 1))
+            if (hlsl_version_lt(ctx, 4, 1))
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                         "Multisampled texture object declaration needs sample count for profile %s.", ctx->profile->name);
@@ -6500,7 +6490,7 @@ type_no_void:
             $$ = hlsl_get_type(ctx->cur_scope, $1, true, true);
             if ($$->is_minimum_precision)
             {
-                if (shader_profile_version_lt(ctx, 4, 0))
+                if (hlsl_version_lt(ctx, 4, 0))
                 {
                     hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Target profile doesn't support minimum-precision types.");
