@@ -82,7 +82,10 @@ struct action
     } type;
     union
     {
-        const char *output_filename;
+        struct emit
+        {
+            const char *output_filename;
+        } emit;
     } u;
 };
 
@@ -206,7 +209,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                             "If this is really what you intended, specify the output explicitly.\n");
                     return false;
                 }
-                action->u.output_filename = options->output_filename;
+                action->u.emit.output_filename = options->output_filename;
                 break;
 
             case 'h':
@@ -505,17 +508,47 @@ static void dump_dxbc(const struct vkd3d_shader_code *dxbc, const struct vkd3d_s
     }
 }
 
+static bool emit_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const struct emit *emit)
+{
+    struct vkd3d_shader_code dxbc;
+    bool close_output;
+    char *messages;
+    FILE *output;
+    bool success;
+    int ret;
+
+    ret = vkd3d_shader_serialize_dxbc(dxbc_desc->section_count, dxbc_desc->sections, &dxbc, &messages);
+    if (messages)
+        fputs(messages, stderr);
+    vkd3d_shader_free_messages(messages);
+    if (ret < 0)
+        return false;
+
+    if (!(output = open_output(emit->output_filename, &close_output)))
+    {
+        vkd3d_shader_free_shader_code(&dxbc);
+        return false;
+    }
+
+    if (!(success = write_output(output, &dxbc)))
+        fprintf(stderr, "Failed to write output blob.\n");
+
+    if (close_output)
+        fclose(output);
+    vkd3d_shader_free_shader_code(&dxbc);
+    return success;
+}
+
 int main(int argc, char **argv)
 {
-    bool close_input = false, close_output = false;
-    struct vkd3d_shader_code dxbc, serialized;
     struct vkd3d_shader_dxbc_desc dxbc_desc;
+    struct vkd3d_shader_code dxbc;
+    bool close_input = false;
     struct options options;
-    FILE *input, *output;
     char *messages;
     uint32_t flags;
-    bool success;
     int fail = 1;
+    FILE *input;
     size_t i;
     int ret;
 
@@ -571,26 +604,7 @@ int main(int argc, char **argv)
         switch (action->type)
         {
             case ACTION_TYPE_EMIT:
-                ret = vkd3d_shader_serialize_dxbc(dxbc_desc.section_count, dxbc_desc.sections, &serialized, &messages);
-                if (messages)
-                    fputs(messages, stderr);
-                vkd3d_shader_free_messages(messages);
-                if (ret < 0)
-                    goto done;
-
-                if (!(output = open_output(action->u.output_filename, &close_output)))
-                {
-                    vkd3d_shader_free_shader_code(&serialized);
-                    goto done;
-                }
-
-                if (!(success = write_output(output, &serialized)))
-                    fprintf(stderr, "Failed to write output blob.\n");
-
-                if (close_output)
-                    fclose(output);
-                vkd3d_shader_free_shader_code(&serialized);
-                if (!success)
+                if (!emit_dxbc(&dxbc_desc, &action->u.emit))
                     goto done;
                 break;
         }
