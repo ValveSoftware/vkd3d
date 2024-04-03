@@ -514,6 +514,7 @@ int main(int argc, char **argv)
     FILE *input, *output;
     char *messages;
     uint32_t flags;
+    bool success;
     int fail = 1;
     size_t i;
     int ret;
@@ -583,18 +584,15 @@ int main(int argc, char **argv)
                     goto done;
                 }
 
-                if (!write_output(output, &serialized))
-                {
+                if (!(success = write_output(output, &serialized)))
                     fprintf(stderr, "Failed to write output blob.\n");
-                    vkd3d_shader_free_shader_code(&serialized);
-                    goto done;
-                }
 
+                if (close_output)
+                    fclose(output);
                 vkd3d_shader_free_shader_code(&serialized);
+                if (!success)
+                    goto done;
                 break;
-
-            default:
-                vkd3d_unreachable();
         }
     }
 
@@ -605,7 +603,5 @@ done:
     free(options.actions);
     if (close_input)
         fclose(input);
-    if (close_output)
-        fclose(output);
     return fail;
 }
