@@ -7283,8 +7283,12 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
     }
 
 general_implementation:
-    write_mask = (src->reg.type == VKD3DSPR_IMMCONST64 && !data_type_is_64_bit(dst->reg.data_type))
-            ? vsir_write_mask_64_from_32(dst->write_mask) : dst->write_mask;
+    write_mask = dst->write_mask;
+    if (src->reg.type == VKD3DSPR_IMMCONST64 && !data_type_is_64_bit(dst->reg.data_type))
+        write_mask = vsir_write_mask_64_from_32(write_mask);
+    else if (!data_type_is_64_bit(src->reg.data_type) && data_type_is_64_bit(dst->reg.data_type))
+        write_mask = vsir_write_mask_32_from_64(write_mask);
+
     val_id = spirv_compiler_emit_load_src(compiler, src, write_mask);
     if (dst->reg.data_type != src->reg.data_type)
     {
