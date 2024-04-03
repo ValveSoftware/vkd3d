@@ -3399,12 +3399,15 @@ static void test_create_pipeline_state(void)
         NULL, /* fill in dynamically */
     };
 
-    D3D12_SHADER_BYTECODE cs = shader_bytecode_from_blob(compile_shader(cs_code, sizeof(cs_code) - 1, "cs_4_0"));
-    D3D12_SHADER_BYTECODE ps = shader_bytecode_from_blob(compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0"));
-    D3D12_SHADER_BYTECODE vs = shader_bytecode_from_blob(compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0"));
-    const struct d3d12_shader_bytecode_subobject vs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, vs };
-    const struct d3d12_shader_bytecode_subobject ps_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, ps };
-    const struct d3d12_shader_bytecode_subobject cs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, cs };
+    ID3D10Blob *cs = compile_shader(cs_code, sizeof(cs_code) - 1, "cs_4_0");
+    ID3D10Blob *ps = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ID3D10Blob *vs = compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0");
+    const struct d3d12_shader_bytecode_subobject vs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS,
+            shader_bytecode_from_blob(vs) };
+    const struct d3d12_shader_bytecode_subobject ps_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS,
+            shader_bytecode_from_blob(ps) };
+    const struct d3d12_shader_bytecode_subobject cs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS,
+            shader_bytecode_from_blob(cs) };
 
     static const D3D12_SO_DECLARATION_ENTRY so_entries[] =
     {
@@ -3683,14 +3686,14 @@ static void test_create_pipeline_state(void)
     if (!(device = create_device()))
     {
         skip("Failed to create device.\n");
-        return;
+        goto cleanup;
     }
 
     if (ID3D12Device_QueryInterface(device, &IID_ID3D12Device2, (void **)&device2))
     {
         skip("ID3D12Device2 not supported.\n");
         ID3D12Device_Release(device);
-        return;
+        goto cleanup;
     }
 
     root_signature_desc.NumParameters = 0;
@@ -3740,6 +3743,10 @@ static void test_create_pipeline_state(void)
     ok(refcount == 1, "ID3D12Device2 has %u references left.\n", (unsigned int)refcount);
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
+cleanup:
+    ID3D10Blob_Release(vs);
+    ID3D10Blob_Release(ps);
+    ID3D10Blob_Release(cs);
 }
 
 static void test_create_fence(void)
