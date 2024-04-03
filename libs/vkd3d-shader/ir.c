@@ -2718,109 +2718,80 @@ static void materialize_ssas_to_temps_process_src_param(struct vsir_program *pro
     materialize_ssas_to_temps_process_reg(program, &src->reg);
 }
 
-static const struct vkd3d_shader_src_param *materialize_ssas_to_temps_compute_source(struct vkd3d_shader_instruction *ins,
-        unsigned int label)
+struct ssas_to_temps_block_info
 {
-    unsigned int i;
-
-    assert(ins->handler_idx == VKD3DSIH_PHI);
-
-    for (i = 0; i < ins->src_count; i += 2)
+    struct phi_incoming_to_temp
     {
-        if (label_from_src_param(&ins->src[i + 1]) == label)
-            return &ins->src[i];
-    }
+        struct vkd3d_shader_src_param *src;
+        struct vkd3d_shader_dst_param *dst;
+    } *incomings;
+    size_t incoming_capacity;
+    size_t incoming_count;
+};
 
-    vkd3d_unreachable();
-}
-
-static bool materialize_ssas_to_temps_synthesize_mov(struct vsir_program *program,
-        struct vkd3d_shader_instruction *instruction, const struct vkd3d_shader_location *loc,
-        const struct vkd3d_shader_dst_param *dest, const struct vkd3d_shader_src_param *cond,
-        const struct vkd3d_shader_src_param *source, bool invert)
+static void ssas_to_temps_block_info_cleanup(struct ssas_to_temps_block_info *block_info,
+        size_t count)
 {
-    struct vkd3d_shader_src_param *src;
-    struct vkd3d_shader_dst_param *dst;
+    size_t i;
 
-    if (!vsir_instruction_init_with_params(program, instruction, loc,
-            cond ? VKD3DSIH_MOVC : VKD3DSIH_MOV, 1, cond ? 3 : 1))
-        return false;
+    for (i = 0; i < count; ++i)
+        vkd3d_free(block_info[i].incomings);
 
-    dst = instruction->dst;
-    src = instruction->src;
-
-    dst[0] = *dest;
-    materialize_ssas_to_temps_process_dst_param(program, &dst[0]);
-
-    assert(dst[0].write_mask == VKD3DSP_WRITEMASK_0);
-    assert(dst[0].modifiers == 0);
-    assert(dst[0].shift == 0);
-
-    if (cond)
-    {
-        src[0] = *cond;
-        src[1 + invert] = *source;
-        memset(&src[2 - invert], 0, sizeof(src[2 - invert]));
-        src[2 - invert].reg = dst[0].reg;
-        materialize_ssas_to_temps_process_src_param(program, &src[1]);
-        materialize_ssas_to_temps_process_src_param(program, &src[2]);
-    }
-    else
-    {
-        src[0] = *source;
-        materialize_ssas_to_temps_process_src_param(program, &src[0]);
-    }
-
-    return true;
+    vkd3d_free(block_info);
 }
 
 static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_program *program)
 {
+    size_t ins_capacity = 0, ins_count = 0, phi_count, incoming_count, i;
+    struct ssas_to_temps_block_info *info, *block_info = NULL;
     struct vkd3d_shader_instruction *instructions = NULL;
-    struct materialize_ssas_to_temps_block_data
-    {
-        size_t phi_begin;
-        size_t phi_count;
-    } *block_index = NULL;
-    size_t ins_capacity = 0, ins_count = 0, i;
     unsigned int current_label = 0;
 
-    if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count))
-        goto fail;
-
-    if (!(block_index = vkd3d_calloc(program->block_count, sizeof(*block_index))))
+    if (!(block_info = vkd3d_calloc(program->block_count, sizeof(*block_info))))
     {
-        ERR("Failed to allocate block index.\n");
+        ERR("Failed to allocate block info array.\n");
         goto fail;
     }
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (i = 0, phi_count = 0, incoming_count = 0; i < program->instructions.count; ++i)
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+        unsigned int j;
 
-        switch (ins->handler_idx)
+        if (ins->handler_idx != VKD3DSIH_PHI)
+            continue;
+        ++phi_count;
+
+        for (j = 0; j < ins->src_count; j += 2)
         {
-            case VKD3DSIH_LABEL:
-                current_label = label_from_src_param(&ins->src[0]);
-                break;
+            struct phi_incoming_to_temp *incoming;
+            unsigned int label;
 
-            case VKD3DSIH_PHI:
-                assert(current_label != 0);
-                assert(i != 0);
-                if (block_index[current_label - 1].phi_begin == 0)
-                    block_index[current_label - 1].phi_begin = i;
-                block_index[current_label - 1].phi_count += 1;
-                break;
+            label = label_from_src_param(&ins->src[j + 1]);
+            assert(label);
 
-            default:
-                current_label = 0;
-                break;
+            info = &block_info[label - 1];
+
+            if (!(vkd3d_array_reserve((void **)&info->incomings, &info->incoming_capacity, info->incoming_count + 1,
+                    sizeof(*info->incomings))))
+                goto fail;
+
+            incoming = &info->incomings[info->incoming_count++];
+            incoming->src = &ins->src[j];
+            incoming->dst = ins->dst;
+
+            ++incoming_count;
         }
+
+        materialize_ssas_to_temps_process_dst_param(program, ins->dst);
     }
+
+    if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count + incoming_count - phi_count))
+        goto fail;
 
     for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+        struct vkd3d_shader_instruction *mov_ins, *ins = &program->instructions.elements[i];
         size_t j;
 
         for (j = 0; j < ins->dst_count; ++j)
@@ -2836,65 +2807,20 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
                 break;
 
             case VKD3DSIH_BRANCH:
-            {
-                if (vsir_register_is_label(&ins->src[0].reg))
+                info = &block_info[current_label - 1];
+
+                for (j = 0; j < info->incoming_count; ++j)
                 {
-                    const struct materialize_ssas_to_temps_block_data *data = &block_index[label_from_src_param(&ins->src[0]) - 1];
+                    struct phi_incoming_to_temp *incoming = &info->incomings[j];
 
-                    if (!reserve_instructions(&instructions, &ins_capacity, ins_count + data->phi_count))
+                    mov_ins = &instructions[ins_count++];
+                    if (!vsir_instruction_init_with_params(program, mov_ins, &ins->location, VKD3DSIH_MOV, 1, 0))
                         goto fail;
-
-                    for (j = data->phi_begin; j < data->phi_begin + data->phi_count; ++j)
-                    {
-                        const struct vkd3d_shader_src_param *source;
-
-                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
-                                current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
-                                &ins->location, &program->instructions.elements[j].dst[0], NULL, source, false))
-                            goto fail;
-
-                        ++ins_count;
-                    }
-                }
-                else
-                {
-                    struct materialize_ssas_to_temps_block_data *data_true = &block_index[label_from_src_param(&ins->src[1]) - 1],
-                            *data_false = &block_index[label_from_src_param(&ins->src[2]) - 1];
-                    const struct vkd3d_shader_src_param *cond = &ins->src[0];
-
-                    if (!reserve_instructions(&instructions, &ins_capacity,
-                            ins_count + data_true->phi_count + data_false->phi_count))
-                        goto fail;
-
-                    for (j = data_true->phi_begin; j < data_true->phi_begin + data_true->phi_count; ++j)
-                    {
-                        const struct vkd3d_shader_src_param *source;
-
-                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
-                                current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
-                                &ins->location, &program->instructions.elements[j].dst[0], cond, source, false))
-                            goto fail;
-
-                        ++ins_count;
-                    }
-
-                    for (j = data_false->phi_begin; j < data_false->phi_begin + data_false->phi_count; ++j)
-                    {
-                        const struct vkd3d_shader_src_param *source;
-
-                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
-                                current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
-                                &ins->location, &program->instructions.elements[j].dst[0], cond, source, true))
-                            goto fail;
-
-                        ++ins_count;
-                    }
+                    *mov_ins->dst = *incoming->dst;
+                    mov_ins->src = incoming->src;
+                    mov_ins->src_count = 1;
                 }
                 break;
-            }
 
             case VKD3DSIH_PHI:
                 continue;
@@ -2903,25 +2829,23 @@ static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_prog
                 break;
         }
 
-        if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
-            goto fail;
-
         instructions[ins_count++] = *ins;
     }
 
     vkd3d_free(program->instructions.elements);
-    vkd3d_free(block_index);
     program->instructions.elements = instructions;
     program->instructions.capacity = ins_capacity;
     program->instructions.count = ins_count;
     program->temp_count += program->ssa_count;
     program->ssa_count = 0;
 
+    ssas_to_temps_block_info_cleanup(block_info, program->block_count);
+
     return VKD3D_OK;
 
 fail:
     vkd3d_free(instructions);
-    vkd3d_free(block_index);
+    ssas_to_temps_block_info_cleanup(block_info, program->block_count);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
