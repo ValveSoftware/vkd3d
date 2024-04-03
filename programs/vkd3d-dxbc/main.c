@@ -610,7 +610,10 @@ int main(int argc, char **argv)
         fputs(messages, stderr);
     vkd3d_shader_free_messages(messages);
     if (ret < 0)
+    {
+        vkd3d_shader_free_shader_code(&dxbc);
         goto done;
+    }
 
     if (options.list || options.list_data)
         dump_dxbc(&dxbc, &dxbc_desc, &options);
