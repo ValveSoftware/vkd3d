@@ -539,6 +539,25 @@ static bool emit_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const stru
     return success;
 }
 
+static bool apply_actions(struct vkd3d_shader_dxbc_desc *dxbc_desc,
+        size_t action_count, const struct action *actions)
+{
+    for (size_t i = 0; i < action_count; ++i)
+    {
+        const struct action *action = &actions[i];
+
+        switch (action->type)
+        {
+            case ACTION_TYPE_EMIT:
+                if (!emit_dxbc(dxbc_desc, &action->u.emit))
+                    return false;
+                break;
+        }
+    }
+
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     struct vkd3d_shader_dxbc_desc dxbc_desc;
@@ -549,7 +568,6 @@ int main(int argc, char **argv)
     uint32_t flags;
     int fail = 1;
     FILE *input;
-    size_t i;
     int ret;
 
     if (!parse_command_line(argc, argv, &options))
@@ -597,22 +615,10 @@ int main(int argc, char **argv)
     if (options.list || options.list_data)
         dump_dxbc(&dxbc, &dxbc_desc, &options);
 
-    for (i = 0; i < options.action_count; ++i)
-    {
-        struct action *action = &options.actions[i];
-
-        switch (action->type)
-        {
-            case ACTION_TYPE_EMIT:
-                if (!emit_dxbc(&dxbc_desc, &action->u.emit))
-                    goto done;
-                break;
-        }
-    }
+    fail = !apply_actions(&dxbc_desc, options.action_count, options.actions);
 
     vkd3d_shader_free_dxbc(&dxbc_desc);
     vkd3d_shader_free_shader_code(&dxbc);
-    fail = 0;
 done:
     free(options.actions);
     if (close_input)
