@@ -65,6 +65,7 @@ enum
 {
     OPTION_COLOUR = CHAR_MAX + 1,
     OPTION_EMIT,
+    OPTION_EXTRACT,
     OPTION_HELP,
     OPTION_IGNORE_CHECKSUM,
     OPTION_LIST,
@@ -79,6 +80,7 @@ struct action
     enum action_type
     {
         ACTION_TYPE_EMIT,
+        ACTION_TYPE_EXTRACT,
     } type;
     union
     {
@@ -86,6 +88,11 @@ struct action
         {
             const char *output_filename;
         } emit;
+        struct extract
+        {
+            const char *section;
+            const char *output_filename;
+        } extract;
     } u;
 };
 
@@ -157,6 +164,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     {
         {"colour",          no_argument,       NULL, OPTION_COLOUR},
         {"emit",            no_argument,       NULL, OPTION_EMIT},
+        {"extract",         required_argument, NULL, OPTION_EXTRACT},
         {"help",            no_argument,       NULL, OPTION_HELP},
         {"ignore-checksum", no_argument,       NULL, OPTION_IGNORE_CHECKSUM},
         {"list",            no_argument,       NULL, OPTION_LIST},
@@ -191,7 +199,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "ehtVo:", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "ex:hto:V", long_options, NULL)) == -1)
             break;
 
         switch (option)
@@ -210,6 +218,14 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                     return false;
                 }
                 action->u.emit.output_filename = options->output_filename;
+                break;
+
+            case 'x':
+            case OPTION_EXTRACT:
+                if (!(action = action_push(options, ACTION_TYPE_EXTRACT)))
+                    return false;
+                action->u.extract.section = optarg;
+                action->u.extract.output_filename = options->output_filename;
                 break;
 
             case 'h':
@@ -234,8 +250,8 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 options->colours = no_colours;
                 break;
 
-            case OPTION_OUTPUT:
             case 'o':
+            case OPTION_OUTPUT:
                 options->output_filename = optarg;
                 break;
 
@@ -262,27 +278,30 @@ static void print_usage(const char *program_name)
         "Options:\n"
         "  --colour                 Enable colour, even when not supported by the output.\n"
         "  -e, --emit               Emit the content of the DXBC blob.\n"
+        "  -x, --extract=<section>  Extract the data contained in <section>.\n"
+        "                           <section> must be of the form 'i:<index>'.\n"
         "  -h, --help               Display this information and exit.\n"
+        "  --ignore-checksum        Do not validate the checksum when parsing the DXBC\n"
+        "                           blob.\n"
         "  -t, --list               List the contents of the DXBC blob.\n"
         "  --list-data              List the data contained in the DXBC sections.\n"
         "  --no-colour              Disable colour, even when supported by the output.\n"
+        "  -o, --output=<file>      Set the output filename for --emit or --extract.\n"
         "  -V, --version            Display version information and exit.\n"
-        "  --ignore-checksum        Do not validate the checksum when parsing the DXBC blob.\n"
-        "  -o, --output=<file>      Set the output filename for --emit.\n"
         "  --                       Stop option processing. Any subsequent argument is\n"
         "                           interpreted as a filename.\n"
         "\n"
         "If the input file is '-' or not specified, input will be read from standard\n"
         "input. Similarly, if the output file is '-' or not specified at the point\n"
-        "--emit is found, output will be written to the standard output.\n"
+        "--emit or --extract is found, output will be written to the standard output.\n"
         "\n"
         "Currently this tool can only re-emit the same DXBC blob it loaded. However, it\n"
-        "will recompute the checksum while doing so, so --emit can be useful\n"
-        "together with --ignore-checksum to fix the checksum for a blob.\n"
+        "will recompute the checksum while doing so, so --emit can be useful together\n"
+        "with --ignore-checksum to fix the checksum for a blob.\n"
         "\n"
-        "Options --emit and --output can be specified more than once. The DXBC blob\n"
-        "will be emitted once for each --emit occurrence, each time using the closest\n"
-        "previous --output occurrence as output filename.\n";
+        "Options --emit, --extract, and --output can be specified more than once. The\n"
+        "DXBC blob will be emitted once for each --emit occurrence, each time using the\n"
+        "closest previous --output occurrence as output filename.\n";
 
     fprintf(stderr, "Usage: %s %s", program_name, usage);
 }
@@ -539,6 +558,53 @@ static bool emit_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const stru
     return success;
 }
 
+static struct vkd3d_shader_dxbc_section_desc *get_section(size_t section_count,
+        struct vkd3d_shader_dxbc_section_desc *sections, const char *s)
+{
+    size_t idx;
+    char *end;
+
+    if (!strncmp("i:", s, 2))
+    {
+        s += 2;
+        idx = strtoul(s, &end, 10);
+        if (*end || idx >= section_count)
+        {
+            fprintf(stderr, "Invalid section index '%s' specified.\n", s);
+            return NULL;
+        }
+        return &sections[idx];
+    }
+
+    fprintf(stderr, "Invalid section specifier '%s' specified.\n", s);
+    return NULL;
+}
+
+static bool extract_section(struct vkd3d_shader_dxbc_desc *dxbc_desc, const struct extract *extract)
+{
+    const struct vkd3d_shader_dxbc_section_desc *section;
+    bool close_output, success = true;
+    FILE *output;
+
+    if (!(section = get_section(dxbc_desc->section_count, dxbc_desc->sections, extract->section)))
+        return false;
+
+    if (!(output = open_output(extract->output_filename, &close_output)))
+        return false;
+
+    if (!extract->output_filename && isatty(fileno(output)))
+        fprintf(stderr, "Output is a tty, skipping section '%s'.\n"
+                "If this is really what you intended, specify the output explicitly.\n",
+                extract->section);
+    else if (!(success = write_output(output, &section->data)))
+        fprintf(stderr, "Failed to write output.\n");
+
+    if (close_output)
+        fclose(output);
+
+    return success;
+}
+
 static bool apply_actions(struct vkd3d_shader_dxbc_desc *dxbc_desc,
         size_t action_count, const struct action *actions)
 {
@@ -550,6 +616,11 @@ static bool apply_actions(struct vkd3d_shader_dxbc_desc *dxbc_desc,
         {
             case ACTION_TYPE_EMIT:
                 if (!emit_dxbc(dxbc_desc, &action->u.emit))
+                    return false;
+                break;
+
+            case ACTION_TYPE_EXTRACT:
+                if (!extract_section(dxbc_desc, &action->u.extract))
                     return false;
                 break;
         }
