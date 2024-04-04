@@ -1568,6 +1568,12 @@ static void trace_tags(const struct shader_runner_caps *caps)
     trace("%s.\n", tags);
 }
 
+static void update_line_number_context(const char *testname, unsigned int line_number)
+{
+    vkd3d_test_pop_context();
+    vkd3d_test_push_context("%s:%u", testname, line_number);
+}
+
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
         const struct shader_runner_ops *ops, void *dxc_compiler)
 {
@@ -1575,7 +1581,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
     enum parse_state state = STATE_NONE;
-    unsigned int i, line_number = 0;
+    unsigned int i, line_number = 0, block_start_line_number = 0;
     char *shader_source = NULL;
     HRESULT expect_hr = S_OK;
     bool skip_tests = false;
@@ -1609,17 +1615,19 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     else
         testname = test_options.filename;
 
+    vkd3d_test_push_context("%s:%u", testname, line_number);
+
     for (;;)
     {
         char *ret = fgets(line_buffer, sizeof(line_buffer), f);
         const char *line = line_buffer;
 
-        if (line_number++)
-            vkd3d_test_pop_context();
-        vkd3d_test_push_context("%s:%u", testname, line_number);
+        line_number++;
 
         if (!ret || line[0] == '[')
         {
+            update_line_number_context(testname, block_start_line_number);
+
             switch (state)
             {
                 case STATE_INPUT_LAYOUT:
@@ -1801,6 +1809,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
         {
             unsigned int index;
 
+            block_start_line_number = line_number;
+            update_line_number_context(testname, line_number);
+
             if (match_directive_substring(line, "[compute shader", &line))
             {
                 state = STATE_SHADER_COMPUTE;
@@ -1953,6 +1964,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
+            update_line_number_context(testname, line_number);
+
             switch (state)
             {
                 case STATE_NONE:
@@ -2008,8 +2021,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
         }
     }
 
-    if (line_number)
-        vkd3d_test_pop_context();
+    /* Pop line_number context. */
+    vkd3d_test_pop_context();
 
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
