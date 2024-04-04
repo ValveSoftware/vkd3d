@@ -414,6 +414,7 @@ enum dx_intrinsic_opcode
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
     DX_DERIV_FINEY                  =  86,
+    DX_COVERAGE                     =  91,
     DX_THREAD_ID                    =  93,
     DX_GROUP_ID                     =  94,
     DX_THREAD_ID_IN_GROUP           =  95,
@@ -4817,6 +4818,12 @@ static void sm6_parser_emit_dx_input_register_mov(struct sm6_parser *sm6,
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static void sm6_parser_emit_dx_coverage(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_COVERAGE, VKD3D_DATA_UINT);
+}
+
 static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_parser *sm6,
         enum vkd3d_shader_descriptor_type type, unsigned int id, const struct sm6_value *address)
 {
@@ -5935,6 +5942,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_COVERAGE                      ] = {"i", "",     sm6_parser_emit_dx_coverage},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
     [DX_DERIV_COARSEX                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DERIV_COARSEY                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
