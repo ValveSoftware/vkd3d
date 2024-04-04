@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
 #include <windows.h>
 #include <shlobj.h>
 
@@ -141,8 +143,8 @@ static bool run_tests_for_directory(const char *commit_dir)
     if (!test_arch)
         test_arch = "64";
 
-    printf("Building %s\n", commit_dir);
-    printf("---\n");
+    printf("\e[0Ksection_start:%I64d:commit_%s\r\e[0KBuilding commit %s\n",
+            (uint64_t)time(NULL), commit_dir, commit_dir);
 
     sprintf(list_filename, "artifacts/%s/tests/shader_tests.txt", commit_dir);
     list_file = fopen(list_filename, "r");
@@ -231,6 +233,9 @@ static bool run_tests_for_directory(const char *commit_dir)
                 fprintf(stderr, "Cannot close failure file, last error %ld.\n", GetLastError());
         }
     }
+
+    printf("\e[0Ksection_end:%I64d:commit_%s\r\e[0K\n",
+            (uint64_t)time(NULL), commit_dir);
 
     return ret;
 }
