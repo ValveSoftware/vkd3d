@@ -19,6 +19,10 @@ image-linux:
     - sed -i "1iFROM $IMAGE_SOURCE" "$DOCKER_FILE"
     - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$DOCKER_FILE" --destination "$IMAGE_LOCAL"
 
+# Job `image-mac' must be run each time the pipeline is run on a push,
+# otherwise macOS artifacts are not regenerated and macOS jobs cannot find them.
+# So we add a dependency on image.docker too, even if that file is not really
+# used for macOS.
 image-mac:
   stage: image
   rules:
@@ -26,6 +30,7 @@ image-mac:
       changes:
         - .gitlab-ci.yml
         - gitlab/image.yml
+        - gitlab/image.docker
   interruptible: true
   tags:
     - mac
