@@ -934,11 +934,6 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v);
 }
 
-static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
-{
-    return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
-}
-
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
         struct hlsl_type *type, uint32_t modifiers, struct list *defs)
 {
@@ -961,7 +956,7 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
 
         field->type = type;
 
-        if (shader_is_sm_5_1(ctx) && type->class == HLSL_CLASS_OBJECT)
+        if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_OBJECT)
         {
             for (k = 0; k < v->arrays.count; ++k)
                 unbounded_res_array |= (v->arrays.sizes[k] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
@@ -2167,7 +2162,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
 
     type = basic_type;
 
-    if (shader_is_sm_5_1(ctx) && type->class == HLSL_CLASS_OBJECT)
+    if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_OBJECT)
     {
         for (i = 0; i < v->arrays.count; ++i)
             unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
