@@ -133,3 +133,31 @@ probe uav 2 (4)  ri (9)
 probe uav 2 (5)  ri (6)
 probe uav 2 (6)  ri (3)
 probe uav 2 (7)  ri (4)
+
+
+[uav 1]
+format r32 uint
+size (buffer, 1)
+
+0
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u1);
+groupshared uint m;
+
+    [numthreads(32, 1, 1)]
+void main(uint local_idx : SV_GroupIndex)
+{
+    uint orig;
+    if (!local_idx)
+        m = 7;
+    GroupMemoryBarrierWithGroupSync();
+    InterlockedCompareExchange(m, local_idx, local_idx + 32, orig);
+    GroupMemoryBarrierWithGroupSync();
+    if (!local_idx)
+        u.Store(0, m);
+}
+
+[test]
+todo dispatch 1 1 1
+probe uav 1 (0) rui (39)
