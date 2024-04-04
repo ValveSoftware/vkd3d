@@ -1590,53 +1590,56 @@ static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
     if (mmask) FIXME("Unrecognised modifier %#x.\n", mmask);
 }
 
-static void shader_dump_primitive_type(struct vkd3d_d3d_asm_compiler *compiler,
-        const struct vkd3d_shader_primitive_type *primitive_type)
+static void shader_print_primitive_type(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, const struct vkd3d_shader_primitive_type *p, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *primitive_type;
 
-    switch (primitive_type->type)
+    switch (p->type)
     {
         case VKD3D_PT_UNDEFINED:
-            shader_addline(buffer, "undefined");
+            primitive_type = "undefined";
             break;
         case VKD3D_PT_POINTLIST:
-            shader_addline(buffer, "pointlist");
+            primitive_type = "pointlist";
             break;
         case VKD3D_PT_LINELIST:
-            shader_addline(buffer, "linelist");
+            primitive_type = "linelist";
             break;
         case VKD3D_PT_LINESTRIP:
-            shader_addline(buffer, "linestrip");
+            primitive_type = "linestrip";
             break;
         case VKD3D_PT_TRIANGLELIST:
-            shader_addline(buffer, "trianglelist");
+            primitive_type = "trianglelist";
             break;
         case VKD3D_PT_TRIANGLESTRIP:
-            shader_addline(buffer, "trianglestrip");
+            primitive_type = "trianglestrip";
             break;
         case VKD3D_PT_TRIANGLEFAN:
-            shader_addline(buffer, "trianglefan");
+            primitive_type = "trianglefan";
             break;
         case VKD3D_PT_LINELIST_ADJ:
-            shader_addline(buffer, "linelist_adj");
+            primitive_type = "linelist_adj";
             break;
         case VKD3D_PT_LINESTRIP_ADJ:
-            shader_addline(buffer, "linestrip_adj");
+            primitive_type = "linestrip_adj";
             break;
         case VKD3D_PT_TRIANGLELIST_ADJ:
-            shader_addline(buffer, "trianglelist_adj");
+            primitive_type = "trianglelist_adj";
             break;
         case VKD3D_PT_TRIANGLESTRIP_ADJ:
-            shader_addline(buffer, "trianglestrip_adj");
+            primitive_type = "trianglestrip_adj";
             break;
         case VKD3D_PT_PATCH:
-            shader_addline(buffer, "patch%u", primitive_type->patch_vertex_count);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%spatch%u%s", prefix, p->patch_vertex_count, suffix);
+            return;
         default:
-            shader_addline(buffer, "<unrecognized_primitive_type %#x>", primitive_type->type);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled primitive type %#x>%s%s",
+                    prefix, compiler->colours.error, p->type, compiler->colours.reset, suffix);
+            return;
     }
+    vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, primitive_type, suffix);
 }
 
 static void shader_dump_interpolation_mode(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1944,8 +1947,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
         case VKD3DSIH_DCL_INPUT_PRIMITIVE:
         case VKD3DSIH_DCL_OUTPUT_TOPOLOGY:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_primitive_type(compiler, &ins->declaration.primitive_type);
+            shader_print_primitive_type(compiler, " ", &ins->declaration.primitive_type, "");
             break;
 
         case VKD3DSIH_DCL_INTERFACE:
