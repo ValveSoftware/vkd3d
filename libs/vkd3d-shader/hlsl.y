@@ -2836,20 +2836,20 @@ static bool write_atan_or_atan2(struct hlsl_ctx *ctx,
                 type->name, type->name, type->name);
     if (ret < 0)
     {
-        vkd3d_string_buffer_cleanup(buf);
+        hlsl_release_string_buffer(ctx, buf);
         return false;
     }
 
     ret = vkd3d_string_buffer_printf(buf, body_template, type->name);
     if (ret < 0)
     {
-        vkd3d_string_buffer_cleanup(buf);
+        hlsl_release_string_buffer(ctx, buf);
         return false;
     }
 
     func = hlsl_compile_internal_function(ctx,
             atan2_mode ? atan2_name : atan_name, buf->buffer);
-    vkd3d_string_buffer_cleanup(buf);
+    hlsl_release_string_buffer(ctx, buf);
     if (!func)
         return false;
 
