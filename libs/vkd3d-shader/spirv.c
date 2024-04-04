@@ -9258,7 +9258,11 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     val_id = spirv_compiler_emit_load_src_with_type(compiler, &src[1], VKD3DSP_WRITEMASK_0, component_type);
 
     if (instruction->flags & VKD3DARF_VOLATILE)
+    {
         WARN("Ignoring 'volatile' attribute.\n");
+        spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_IGNORING_FLAG,
+                "Ignoring the 'volatile' attribute flag for atomic instruction %#x.", instruction->handler_idx);
+    }
 
     memory_semantic = (instruction->flags & VKD3DARF_SEQ_CST)
             ? SpvMemorySemanticsSequentiallyConsistentMask
