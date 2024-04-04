@@ -188,7 +188,7 @@ details=$(awk "$awk_program" "$log_file")
 
 # In case of SIGABRT or SIGSEGV, add tag and print second to last line, containing the
 #   "(core dumped)" message.
-nxt_to_last_line=$(tail -n2 "$log_file" | head -n -1)
+nxt_to_last_line=$(tail -n2 "$log_file" | head -n1)
 if [ "$tweaked_estatus" -eq 134 ]; then
   details="$details#   [SIGABRT] <fade>$nxt_to_last_line<reset>"
 elif [ "$tweaked_estatus" -eq 139 ]; then
