@@ -1119,6 +1119,8 @@ static bool gl_runner_draw(struct shader_runner *r,
         }
     }
 
+    /* TODO: sample count and mask. */
+
     glViewport(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
     glScissor(0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
     glDrawBuffers(rt_count, draw_buffers);

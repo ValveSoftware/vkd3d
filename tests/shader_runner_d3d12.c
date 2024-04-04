@@ -590,7 +590,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     pso_desc.SampleDesc.Count = sample_count;
-    pso_desc.SampleMask = ~(UINT)0;
+    pso_desc.SampleMask = r->sample_mask ? r->sample_mask : ~(UINT)0;
     pso_desc.pRootSignature = test_context->root_signature;
 
     input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));

@@ -1,0 +1,56 @@
+[require]
+shader model >= 5.0
+
+[rtv 0]
+format r32g32b32a32 float
+size (2dms, 4, 640, 480)
+
+[uav 1]
+format r32 uint
+size (2d, 4, 4)
+0   0   0   0
+0   0   0   0
+0   0   0   0
+0   0   0   0
+
+[pixel shader todo]
+RWTexture2D<uint> u : register(u1);
+
+float4 main(float4 position : SV_Position, uint coverage : SV_Coverage) : SV_Target
+{
+    InterlockedOr(u[uint2(position.x, position.y)], coverage);
+    return float4(0.0, 1.0, 0.0, 1.0);
+}
+
+[test]
+sample mask 0x01
+todo draw quad
+probe all rgba (0.0, 0.25, 0.0, 0.25)
+probe uav 1 all rui (0x01)
+sample mask 0x03
+todo draw quad
+probe all rgba (0.0, 0.5, 0.0, 0.5)
+probe uav 1 all rui (0x03)
+sample mask 0x07
+todo draw quad
+probe all rgba (0.0, 0.75, 0.0, 0.75)
+probe uav 1 all rui (0x07)
+
+[uav 1]
+format r32 uint
+size (2d, 4, 4)
+0   0   0   0
+0   0   0   0
+0   0   0   0
+0   0   0   0
+
+[test]
+clear rtv 0 0.0 0.0 0.0 0.0
+sample mask 0x09
+todo draw quad
+probe all rgba (0.0, 0.5, 0.0, 0.5)
+probe uav 1 all rui (0x09)
+sample mask 0x0f
+todo draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe uav 1 all rui (0x0f)

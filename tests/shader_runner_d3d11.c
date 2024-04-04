@@ -803,6 +803,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
 
     ID3D10Blob_Release(vs_code);
 
+    if (r->sample_mask)
+        ID3D11DeviceContext_OMSetBlendState(context, NULL, NULL, r->sample_mask);
     ID3D11DeviceContext_IASetPrimitiveTopology(context, primitive_topology);
     ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);

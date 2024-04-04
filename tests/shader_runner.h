@@ -175,6 +175,8 @@ struct shader_runner
     uint32_t *uniforms;
     size_t uniform_count, uniform_capacity;
 
+    uint32_t sample_mask;
+
     struct resource *resources[MAX_RESOURCES];
     size_t resource_count;
     uint32_t failed_resources[RESOURCE_TYPE_VERTEX_BUFFER + 1][VKD3D_BITMAP_SIZE(MAX_RESOURCES)];

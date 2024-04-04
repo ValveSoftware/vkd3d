@@ -845,6 +845,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     rs_desc.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs_desc.lineWidth = 1.0f;
 
+    /* TODO: sample count and mask. */
     ms_desc.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     pipeline_desc.stageCount = stage_count;

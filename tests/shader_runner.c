@@ -1231,6 +1231,13 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             fatal_error("Unknown uniform type '%s'.\n", line);
         }
     }
+    else if (match_string(line, "sample mask", &line))
+    {
+        unsigned int sample_mask;
+
+        read_uint(&line, &sample_mask, false);
+        runner->sample_mask = sample_mask;
+    }
     else
     {
         fatal_error("Unknown test directive '%s'.\n", line);
