@@ -38338,6 +38338,7 @@ static void test_shader_cache(void)
     base_refcount = get_refcount(device);
 
     /* The description needs to be non-NULL and have at least the identifier set. */
+    unk = (IUnknown *)0xdeadbeef;
     hr = ID3D12Device9_CreateShaderCacheSession(device, NULL, &IID_IUnknown, (void **)&unk);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     hr = ID3D12Device9_CreateShaderCacheSession(device, NULL, &IID_IUnknown, NULL);
@@ -38348,6 +38349,7 @@ static void test_shader_cache(void)
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, NULL, (void **)&unk);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(unk == (IUnknown *)0xdeadbeef, "Got unexpected pointer %p.\n", unk);
 
     desc.Identifier = test_guid;
     desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
@@ -38396,10 +38398,13 @@ static void test_shader_cache(void)
             (void **)&session);
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
     ID3D12ShaderCacheSession_Release(session);
+
+    session = (ID3D12ShaderCacheSession *)0xdeadbeef;
     desc.MaximumValueFileSizeBytes = 1024 * 1024 * 1024 + 1;
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc, &IID_ID3D12ShaderCacheSession,
             (void **)&session);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(session == (ID3D12ShaderCacheSession *)0xdeadbeef, "Got unexpected pointer %p.\n", unk);
 
     memset(&desc, 0, sizeof(desc));
     desc.Identifier = test_guid;
@@ -38420,6 +38425,7 @@ static void test_shader_cache(void)
     desc.Identifier = test_guid;
     desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
     desc.Flags = 0x1245670;
+    session = (ID3D12ShaderCacheSession *)0xdeadbeef;
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
             &IID_ID3D12ShaderCacheSession, (void **)&session);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
@@ -38428,6 +38434,7 @@ static void test_shader_cache(void)
     hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
             &IID_ID3D12ShaderCacheSession, (void **)&session);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(session == (ID3D12ShaderCacheSession *)0xdeadbeef, "Got unexpected pointer %p.\n", unk);
 
     memset(&desc, 0, sizeof(desc));
     desc.Identifier = test_guid;
