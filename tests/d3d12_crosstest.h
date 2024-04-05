@@ -654,6 +654,7 @@ static inline bool is_mesa_device(ID3D12Device *device)
 
     get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MESA_RADV_KHR
+            || properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE
             || properties.driverID == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR;
 }
 
