@@ -2532,6 +2532,7 @@ struct d3d12_cache_session
     struct d3d12_device *device;
     struct vkd3d_private_store private_store;
     D3D12_SHADER_CACHE_SESSION_DESC desc;
+    struct vkd3d_shader_cache *cache;
 };
 
 static inline struct d3d12_cache_session *impl_from_ID3D12ShaderCacheSession(ID3D12ShaderCacheSession *iface)
@@ -2582,6 +2583,7 @@ static void d3d12_cache_session_destroy(struct d3d12_cache_session *session)
 
     TRACE("Destroying cache session %p.\n", session);
 
+    vkd3d_shader_cache_decref(session->cache);
     vkd3d_private_store_destroy(&session->private_store);
     vkd3d_free(session);
 
@@ -2707,6 +2709,7 @@ static const struct ID3D12ShaderCacheSessionVtbl d3d12_cache_session_vtbl =
 static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
         struct d3d12_device *device, const D3D12_SHADER_CACHE_SESSION_DESC *desc)
 {
+    enum vkd3d_result ret;
     HRESULT hr;
 
     session->ID3D12ShaderCacheSession_iface.lpVtbl = &d3d12_cache_session_vtbl;
@@ -2722,6 +2725,17 @@ static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
 
     if (FAILED(hr = vkd3d_private_store_init(&session->private_store)))
         return hr;
+
+    if (session->desc.Mode == D3D12_SHADER_CACHE_MODE_DISK)
+        FIXME("Disk caches are not yet implemented.\n");
+
+    ret = vkd3d_shader_open_cache(&session->cache);
+    if (ret)
+    {
+        WARN("Failed to open shader cache.\n");
+        vkd3d_private_store_destroy(&session->private_store);
+        return hresult_from_vkd3d_result(ret);
+    }
 
     d3d12_device_add_ref(session->device = device);
 

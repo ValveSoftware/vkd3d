@@ -1927,4 +1927,10 @@ static inline void vkd3d_prepend_struct(void *header, void *structure)
     vkd3d_header->next = vkd3d_structure;
 }
 
+struct vkd3d_shader_cache;
+
+int vkd3d_shader_open_cache(struct vkd3d_shader_cache **cache);
+unsigned int vkd3d_shader_cache_incref(struct vkd3d_shader_cache *cache);
+unsigned int vkd3d_shader_cache_decref(struct vkd3d_shader_cache *cache);
+
 #endif  /* __VKD3D_PRIVATE_H */
