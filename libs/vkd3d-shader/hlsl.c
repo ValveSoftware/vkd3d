@@ -2631,7 +2631,6 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
 
         [HLSL_OP3_CMP]         = "cmp",
         [HLSL_OP3_DP2ADD]      = "dp2add",
-        [HLSL_OP3_MOVC]        = "movc",
         [HLSL_OP3_TERNARY]     = "ternary",
     };
 

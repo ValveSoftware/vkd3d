@@ -5343,7 +5343,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
                     &expr->node, arg1, arg2);
             break;
 
-        case HLSL_OP3_MOVC:
+        case HLSL_OP3_TERNARY:
             write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MOVC, &expr->node, arg1, arg2, arg3);
             break;
 

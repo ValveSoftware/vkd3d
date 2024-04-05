@@ -2954,7 +2954,7 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
     return true;
 }
 
-/* Use movc/cmp for the ternary operator. */
+/* Lower TERNARY to CMP for SM1. */
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 }, *replacement;
@@ -2981,35 +2981,23 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
 
     assert(cond->data_type->base_type == HLSL_TYPE_BOOL);
 
-    if (ctx->profile->major_version < 4)
-    {
-        type = hlsl_get_numeric_type(ctx, instr->data_type->class, HLSL_TYPE_FLOAT,
-                instr->data_type->dimx, instr->data_type->dimy);
+    type = hlsl_get_numeric_type(ctx, instr->data_type->class, HLSL_TYPE_FLOAT,
+            instr->data_type->dimx, instr->data_type->dimy);
 
-        if (!(float_cond = hlsl_new_cast(ctx, cond, type, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, float_cond);
+    if (!(float_cond = hlsl_new_cast(ctx, cond, type, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, float_cond);
 
-        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, float_cond, &instr->loc)))
-            return false;
-        hlsl_block_add_instr(block, neg);
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, float_cond, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, neg);
 
-        memset(operands, 0, sizeof(operands));
-        operands[0] = neg;
-        operands[1] = second;
-        operands[2] = first;
-        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_CMP, operands, first->data_type, &instr->loc)))
-            return false;
-    }
-    else
-    {
-        memset(operands, 0, sizeof(operands));
-        operands[0] = cond;
-        operands[1] = first;
-        operands[2] = second;
-        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_MOVC, operands, first->data_type, &instr->loc)))
-            return false;
-    }
+    memset(operands, 0, sizeof(operands));
+    operands[0] = neg;
+    operands[1] = second;
+    operands[2] = first;
+    if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_CMP, operands, first->data_type, &instr->loc)))
+        return false;
 
     hlsl_block_add_instr(block, replacement);
     return true;
@@ -5429,9 +5417,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
     sort_synthetic_separated_samplers_first(ctx);
 
-    lower_ir(ctx, lower_ternary, body);
     if (profile->major_version < 4)
     {
+        lower_ir(ctx, lower_ternary, body);
+
         lower_ir(ctx, lower_nonfloat_exprs, body);
         /* Constants casted to float must be folded, and new casts to bool also need to be lowered. */
         hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);

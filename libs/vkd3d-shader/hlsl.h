@@ -602,11 +602,8 @@ enum hlsl_ir_expr_op
      * then adds c. */
     HLSL_OP3_DP2ADD,
     /* TERNARY(a, b, c) returns 'b' if 'a' is true and 'c' otherwise. 'a' must always be boolean.
-     * MOVC(a, b, c) returns 'c' if 'a' is bitwise zero and 'b' otherwise.
-     * CMP(a, b, c) returns 'b' if 'a' >= 0, and 'c' otherwise. It's used only for SM1-SM3 targets,
-       while SM4+ is using MOVC in such cases. */
+     * CMP(a, b, c) returns 'b' if 'a' >= 0, and 'c' otherwise. It's used only for SM1-SM3 targets. */
     HLSL_OP3_CMP,
-    HLSL_OP3_MOVC,
     HLSL_OP3_TERNARY,
 };
 
