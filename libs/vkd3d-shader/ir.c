@@ -5433,6 +5433,46 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             ctx->dcl_temps_found = false;
             return;
 
+        case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+            /* Exclude non-finite values. */
+            if (!(instruction->declaration.max_tessellation_factor >= 1.0f
+                    && instruction->declaration.max_tessellation_factor <= 64.0f))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION, "Max tessellation factor %f is invalid.",
+                        instruction->declaration.max_tessellation_factor);
+            return;
+
+        /* The DXIL parser can generate these outside phases, but this is not an issue. */
+        case VKD3DSIH_DCL_INPUT:
+        case VKD3DSIH_DCL_OUTPUT:
+            return;
+
+        case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
+            if (!instruction->declaration.count || instruction->declaration.count > 32)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION, "Output control point count %u is invalid.",
+                        instruction->declaration.count);
+            return;
+
+        case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
+            if (instruction->declaration.tessellator_domain == VKD3D_TESSELLATOR_DOMAIN_INVALID
+                    || instruction->declaration.tessellator_domain >= VKD3D_TESSELLATOR_DOMAIN_COUNT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                        "Tessellator domain %#x is invalid.", instruction->declaration.tessellator_domain);
+            return;
+
+        case VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
+            if (!instruction->declaration.tessellator_output_primitive
+                    || instruction->declaration.tessellator_output_primitive > VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CCW)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                        "Tessellator output primitive %#x is invalid.", instruction->declaration.tessellator_output_primitive);
+            return;
+
+        case VKD3DSIH_DCL_TESSELLATOR_PARTITIONING:
+            if (!instruction->declaration.tessellator_partitioning
+                    || instruction->declaration.tessellator_partitioning > VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_EVEN)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION,
+                        "Tessellator partitioning %#x is invalid.", instruction->declaration.tessellator_partitioning);
+            return;
+
         default:
             break;
     }
