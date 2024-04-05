@@ -606,6 +606,7 @@ static bool get_driver_properties(ID3D12Device *device, VkPhysicalDeviceProperti
 static void init_adapter_info(void)
 {
     VkPhysicalDeviceDriverPropertiesKHR driver_properties;
+    VkPhysicalDeviceProperties device_properties;
     struct vkd3d_instance *instance;
     ID3D12Device *device;
     void *libvulkan;
@@ -627,8 +628,9 @@ LOAD_VK_PFN(vkGetInstanceProcAddr)
 
     if (SUCCEEDED(hr = create_vkd3d_device(instance, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void **)&device)))
     {
-        if (get_driver_properties(device, NULL, &driver_properties))
-            trace("Driver name: %s, driver info: %s.\n", driver_properties.driverName, driver_properties.driverInfo);
+        if (get_driver_properties(device, &device_properties, &driver_properties))
+            trace("Driver name: %s, driver info: %s, device name: %s.\n", driver_properties.driverName,
+                    driver_properties.driverInfo, device_properties.deviceName);
 
         ID3D12Device_Release(device);
     }
