@@ -55,6 +55,10 @@ enum vkd3d_result
     VKD3D_ERROR_NOT_IMPLEMENTED = -5,
     /** The object or entry already exists. \since 1.12 */
     VKD3D_ERROR_KEY_ALREADY_EXISTS = -6,
+    /** The requested object was not found. \since 1.12 */
+    VKD3D_ERROR_NOT_FOUND = -7,
+    /** The output buffer is larger than the requested object \since 1.12. */
+    VKD3D_ERROR_MORE_DATA = -8,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_RESULT),
 };

@@ -179,3 +179,54 @@ int vkd3d_shader_cache_put(struct vkd3d_shader_cache *cache,
 done:
     return ret;
 }
+
+int vkd3d_shader_cache_get(struct vkd3d_shader_cache *cache,
+        const void *key, size_t key_size, void *value, size_t *value_size)
+{
+    struct shader_cache_entry *e;
+    struct shader_cache_key k;
+    struct rb_entry *entry;
+    enum vkd3d_result ret;
+    size_t size_in;
+
+    TRACE("%p, %p, %#zx, %p, %p.\n", cache, key, key_size, value, value_size);
+
+    size_in = *value_size;
+
+    k.hash = vkd3d_shader_cache_hash_key(key, key_size);
+    k.key = key;
+    k.key_size = key_size;
+    entry = rb_get(&cache->tree, &k);
+    if (!entry)
+    {
+        WARN("Entry not found.\n");
+        ret = VKD3D_ERROR_NOT_FOUND;
+        goto done;
+    }
+
+    e = RB_ENTRY_VALUE(entry, struct shader_cache_entry, entry);
+
+    *value_size = e->h.value_size;
+    if (!value)
+    {
+        TRACE("Found item %#"PRIx64", returning needed size %#"PRIx64".\n",
+                e->h.hash, e->h.value_size);
+        ret = VKD3D_OK;
+        goto done;
+    }
+
+    if (size_in < e->h.value_size)
+    {
+        WARN("Output buffer is too small for item %#"PRIx64", got %#zx want %#"PRIx64".\n",
+                e->h.hash, size_in, e->h.value_size);
+        ret = VKD3D_ERROR_MORE_DATA;
+        goto done;
+    }
+
+    memcpy(value, e->payload + e->h.key_size, e->h.value_size);
+    ret = VKD3D_OK;
+    TRACE("Returning cached item %#"PRIx64".\n", e->h.hash);
+
+done:
+    return ret;
+}

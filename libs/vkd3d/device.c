@@ -2685,10 +2685,24 @@ static HRESULT STDMETHODCALLTYPE d3d12_cache_session_GetDevice(ID3D12ShaderCache
 static HRESULT STDMETHODCALLTYPE d3d12_cache_session_FindValue(ID3D12ShaderCacheSession *iface,
         const void *key, UINT key_size, void *value, UINT *value_size)
 {
-    FIXME("iface %p, key %p, key_size %#x, value %p, value_size %p stub!\n",
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+    enum vkd3d_result ret;
+    size_t size;
+
+    TRACE("iface %p, key %p, key_size %#x, value %p, value_size %p.\n",
             iface, key, key_size, value, value_size);
 
-    return DXGI_ERROR_NOT_FOUND;
+    if (!value_size)
+    {
+        WARN("value_size is NULL, returning E_INVALIDARG.\n");
+        return E_INVALIDARG;
+    }
+
+    size = *value_size;
+    ret = vkd3d_shader_cache_get(session->cache, key, key_size, value, &size);
+    *value_size = size;
+
+    return hresult_from_vkd3d_result(ret);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_cache_session_StoreValue(ID3D12ShaderCacheSession *iface,
