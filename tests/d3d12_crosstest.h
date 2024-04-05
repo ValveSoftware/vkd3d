@@ -406,6 +406,12 @@ static inline bool is_llvmpipe_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_llvmpipe_device_gte(ID3D12Device *device,
+        uint32_t major, uint32_t minor, uint32_t patch)
+{
+    return false;
+}
+
 static inline bool is_nvidia_device(ID3D12Device *device)
 {
     return false;
@@ -564,7 +570,8 @@ static ID3D12Device *create_device(void)
     return SUCCEEDED(hr) ? device : NULL;
 }
 
-static bool get_driver_properties(ID3D12Device *device, VkPhysicalDeviceDriverPropertiesKHR *driver_properties)
+static bool get_driver_properties(ID3D12Device *device, VkPhysicalDeviceProperties *device_properties,
+        VkPhysicalDeviceDriverPropertiesKHR *driver_properties)
 {
     PFN_vkGetPhysicalDeviceProperties2KHR pfn_vkGetPhysicalDeviceProperties2KHR;
     VkPhysicalDeviceProperties2 device_properties2;
@@ -588,6 +595,8 @@ static bool get_driver_properties(ID3D12Device *device, VkPhysicalDeviceDriverPr
         device_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         device_properties2.pNext = driver_properties;
         pfn_vkGetPhysicalDeviceProperties2KHR(vk_physical_device, &device_properties2);
+        if (device_properties)
+            *device_properties = device_properties2.properties;
         return true;
     }
 
@@ -618,7 +627,7 @@ LOAD_VK_PFN(vkGetInstanceProcAddr)
 
     if (SUCCEEDED(hr = create_vkd3d_device(instance, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, (void **)&device)))
     {
-        if (get_driver_properties(device, &driver_properties))
+        if (get_driver_properties(device, NULL, &driver_properties))
             trace("Driver name: %s, driver info: %s.\n", driver_properties.driverName, driver_properties.driverInfo);
 
         ID3D12Device_Release(device);
@@ -641,7 +650,7 @@ static inline bool is_mesa_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MESA_RADV_KHR
             || properties.driverID == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR;
 }
@@ -650,7 +659,7 @@ static inline bool is_mesa_intel_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR;
 }
 
@@ -658,15 +667,42 @@ static inline bool is_llvmpipe_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE;
+}
+
+static inline bool is_llvmpipe_device_gte(ID3D12Device *device,
+        uint32_t major, uint32_t minor, uint32_t patch)
+{
+    VkPhysicalDeviceDriverPropertiesKHR driver_properties;
+    VkPhysicalDeviceProperties device_properties;
+
+    get_driver_properties(device, &device_properties, &driver_properties);
+    if (driver_properties.driverID != VK_DRIVER_ID_MESA_LLVMPIPE)
+        return false;
+
+    if (device_properties.driverVersion == 1)
+    {
+        uint32_t driver_major, driver_minor, driver_patch;
+
+        /* llvmpipe doesn't provide a valid driverVersion value, so we resort to parsing the
+         * driverInfo string. */
+        if (sscanf(driver_properties.driverInfo, "Mesa %u.%u.%u",
+                &driver_major, &driver_minor, &driver_patch) == 3)
+        {
+            device_properties.driverVersion = VK_MAKE_API_VERSION(0,
+                    driver_major, driver_minor, driver_patch);
+        }
+    }
+
+    return device_properties.driverVersion >= VK_MAKE_API_VERSION(0, major, minor, patch);
 }
 
 static inline bool is_nvidia_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_NVIDIA_PROPRIETARY_KHR;
 }
 
@@ -674,7 +710,7 @@ static inline bool is_radv_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MESA_RADV_KHR;
 }
 
@@ -682,7 +718,7 @@ static inline bool is_mvk_device(ID3D12Device *device)
 {
     VkPhysicalDeviceDriverPropertiesKHR properties;
 
-    get_driver_properties(device, &properties);
+    get_driver_properties(device, NULL, &properties);
     return properties.driverID == VK_DRIVER_ID_MOLTENVK;
 }
 

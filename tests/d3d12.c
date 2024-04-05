@@ -19588,6 +19588,15 @@ static void test_null_srv(void)
     queue = context.queue;
     device = context.device;
 
+    if (is_llvmpipe_device_gte(device, 23, 2, 1))
+    {
+        /* llvmpipe crashes when mutable descriptors are used. I don't
+         * know yet whether this is a bug in vkd3d or Mesa. */
+        skip("Test crashes on llvmpipe, skipping.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
     context.root_signature = create_texture_root_signature(context.device,
             D3D12_SHADER_VISIBILITY_PIXEL, 4, 0);
 
@@ -19802,6 +19811,15 @@ static void test_null_uav(void)
     device = context.device;
     command_list = context.list;
     queue = context.queue;
+
+    if (is_llvmpipe_device_gte(device, 23, 2, 1))
+    {
+        /* llvmpipe crashes when mutable descriptors are used. I don't
+         * know yet whether this is a bug in vkd3d or Mesa. */
+        skip("Test crashes on llvmpipe, skipping.\n");
+        destroy_test_context(&context);
+        return;
+    }
 
     descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     descriptor_ranges[0].NumDescriptors = 1;
