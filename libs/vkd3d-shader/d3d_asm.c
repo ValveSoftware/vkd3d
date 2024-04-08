@@ -2354,6 +2354,10 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
                 break;
 
             case VKD3DSIH_LABEL:
+            case VKD3DSIH_HS_DECLS:
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
                 indent = 0;
                 break;
 
