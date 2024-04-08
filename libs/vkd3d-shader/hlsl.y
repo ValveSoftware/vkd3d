@@ -1286,13 +1286,13 @@ static struct hlsl_block *make_block(struct hlsl_ctx *ctx, struct hlsl_ir_node *
     return block;
 }
 
-static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, struct hlsl_block *block,
-        const struct vkd3d_shader_location *loc)
+static union hlsl_constant_value_component evaluate_static_expression(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
+    union hlsl_constant_value_component ret = {0};
     struct hlsl_ir_constant *constant;
     struct hlsl_ir_node *node;
     struct hlsl_block expr;
-    unsigned int ret = 0;
     struct hlsl_src src;
 
     LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
@@ -1305,29 +1305,32 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
             case HLSL_IR_LOAD:
             case HLSL_IR_INDEX:
                 continue;
+            case HLSL_IR_STORE:
+                if (hlsl_ir_store(node)->lhs.var->is_synthetic)
+                    break;
+                /* fall-through */
             case HLSL_IR_CALL:
             case HLSL_IR_IF:
             case HLSL_IR_LOOP:
             case HLSL_IR_JUMP:
             case HLSL_IR_RESOURCE_LOAD:
             case HLSL_IR_RESOURCE_STORE:
-            case HLSL_IR_STORE:
             case HLSL_IR_SWITCH:
             case HLSL_IR_STATEBLOCK_CONSTANT:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
+                break;
         }
     }
 
     if (!hlsl_clone_block(ctx, &expr, &ctx->static_initializers))
-        return 0;
+        return ret;
     hlsl_block_add_block(&expr, block);
 
-    if (!add_implicit_conversion(ctx, &expr, node_from_block(&expr),
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc))
+    if (!add_implicit_conversion(ctx, &expr, node_from_block(&expr), dst_type, loc))
     {
         hlsl_block_cleanup(&expr);
-        return 0;
+        return ret;
     }
 
     /* Wrap the node into a src to allow the reference to survive the multiple const passes. */
@@ -1339,7 +1342,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
     if (node->type == HLSL_IR_CONSTANT)
     {
         constant = hlsl_ir_constant(node);
-        ret = constant->value.u[0].u;
+        ret = constant->value.u[0];
     }
     else
     {
@@ -1350,6 +1353,15 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
     hlsl_block_cleanup(&expr);
 
     return ret;
+}
+
+static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct vkd3d_shader_location *loc)
+{
+    union hlsl_constant_value_component res;
+
+    res = evaluate_static_expression(ctx, block, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
+    return res.u;
 }
 
 static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
@@ -2087,12 +2099,27 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
 
         dst_comp_type = hlsl_type_get_component_type(ctx, dst->data_type, *store_index);
 
-        if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
-            return;
+        if (dst->default_values)
+        {
+            struct hlsl_default_value default_value = {0};
 
-        if (!hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv))
-            return;
-        hlsl_block_add_block(instrs, &block);
+            if (!hlsl_clone_block(ctx, &block, instrs))
+                return;
+            default_value.value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
+
+            dst->default_values[*store_index] = default_value;
+
+            hlsl_block_cleanup(&block);
+        }
+        else
+        {
+            if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
+                return;
+
+            if (!hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv))
+                return;
+            hlsl_block_add_block(instrs, &block);
+        }
 
         ++*store_index;
     }
@@ -2348,6 +2375,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_block *initializers;
+    unsigned int component_count;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
 
@@ -2371,6 +2399,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
         }
 
         type = var->data_type;
+        component_count = hlsl_type_component_count(type);
 
         var->state_blocks = v->state_blocks;
         var->state_block_count = v->state_block_count;
@@ -2379,28 +2408,39 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
         v->state_block_capacity = 0;
         v->state_blocks = NULL;
 
-        if (var->state_blocks && hlsl_type_component_count(type) != var->state_block_count)
+        if (var->state_blocks && component_count != var->state_block_count)
         {
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Expected %u state blocks, but got %u.",
-                    hlsl_type_component_count(type), var->state_block_count);
+                    "Expected %u state blocks, but got %u.", component_count, var->state_block_count);
             free_parse_variable_def(v);
             continue;
         }
 
         if (v->initializer.args_count)
         {
+            bool is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
+                    || (var->storage_modifiers & HLSL_STORAGE_UNIFORM);
+
+            if (is_default_values_initializer)
+            {
+                assert(!var->default_values);
+                if (!(var->default_values = hlsl_calloc(ctx, component_count, sizeof(*var->default_values))))
+                {
+                    free_parse_variable_def(v);
+                    continue;
+                }
+            }
+
             if (v->initializer.braces)
             {
                 unsigned int size = initializer_size(&v->initializer);
                 unsigned int store_index = 0;
                 unsigned int k;
 
-                if (hlsl_type_component_count(type) != size)
+                if (component_count != size)
                 {
                     hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Expected %u components in initializer, but got %u.",
-                            hlsl_type_component_count(type), size);
+                            "Expected %u components in initializer, but got %u.", component_count, size);
                     free_parse_variable_def(v);
                     continue;
                 }
@@ -2420,10 +2460,18 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
             }
 
-            if (var->storage_modifiers & HLSL_STORAGE_STATIC)
+            if (is_default_values_initializer)
+            {
+                hlsl_dump_var_default_values(var);
+            }
+            else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
+            {
                 hlsl_block_add_block(&ctx->static_initializers, v->initializer.instrs);
+            }
             else
+            {
                 hlsl_block_add_block(initializers, v->initializer.instrs);
+            }
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
@@ -5718,8 +5766,7 @@ hlsl_prog:
     | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement
         {
-            if (!list_empty(&$2->instrs))
-                hlsl_fixme(ctx, &@2, "Uniform initializer.");
+            hlsl_block_add_block(&ctx->static_initializers, $2);
             destroy_block($2);
         }
     | hlsl_prog preproc_directive

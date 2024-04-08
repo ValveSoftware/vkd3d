@@ -218,6 +218,14 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
     uniform->is_uniform = 1;
     uniform->is_param = temp->is_param;
     uniform->buffer = temp->buffer;
+    if (temp->default_values)
+    {
+        /* Transfer default values from the temp to the uniform. */
+        assert(!uniform->default_values);
+        assert(hlsl_type_component_count(temp->data_type) == hlsl_type_component_count(uniform->data_type));
+        uniform->default_values = temp->default_values;
+        temp->default_values = NULL;
+    }
 
     if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", temp->name)))
         return;

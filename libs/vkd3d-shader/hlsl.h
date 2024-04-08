@@ -396,6 +396,14 @@ struct hlsl_reg_reservation
     unsigned int offset_index;
 };
 
+union hlsl_constant_value_component
+{
+    uint32_t u;
+    int32_t i;
+    float f;
+    double d;
+};
+
 struct hlsl_ir_var
 {
     struct hlsl_type *data_type;
@@ -417,6 +425,15 @@ struct hlsl_ir_var
     struct hlsl_scope *scope;
     /* Scope that contains annotations for this variable. */
     struct hlsl_scope *annotations;
+
+    /* Array of default values the variable was initialized with, one for each component.
+     * Only for variables that need it, such as uniforms and variables inside constant buffers.
+     * This pointer is NULL for others. */
+    struct hlsl_default_value
+    {
+        /* Default value, in case the component is a numeric value. */
+        union hlsl_constant_value_component value;
+    } *default_values;
 
     /* A dynamic array containing the state block on the variable's declaration, if any.
      * An array variable may contain multiple state blocks.
@@ -460,6 +477,7 @@ struct hlsl_ir_var
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
     uint32_t is_separated_resource : 1;
+    uint32_t is_synthetic : 1;
 };
 
 /* This struct is used to represent assignments in state block entries:
@@ -775,13 +793,7 @@ struct hlsl_ir_constant
     struct hlsl_ir_node node;
     struct hlsl_constant_value
     {
-        union hlsl_constant_value_component
-        {
-            uint32_t u;
-            int32_t i;
-            float f;
-            double d;
-        } u[4];
+        union hlsl_constant_value_component u[4];
     } value;
     /* Constant register of type 'c' where the constant value is stored for SM1. */
     struct hlsl_reg reg;
@@ -1249,6 +1261,7 @@ void hlsl_block_cleanup(struct hlsl_block *block);
 bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const struct hlsl_block *src_block);
 
 void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func);
+void hlsl_dump_var_default_values(const struct hlsl_ir_var *var);
 
 void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body);
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,

@@ -167,6 +167,8 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
         vkd3d_free((void *)decl->objects_usage[k]);
 
+    vkd3d_free(decl->default_values);
+
     for (i = 0; i < decl->state_block_count; ++i)
         hlsl_free_state_block(decl->state_blocks[i]);
     vkd3d_free(decl->state_blocks);
@@ -1247,6 +1249,7 @@ struct hlsl_ir_var *hlsl_new_synthetic_var_named(struct hlsl_ctx *ctx, const cha
             list_add_tail(&ctx->dummy_scope->vars, &var->scope_entry);
         else
             list_add_tail(&ctx->globals->vars, &var->scope_entry);
+        var->is_synthetic = true;
     }
     return var;
 }
@@ -3081,6 +3084,33 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
     }
     if (func->has_body)
         dump_block(ctx, &buffer, &func->body);
+
+    vkd3d_string_buffer_trace(&buffer);
+    vkd3d_string_buffer_cleanup(&buffer);
+}
+
+void hlsl_dump_var_default_values(const struct hlsl_ir_var *var)
+{
+    unsigned int k, component_count = hlsl_type_component_count(var->data_type);
+    struct vkd3d_string_buffer buffer;
+
+    vkd3d_string_buffer_init(&buffer);
+    if (!var->default_values)
+    {
+        vkd3d_string_buffer_printf(&buffer, "var \"%s\" has no default values.\n", var->name);
+        vkd3d_string_buffer_trace(&buffer);
+        vkd3d_string_buffer_cleanup(&buffer);
+        return;
+    }
+
+    vkd3d_string_buffer_printf(&buffer, "var \"%s\" default values:", var->name);
+    for (k = 0; k < component_count; ++k)
+    {
+        if (k % 4 == 0)
+            vkd3d_string_buffer_printf(&buffer, "\n   ");
+        vkd3d_string_buffer_printf(&buffer, " 0x%08x", var->default_values[k].value.u);
+    }
+    vkd3d_string_buffer_printf(&buffer, "\n");
 
     vkd3d_string_buffer_trace(&buffer);
     vkd3d_string_buffer_cleanup(&buffer);

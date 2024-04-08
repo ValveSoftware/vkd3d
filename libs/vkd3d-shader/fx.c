@@ -794,6 +794,9 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
         case HLSL_CLASS_MATRIX:
         case HLSL_CLASS_STRUCT:
             /* FIXME: write actual initial value */
+            if (var->default_values)
+                hlsl_fixme(fx->ctx, &var->loc, "Write default values.\n");
+
             offset = put_u32(buffer, 0);
 
             for (uint32_t i = 1; i < size / sizeof(uint32_t); ++i)
@@ -1010,6 +1013,8 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     {
         /* FIXME: write default value */
         set_u32(buffer, value_offset, 0);
+        if (var->default_values)
+            hlsl_fixme(fx->ctx, &var->loc, "Write default values.\n");
 
         put_u32(buffer, 0); /* Annotations count */
         if (has_annotations(var))

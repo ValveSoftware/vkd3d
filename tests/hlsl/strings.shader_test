@@ -8,7 +8,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader todo]
+[pixel shader]
 typedef float4 sTring;
 sTring var = float4(1, 2, 3, 4);
 

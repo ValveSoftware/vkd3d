@@ -1,7 +1,7 @@
 % Note that, except for effects, default values do not affect the execution.
 % The default values are intended to be obtained using reflection.
 
-[pixel shader todo]
+[pixel shader]
 float2 a = {1, 2};
 float4x2 b = {1, 2, 3, 4, 5, 6, 7, 8};
 
@@ -17,7 +17,7 @@ if(sm<4)  uniform 8 float4 10 20 0 0
 if(sm>=4) uniform 0 float4 10 20 0 0
 if(sm>=4) uniform 4 float4 10 30 50 70
 if(sm>=4) uniform 8 float4 20 40 60 80
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (10, 20, 50, 60)
 
 
@@ -28,7 +28,7 @@ float4 b = a; // initial value must be a literal expression.
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<6)]
 float a = 7;
 float4 b = {1, 2, a, 4}; // initial value must be a literal expression.
 
@@ -49,7 +49,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 static const float a = 7;
 float4 b = {1, 2, a, 4}; // static constant values are allowed on the initializer.
 
@@ -57,11 +57,11 @@ float4 main() : sv_target { return b; }
 
 [test]
 uniform 0 float4 10.0 20.0 30.0 40.0
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (10, 20, 30, 40)
 
 
-[pixel shader todo]
+[pixel shader]
 float4 a = {3, 5, float2(4, 4)}; // numeric type initializers are allowed.
 
 float4 main() : sv_target
@@ -71,11 +71,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 10.0 20.0 30.0 40.0
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (20, 40, 60, 80)
 
 
-[pixel shader todo]
+[pixel shader]
 int4 a[2] = {10, 20, float3x2(1, 2, 3, 4, 5, 6)}; // matrix numeric type initializers are allowed.
 
 float4 main() : sv_target
@@ -88,11 +88,11 @@ if(sm<4)  uniform 0 float4 10 20 30 40
 if(sm<4)  uniform 4 float4 50 60 70 80
 if(sm>=4) uniform 0 int4 10 20 30 40
 if(sm>=4) uniform 4 int4 50 60 70 80
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (100, 120, 140, 160)
 
 
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float3 a[2];
@@ -111,7 +111,7 @@ if(sm<4)  uniform 8 float4 70 90 0 0
 if(sm<4)  uniform 12 float4 80 100 0 0
 if(sm>=4) uniform 8 int4 70 90 0 0
 if(sm>=4) uniform 12 int4 80 100 0 0
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (70, 80, 90, 100)
 
 
@@ -148,7 +148,7 @@ cbuffer buff
 float4 main() : sv_target { return 0; }
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<6)]
 cbuffer buff
 {
     float a = 7;
@@ -236,7 +236,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 static const float3x2 mat = {10, 20, 30, 40, 50, 60};
 static const float4 array[2] = {1, 2, 3, 4, 5, 6, 7, 8};
 static const int idx = 1;
