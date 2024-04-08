@@ -589,24 +589,46 @@ static bool d3d11_runner_draw(struct shader_runner *r,
 {
     ID3D11UnorderedAccessView *uavs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
     ID3D11RenderTargetView *rtvs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
+    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL;
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
     unsigned int min_uav_slot = ARRAY_SIZE(uavs);
     ID3D11Device *device = runner->device;
-    ID3D10Blob *vs_code, *ps_code;
     unsigned int rtv_count = 0;
     ID3D11Buffer *cb = NULL;
     ID3D11VertexShader *vs;
+    ID3D11DomainShader *ds;
     ID3D11PixelShader *ps;
+    ID3D11HullShader *hs;
+    bool succeeded;
     unsigned int i;
     HRESULT hr;
 
-    if (!(vs_code = compile_shader(runner, runner->r.vs_source, "vs")))
-        return false;
+    vs_code = compile_shader(runner, runner->r.vs_source, "vs");
+    ps_code = compile_shader(runner, runner->r.ps_source, "ps");
+    succeeded = vs_code && ps_code;
 
-    if (!(ps_code = compile_shader(runner, runner->r.ps_source, "ps")))
+    if (runner->r.hs_source)
     {
-        ID3D10Blob_Release(vs_code);
+        hs_code = compile_shader(runner, runner->r.hs_source, "hs");
+        succeeded = succeeded && hs_code;
+    }
+    if (runner->r.ds_source)
+    {
+        ds_code = compile_shader(runner, runner->r.ds_source, "ds");
+        succeeded = succeeded && ds_code;
+    }
+
+    if (!succeeded)
+    {
+        if (ps_code)
+            ID3D10Blob_Release(ps_code);
+        if (vs_code)
+            ID3D10Blob_Release(vs_code);
+        if (hs_code)
+            ID3D10Blob_Release(hs_code);
+        if (ds_code)
+            ID3D10Blob_Release(ds_code);
         return false;
     }
 
@@ -618,12 +640,35 @@ static bool d3d11_runner_draw(struct shader_runner *r,
             ID3D10Blob_GetBufferSize(ps_code), NULL, &ps);
     ok(hr == S_OK, "Failed to create pixel shader, hr %#lx.\n", hr);
 
+    if (hs_code)
+    {
+        hr = ID3D11Device_CreateHullShader(device, ID3D10Blob_GetBufferPointer(hs_code),
+                ID3D10Blob_GetBufferSize(hs_code), NULL, &hs);
+        ok(hr == S_OK, "Failed to create hull shader, hr %#lx.\n", hr);
+    }
+    if (ds_code)
+    {
+        hr = ID3D11Device_CreateDomainShader(device, ID3D10Blob_GetBufferPointer(ds_code),
+                ID3D10Blob_GetBufferSize(ds_code), NULL, &ds);
+        ok(hr == S_OK, "Failed to create domain shader, hr %#lx.\n", hr);
+    }
+
+    ID3D10Blob_Release(ps_code);
+    if (hs_code)
+        ID3D10Blob_Release(hs_code);
+    if (ds_code)
+        ID3D10Blob_Release(ds_code);
+
     if (runner->r.uniform_count)
     {
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
                 runner->r.uniform_count * sizeof(*runner->r.uniforms), 0, runner->r.uniforms);
         ID3D11DeviceContext_VSSetConstantBuffers(context, 0, 1, &cb);
         ID3D11DeviceContext_PSSetConstantBuffers(context, 0, 1, &cb);
+        if (hs_code)
+            ID3D11DeviceContext_HSSetConstantBuffers(context, 0, 1, &cb);
+        if (ds_code)
+            ID3D11DeviceContext_DSSetConstantBuffers(context, 0, 1, &cb);
     }
 
     for (i = 0; i < runner->r.resource_count; ++i)
@@ -694,15 +739,25 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ID3D11InputLayout_Release(input_layout);
     }
 
+    ID3D10Blob_Release(vs_code);
+
     ID3D11DeviceContext_IASetPrimitiveTopology(context, primitive_topology);
     ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);
+    if (hs_code)
+        ID3D11DeviceContext_HSSetShader(context, hs, NULL, 0);
+    if (ds_code)
+        ID3D11DeviceContext_DSSetShader(context, ds, NULL, 0);
     ID3D11DeviceContext_RSSetState(context, runner->rasterizer_state);
 
     ID3D11DeviceContext_Draw(context, vertex_count, 0);
 
     ID3D11PixelShader_Release(ps);
     ID3D11VertexShader_Release(vs);
+    if (hs_code)
+        ID3D11HullShader_Release(hs);
+    if (ds_code)
+        ID3D11DomainShader_Release(ds);
     if (cb)
         ID3D11Buffer_Release(cb);
 

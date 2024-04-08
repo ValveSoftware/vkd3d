@@ -434,29 +434,47 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     struct test_context *test_context = &runner->test_context;
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
+    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL;
     ID3D12GraphicsCommandList *command_list = test_context->list;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     ID3D12Device *device = test_context->device;
-    ID3D10Blob *vs_code, *ps_code;
     unsigned int uniform_index;
     unsigned int rtv_count = 0;
     ID3D12PipelineState *pso;
+    bool succeeded;
     HRESULT hr;
     size_t i;
 
     ps_code = compile_shader(runner, runner->r.ps_source, SHADER_TYPE_PS);
     vs_code = compile_shader(runner, runner->r.vs_source, SHADER_TYPE_VS);
-    todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
-    ok(ps_code && vs_code, "Failed to compile shaders.\n");
+    succeeded = ps_code && vs_code;
 
-    if (!ps_code || !vs_code)
+    if (runner->r.hs_source)
+    {
+        hs_code = compile_shader(runner, runner->r.hs_source, SHADER_TYPE_HS);
+        succeeded = succeeded && hs_code;
+    }
+    if (runner->r.ds_source)
+    {
+        ds_code = compile_shader(runner, runner->r.ds_source, SHADER_TYPE_DS);
+        succeeded = succeeded && ds_code;
+    }
+
+    todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
+    ok(succeeded, "Failed to compile shaders.\n");
+
+    if (!succeeded)
     {
         if (ps_code)
             ID3D10Blob_Release(ps_code);
         if (vs_code)
             ID3D10Blob_Release(vs_code);
+        if (hs_code)
+            ID3D10Blob_Release(hs_code);
+        if (ds_code)
+            ID3D10Blob_Release(ds_code);
         return false;
     }
 
@@ -481,9 +499,20 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
     pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
     pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
+    if (hs_code)
+    {
+        pso_desc.HS.pShaderBytecode = ID3D10Blob_GetBufferPointer(hs_code);
+        pso_desc.HS.BytecodeLength = ID3D10Blob_GetBufferSize(hs_code);
+        pso_desc.DS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ds_code);
+        pso_desc.DS.BytecodeLength = ID3D10Blob_GetBufferSize(ds_code);
+        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    }
+    else
+    {
+        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    }
     pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     pso_desc.SampleDesc.Count = 1;
     pso_desc.SampleMask = ~(UINT)0;
     pso_desc.pRootSignature = test_context->root_signature;
@@ -510,6 +539,10 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     todo_if(runner->r.is_todo) ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
+    if (hs_code)
+        ID3D10Blob_Release(hs_code);
+    if (ds_code)
+        ID3D10Blob_Release(ds_code);
     free(input_element_descs);
 
     if (FAILED(hr))

@@ -804,20 +804,40 @@ static GLenum get_compare_op_gl(D3D12_COMPARISON_FUNC op)
 
 static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Blob **vs_blob)
 {
+    ID3D10Blob *fs_blob, *hs_blob = NULL, *ds_blob = NULL;
     struct vkd3d_shader_code vs_code, fs_code;
     GLuint program_id, vs_id, fs_id;
     const GLchar *source;
-    ID3D10Blob *fs_blob;
     GLint status, size;
+    bool succeeded;
 
     reset_combined_samplers(runner);
 
-    if (!(*vs_blob = compile_hlsl(&runner->r, runner->r.vs_source, "vs")))
-        return false;
+    *vs_blob = compile_hlsl(&runner->r, runner->r.vs_source, "vs");
+    fs_blob = compile_hlsl(&runner->r, runner->r.ps_source, "ps");
+    succeeded = *vs_blob && fs_blob;
 
-    if (!(fs_blob = compile_hlsl(&runner->r, runner->r.ps_source, "ps")))
+    if (runner->r.hs_source)
     {
-        ID3D10Blob_Release(*vs_blob);
+        hs_blob = compile_hlsl(&runner->r, runner->r.hs_source, "hs");
+        succeeded = succeeded && hs_blob;
+    }
+    if (runner->r.ds_source)
+    {
+        ds_blob = compile_hlsl(&runner->r, runner->r.ds_source, "ds");
+        succeeded = succeeded && ds_blob;
+    }
+
+    if (!succeeded)
+    {
+        if (*vs_blob)
+            ID3D10Blob_Release(*vs_blob);
+        if (fs_blob)
+            ID3D10Blob_Release(fs_blob);
+        if (hs_blob)
+            ID3D10Blob_Release(hs_blob);
+        if (ds_blob)
+            ID3D10Blob_Release(ds_blob);
         return false;
     }
 
@@ -836,6 +856,13 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
         return false;
     }
     ID3D10Blob_Release(fs_blob);
+
+    /* TODO: compile and use the hs and ds blobs too, but currently this
+     * point is not reached because compile_hlsl() fails on these. */
+    if (hs_blob)
+        ID3D10Blob_Release(hs_blob);
+    if (ds_blob)
+        ID3D10Blob_Release(ds_blob);
 
     vs_id = glCreateShader(GL_VERTEX_SHADER);
     if (runner->language == SPIR_V)

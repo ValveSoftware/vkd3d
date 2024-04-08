@@ -202,6 +202,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/swizzle-matrix.shader_test \
 	tests/hlsl/swizzles.shader_test \
 	tests/hlsl/ternary.shader_test \
+	tests/hlsl/tessellation.shader_test \
 	tests/hlsl/texture-load-offset.shader_test \
 	tests/hlsl/texture-load-typed.shader_test \
 	tests/hlsl/texture-load.shader_test \

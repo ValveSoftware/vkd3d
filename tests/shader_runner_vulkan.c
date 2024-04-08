@@ -683,9 +683,10 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
+    VkPipelineTessellationStateCreateInfo tessellation_info;
     VkVertexInputAttributeDescription input_attributes[32];
     VkVertexInputBindingDescription input_bindings[32];
-    VkPipelineShaderStageCreateInfo stage_desc[2];
+    VkPipelineShaderStageCreateInfo stage_desc[4];
     struct vkd3d_shader_code vs_dxbc;
     VkDevice device = runner->device;
     VkPipeline pipeline;
@@ -696,11 +697,17 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     memset(stage_desc, 0, sizeof(stage_desc));
     ret = create_shader_stage(runner, &stage_desc[0], "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc)
             && create_shader_stage(runner, &stage_desc[1], "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL);
+
+    if (runner->r.hs_source)
+    {
+        ret &= create_shader_stage(runner, &stage_desc[1], "hs", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source, NULL);
+        ret &= create_shader_stage(runner, &stage_desc[2], "ds", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source, NULL);
+    }
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
     if (!ret)
     {
-        VK_CALL(vkDestroyShaderModule(device, stage_desc[0].module, NULL));
-        VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
+        for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
+            VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
         return VK_NULL_HANDLE;
     }
 
@@ -791,11 +798,21 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     pipeline_desc.renderPass = render_pass;
     pipeline_desc.subpass = 0;
 
+    if (runner->r.hs_source)
+    {
+        tessellation_info.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+        tessellation_info.pNext = NULL;
+        tessellation_info.flags = 0;
+        tessellation_info.patchControlPoints
+                = max(primitive_topology - D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST + 1, 1);
+        pipeline_desc.pTessellationState = &tessellation_info;
+    }
+
     vr = VK_CALL(vkCreateGraphicsPipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
     ok(vr == VK_SUCCESS, "Failed to create graphics pipeline, vr %d.\n", vr);
 
-    VK_CALL(vkDestroyShaderModule(device, stage_desc[0].module, NULL));
-    VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
+    for (i = 0; i < ARRAY_SIZE(stage_desc); ++i)
+        VK_CALL(vkDestroyShaderModule(device, stage_desc[i].module, NULL));
     vkd3d_shader_free_scan_signature_info(&runner->vs_signatures);
     vkd3d_shader_free_shader_code(&vs_dxbc);
 

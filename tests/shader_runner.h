@@ -45,6 +45,8 @@ enum shader_type
     SHADER_TYPE_CS,
     SHADER_TYPE_PS,
     SHADER_TYPE_VS,
+    SHADER_TYPE_HS,
+    SHADER_TYPE_DS,
     SHADER_TYPE_FX,
 };
 
@@ -157,6 +159,8 @@ struct shader_runner
     char *ps_source;
     char *cs_source;
     char *fx_source;
+    char *hs_source;
+    char *ds_source;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
     bool require_float64;

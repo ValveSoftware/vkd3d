@@ -107,6 +107,10 @@ enum parse_state
     STATE_SHADER_VERTEX_TODO,
     STATE_SHADER_EFFECT,
     STATE_SHADER_EFFECT_TODO,
+    STATE_SHADER_HULL,
+    STATE_SHADER_HULL_TODO,
+    STATE_SHADER_DOMAIN,
+    STATE_SHADER_DOMAIN_TODO,
     STATE_TEST,
 };
 
@@ -818,6 +822,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             "    return pos;\n"
             "}";
 
+        if (!runner->hs_source != !runner->ds_source)
+            fatal_error("Have a domain or hull shader but not both.\n");
+
         if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
         {
             memset(&params, 0, sizeof(params));
@@ -868,6 +875,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         struct resource_params params;
         unsigned int vertex_count;
 
+        if (!runner->hs_source != !runner->ds_source)
+            fatal_error("Have a domain or hull shader but not both.\n");
+
         if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
         {
             memset(&params, 0, sizeof(params));
@@ -888,6 +898,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         else if (match_string(line, "triangle strip", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+        else if (match_string(line, "1 control point patch list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
+        else if (match_string(line, "2 control point patch list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_2_CONTROL_POINT_PATCHLIST;
+        else if (match_string(line, "3 control point patch list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+        else if (match_string(line, "4 control point patch list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST;
         else
             fatal_error("Unknown primitive topology '%s'.\n", line);
 
@@ -1205,6 +1223,8 @@ const char *shader_type_string(enum shader_type type)
         [SHADER_TYPE_CS] = "cs",
         [SHADER_TYPE_PS] = "ps",
         [SHADER_TYPE_VS] = "vs",
+        [SHADER_TYPE_HS] = "hs",
+        [SHADER_TYPE_DS] = "ds",
         [SHADER_TYPE_FX] = "fx",
     };
     assert(type < ARRAY_SIZE(shader_types));
@@ -1266,6 +1286,8 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, u
         [SHADER_TYPE_CS] = L"cs_6_0",
         [SHADER_TYPE_PS] = L"ps_6_0",
         [SHADER_TYPE_VS] = L"vs_6_0",
+        [SHADER_TYPE_HS] = L"hs_6_0",
+        [SHADER_TYPE_DS] = L"ds_6_0",
     };
     const WCHAR *args[] =
     {
@@ -1393,6 +1415,10 @@ static enum parse_state get_parse_state_todo(enum parse_state state)
         return STATE_SHADER_PIXEL_TODO;
     else if (state == STATE_SHADER_VERTEX)
         return STATE_SHADER_VERTEX_TODO;
+    else if (state == STATE_SHADER_HULL)
+        return STATE_SHADER_HULL_TODO;
+    else if (state == STATE_SHADER_DOMAIN)
+        return STATE_SHADER_DOMAIN_TODO;
     else
         return STATE_SHADER_EFFECT_TODO;
 }
@@ -1613,6 +1639,36 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     shader_source_size = 0;
                     break;
 
+                case STATE_SHADER_HULL:
+                case STATE_SHADER_HULL_TODO:
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_HULL_TODO)
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_HS,
+                                expect_hr);
+                    }
+                    free(runner->hs_source);
+                    runner->hs_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
+                case STATE_SHADER_DOMAIN:
+                case STATE_SHADER_DOMAIN_TODO:
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_DOMAIN_TODO)
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_DS,
+                                expect_hr);
+                    }
+                    free(runner->ds_source);
+                    runner->ds_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
                 case STATE_PREPROC_INVALID:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -1795,6 +1851,18 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 expect_hr = S_OK;
                 state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
+            else if (match_directive_substring(line, "[hull shader", &line))
+            {
+                state = STATE_SHADER_HULL;
+                expect_hr = S_OK;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+            }
+            else if (match_directive_substring(line, "[domain shader", &line))
+            {
+                state = STATE_SHADER_DOMAIN;
+                expect_hr = S_OK;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+            }
             else if (!strcmp(line, "[input layout]\n"))
             {
                 state = STATE_INPUT_LAYOUT;
@@ -1826,6 +1894,10 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_SHADER_VERTEX_TODO:
                 case STATE_SHADER_EFFECT:
                 case STATE_SHADER_EFFECT_TODO:
+                case STATE_SHADER_HULL:
+                case STATE_SHADER_HULL_TODO:
+                case STATE_SHADER_DOMAIN:
+                case STATE_SHADER_DOMAIN_TODO:
                 {
                     size_t len = strlen(line);
 

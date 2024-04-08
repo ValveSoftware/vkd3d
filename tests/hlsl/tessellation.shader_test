@@ -1,0 +1,98 @@
+[require]
+shader model >= 5.0
+
+[vertex shader]
+struct data
+{
+    float4 position : SV_Position;
+    float r : RED;
+    float g : GREEN;
+    float b : BLUE;
+};
+
+void main(uint id : SV_VertexID, out data output)
+{
+    float2 coords = float2((id << 1) & 2, id & 2);
+    output.position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
+    output.r = 0.0;
+    output.g = 1.0;
+    output.b = 0.0;
+}
+
+[hull shader todo]
+struct data
+{
+    float4 position : SV_Position;
+    float r : RED;
+    float g : GREEN;
+    float b : BLUE;
+};
+
+struct patch_constant_data
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+
+void patch_constant(InputPatch<data, 3> input, out patch_constant_data output)
+{
+    output.edges[0] = output.edges[1] = output.edges[2] = 1.0f;
+    output.inside = 1.0f;
+}
+
+    [domain("tri")]
+    [outputcontrolpoints(3)]
+    [partitioning("integer")]
+    [outputtopology("triangle_cw")]
+    [patchconstantfunc("patch_constant")]
+data main(InputPatch<data, 3> input, uint i : SV_OutputControlPointID)
+{
+    return input[i];
+}
+
+[domain shader todo]
+struct data
+{
+    float4 position : SV_Position;
+    float r : RED;
+    float g : GREEN;
+    float b : BLUE;
+};
+
+struct patch_constant_data
+{
+    float edges[3] : SV_TessFactor;
+    float inside : SV_InsideTessFactor;
+};
+
+    [domain("tri")]
+void main(patch_constant_data input,
+        float3 tess_coord : SV_DomainLocation,
+        const OutputPatch<data, 3> patch,
+        out data output)
+{
+    output.position = tess_coord.x * patch[0].position
+            + tess_coord.y * patch[1].position
+            + tess_coord.z * patch[2].position;
+    output.r = tess_coord.x * patch[0].r + tess_coord.y * patch[1].r + tess_coord.z * patch[2].r;
+    output.g = tess_coord.x * patch[0].g + tess_coord.y * patch[1].g + tess_coord.z * patch[2].g;
+    output.b = tess_coord.x * patch[0].b + tess_coord.y * patch[1].b + tess_coord.z * patch[2].b;
+}
+
+[pixel shader]
+struct data
+{
+    float4 position : SV_Position;
+    float r : RED;
+    float g : GREEN;
+    float b : BLUE;
+};
+
+float4 main(data input) : sv_target
+{
+    return float4(input.r, input.g, input.b, 1.0);
+}
+
+[test]
+todo draw 3 control point patch list 3
+probe all rgba (0.0, 1.0, 0.0, 1.0)
