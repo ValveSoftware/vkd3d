@@ -75,7 +75,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     cd mesa && \
     mkdir build && \
     cd build && \
-    meson setup -Dprefix=/opt/mesa24 -Dplatforms= -Dvideo-codecs= -Dvulkan-drivers=swrast -Dgallium-drivers=swrast -Dopengl=true -Degl=enabled -Dglvnd=true -Dshared-glapi=enabled -Dglx=disabled -Dgles1=disabled -Dgles2=disabled .. && \
+    meson setup --buildtype release -Dprefix=/opt/mesa24 -Dplatforms= -Dvideo-codecs= -Dvulkan-drivers=swrast -Dgallium-drivers=swrast -Dopengl=true -Degl=enabled -Dglvnd=true -Dshared-glapi=enabled -Dglx=disabled -Dgles1=disabled -Dgles2=disabled .. && \
     meson install && \
     cd ../.. && \
     rm -fr mesa && \
