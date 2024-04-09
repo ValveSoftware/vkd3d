@@ -404,14 +404,6 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     uint32_t name_offset, offset, size, stride, numeric_desc;
     uint32_t elements_count = 0;
     const char *name;
-    static const uint32_t variable_type[] =
-    {
-        [HLSL_CLASS_SCALAR] = 1,
-        [HLSL_CLASS_VECTOR] = 1,
-        [HLSL_CLASS_MATRIX] = 1,
-        [HLSL_CLASS_OBJECT] = 2,
-        [HLSL_CLASS_STRUCT] = 3,
-    };
     struct hlsl_ctx *ctx = fx->ctx;
 
     /* Resolve arrays to element type and number of elements. */
@@ -431,13 +423,19 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
-        case HLSL_CLASS_OBJECT:
-        case HLSL_CLASS_STRUCT:
-            put_u32_unaligned(buffer, variable_type[type->class]);
+            put_u32_unaligned(buffer, 1);
             break;
-        default:
-            hlsl_fixme(ctx, &ctx->location, "Writing type class %u is not implemented.", type->class);
-            return 0;
+
+        case HLSL_CLASS_OBJECT:
+            put_u32_unaligned(buffer, 2);
+            break;
+
+        case HLSL_CLASS_STRUCT:
+            put_u32_unaligned(buffer, 3);
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            vkd3d_unreachable();
     }
 
     size = stride = type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
