@@ -1526,6 +1526,15 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
     {
         case HLSL_TYPE_BOOL:
             return D3DXPT_BOOL;
+        /* Actually double behaves differently depending on DLL version:
+         * For <= 36, it maps to D3DXPT_FLOAT.
+         * For 37-40, it maps to zero (D3DXPT_VOID).
+         * For >= 41, it maps to 39, which is D3D_SVT_DOUBLE (note D3D_SVT_*
+         *            values are mostly compatible with D3DXPT_*).
+         * However, the latter two cases look like bugs, and a reasonable
+         * application certainly wouldn't know what to do with them.
+         * For fx_2_0 it's always D3DXPT_FLOAT regardless of DLL version. */
+        case HLSL_TYPE_DOUBLE:
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:
             return D3DXPT_FLOAT;
