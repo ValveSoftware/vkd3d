@@ -2003,6 +2003,11 @@ static HRESULT d3d12_resource_init(struct d3d12_resource *resource, struct d3d12
         WARN("Invalid initial resource state %#x.\n", initial_state);
         return E_INVALIDARG;
     }
+    if (initial_state == D3D12_RESOURCE_STATE_RENDER_TARGET && !(desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET))
+    {
+        WARN("Invalid initial resource state %#x for non-render-target.\n", initial_state);
+        return E_INVALIDARG;
+    }
 
     if (optimized_clear_value && d3d12_resource_is_buffer(resource))
     {
