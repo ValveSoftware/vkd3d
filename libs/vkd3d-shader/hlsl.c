@@ -365,6 +365,9 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             }
             break;
         }
+
+        case HLSL_CLASS_VOID:
+            break;
     }
 }
 
@@ -375,6 +378,25 @@ unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, 
     if (regset == HLSL_REGSET_NUMERIC)
         return align(type->reg_size[regset], 4);
     return type->reg_size[regset];
+}
+
+static struct hlsl_type *hlsl_new_simple_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class class)
+{
+    struct hlsl_type *type;
+
+    if (!(type = hlsl_alloc(ctx, sizeof(*type))))
+        return NULL;
+    if (!(type->name = hlsl_strdup(ctx, name)))
+    {
+        vkd3d_free(type);
+        return NULL;
+    }
+    type->class = class;
+    hlsl_type_calculate_reg_size(ctx, type);
+
+    list_add_tail(&ctx->types, &type->entry);
+
+    return type;
 }
 
 static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
@@ -402,7 +424,22 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
 
 static bool type_is_single_component(const struct hlsl_type *type)
 {
-    return type->class == HLSL_CLASS_SCALAR || type->class == HLSL_CLASS_OBJECT;
+    switch (type->class)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_OBJECT:
+            return true;
+
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+        case HLSL_CLASS_STRUCT:
+        case HLSL_CLASS_ARRAY:
+            return false;
+
+        case HLSL_CLASS_VOID:
+            break;
+    }
+    vkd3d_unreachable();
 }
 
 /* Given a type and a component index, this function moves one step through the path required to
@@ -525,7 +562,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
                 assert(idx == 0);
                 break;
 
-            default:
+            case HLSL_CLASS_VOID:
                 vkd3d_unreachable();
         }
         type = next_type;
@@ -752,7 +789,6 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->class = HLSL_CLASS_STRUCT;
-    type->base_type = HLSL_TYPE_VOID;
     type->name = name;
     type->dimy = 1;
     type->e.record.fields = fields;
@@ -896,9 +932,11 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_OBJECT:
             return 1;
 
-        default:
-            vkd3d_unreachable();
+        case HLSL_CLASS_VOID:
+            break;
     }
+
+    vkd3d_unreachable();
 }
 
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2)
@@ -2313,15 +2351,16 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                     return string;
 
                 default:
-                    vkd3d_string_buffer_printf(string, "<unexpected type>");
-                    return string;
+                    break;
             }
         }
 
-        default:
-            vkd3d_string_buffer_printf(string, "<unexpected type>");
-            return string;
+        case HLSL_CLASS_VOID:
+            break;
     }
+
+    vkd3d_string_buffer_printf(string, "<unexpected type>");
+    return string;
 }
 
 struct vkd3d_string_buffer *hlsl_component_to_string(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var,
@@ -3609,7 +3648,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         ctx->builtin_types.sampler[bt] = type;
     }
 
-    ctx->builtin_types.Void = hlsl_new_type(ctx, "void", HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
+    ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {

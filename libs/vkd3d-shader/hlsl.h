@@ -79,6 +79,7 @@ enum hlsl_type_class
     HLSL_CLASS_STRUCT,
     HLSL_CLASS_ARRAY,
     HLSL_CLASS_OBJECT,
+    HLSL_CLASS_VOID,
 };
 
 enum hlsl_base_type
@@ -101,7 +102,6 @@ enum hlsl_base_type
     HLSL_TYPE_TECHNIQUE,
     HLSL_TYPE_EFFECT_GROUP,
     HLSL_TYPE_STRING,
-    HLSL_TYPE_VOID,
 };
 
 enum hlsl_sampler_dim
@@ -175,7 +175,7 @@ struct hlsl_type
      *   If base_type is HLSL_TYPE_SAMPLER, then both dimx = 1 and dimy = 1.
      *   If base_type is HLSL_TYPE_TEXTURE, then dimx = 4 and dimy = 1.
      *   If base_type is HLSL_TYPE_UAV, then dimx is the dimx of e.resource_format, and dimy = 1.
-     * Otherwise both dimx = 1 and dimy = 1. */
+     */
     unsigned int dimx;
     unsigned int dimy;
     /* Sample count for HLSL_SAMPLER_DIM_2DMS or HLSL_SAMPLER_DIM_2DMSARRAY. */

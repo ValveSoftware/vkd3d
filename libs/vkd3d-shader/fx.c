@@ -436,6 +436,11 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         case HLSL_CLASS_ARRAY:
             vkd3d_unreachable();
+
+        case HLSL_CLASS_VOID:
+            FIXME("Writing type class %u is not implemented.\n", type->class);
+            set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
+            return 0;
     }
 
     size = stride = type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float);
@@ -814,6 +819,9 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
                 default:
                     return false;
             }
+
+        case HLSL_CLASS_VOID:
+            return false;
     }
 
     vkd3d_unreachable();

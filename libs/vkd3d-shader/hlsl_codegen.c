@@ -1634,6 +1634,9 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             /* FIXME: Actually we shouldn't even get here, but we don't split
              * matrices yet. */
             return false;
+
+        case HLSL_CLASS_VOID:
+            vkd3d_unreachable();
     }
 
     if (copy_propagation_replace_with_constant_vector(ctx, state, load, HLSL_SWIZZLE(X, Y, Z, W), &load->node))

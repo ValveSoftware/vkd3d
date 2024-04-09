@@ -1514,10 +1514,11 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
             return D3DXPC_STRUCT;
         case HLSL_CLASS_VECTOR:
             return D3DXPC_VECTOR;
-        default:
-            ERR("Invalid class %#x.\n", type->class);
-            vkd3d_unreachable();
+        case HLSL_CLASS_VOID:
+            break;
     }
+
+    vkd3d_unreachable();
 }
 
 D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
@@ -1595,8 +1596,6 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
                     break;
                 case HLSL_TYPE_VERTEXSHADER:
                     return D3DXPT_VERTEXSHADER;
-                case HLSL_TYPE_VOID:
-                    return D3DXPT_VOID;
                 default:
                     vkd3d_unreachable();
             }
@@ -1607,6 +1606,9 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
 
         case HLSL_CLASS_STRUCT:
             return D3DXPT_VOID;
+
+        case HLSL_CLASS_VOID:
+            break;
     }
 
     vkd3d_unreachable();

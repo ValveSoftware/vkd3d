@@ -3008,6 +3008,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_ARRAY:
         case HLSL_CLASS_STRUCT:
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_VOID:
             break;
     }
     vkd3d_unreachable();
