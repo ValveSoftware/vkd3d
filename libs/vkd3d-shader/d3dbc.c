@@ -1744,6 +1744,8 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */
+            if (var->default_values)
+                FIXME("Write SM1 default values.\n");
         }
     }
 
