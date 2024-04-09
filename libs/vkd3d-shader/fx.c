@@ -631,7 +631,6 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     uint32_t semantic_offset, offset, elements_count = 0, name_offset;
-    struct hlsl_ctx *ctx = fx->ctx;
     size_t i;
 
     /* Resolve arrays to element type and number of elements. */
@@ -643,23 +642,6 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
 
     name_offset = write_string(name, fx);
     semantic_offset = write_string(semantic->name, fx);
-
-    switch (type->base_type)
-    {
-        case HLSL_TYPE_DOUBLE:
-        case HLSL_TYPE_HALF:
-        case HLSL_TYPE_FLOAT:
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-        case HLSL_TYPE_VOID:
-        case HLSL_TYPE_TEXTURE:
-            break;
-        default:
-            hlsl_fixme(ctx, &ctx->location, "Writing parameter type %u is not implemented.",
-                    type->base_type);
-            return 0;
-    };
 
     offset = put_u32(buffer, hlsl_sm1_base_type(type));
     put_u32(buffer, hlsl_sm1_class(type));
@@ -690,6 +672,9 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
         for (i = 0; i < type->e.record.field_count; ++i)
         {
             const struct hlsl_struct_field *field = &type->e.record.fields[i];
+
+            /* Validated in check_invalid_object_fields(). */
+            assert(hlsl_is_numeric_type(field->type));
             write_fx_2_parameter(field->type, field->name, &field->semantic, fx);
         }
     }
@@ -777,44 +762,54 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
     return offset;
 }
 
-static bool is_type_supported_fx_2(const struct hlsl_type *type)
+static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+        const struct vkd3d_shader_location *loc)
 {
-    type = hlsl_get_multiarray_element_type(type);
-
-    if (type->class == HLSL_CLASS_STRUCT)
-        return true;
-
-    switch (type->base_type)
+    switch (type->class)
     {
-        case HLSL_TYPE_FLOAT:
-        case HLSL_TYPE_HALF:
-        case HLSL_TYPE_DOUBLE:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_PIXELSHADER:
-        case HLSL_TYPE_VERTEXSHADER:
-        case HLSL_TYPE_STRING:
+        case HLSL_CLASS_STRUCT:
+            /* Note that the fields must all be numeric; this was validated in
+             * check_invalid_object_fields(). */
             return true;
-        case HLSL_TYPE_TEXTURE:
-        case HLSL_TYPE_SAMPLER:
-            switch (type->sampler_dim)
+
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            return true;
+
+        case HLSL_CLASS_ARRAY:
+            return is_type_supported_fx_2(ctx, type->e.array.type, loc);
+
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
             {
-                case HLSL_SAMPLER_DIM_1D:
-                case HLSL_SAMPLER_DIM_2D:
-                case HLSL_SAMPLER_DIM_3D:
-                case HLSL_SAMPLER_DIM_CUBE:
-                case HLSL_SAMPLER_DIM_GENERIC:
-                    return true;
+                case HLSL_TYPE_TEXTURE:
+                    switch (type->sampler_dim)
+                    {
+                        case HLSL_SAMPLER_DIM_1D:
+                        case HLSL_SAMPLER_DIM_2D:
+                        case HLSL_SAMPLER_DIM_3D:
+                        case HLSL_SAMPLER_DIM_CUBE:
+                        case HLSL_SAMPLER_DIM_GENERIC:
+                            return true;
+                        default:
+                            return false;
+                    }
+                    break;
+
+                case HLSL_TYPE_SAMPLER:
+                case HLSL_TYPE_STRING:
+                case HLSL_TYPE_PIXELSHADER:
+                case HLSL_TYPE_VERTEXSHADER:
+                    hlsl_fixme(ctx, loc, "Write fx 2.0 parameter object type %#x.", type->base_type);
+                    return false;
+
                 default:
-                    ;
+                    return false;
             }
-            break;
-        default:
-            return false;
     }
 
-    return false;
+    vkd3d_unreachable();
 }
 
 static void write_fx_2_parameters(struct fx_write_context *fx)
@@ -830,7 +825,7 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!is_type_supported_fx_2(var->data_type))
+        if (!is_type_supported_fx_2(ctx, var->data_type, &var->loc))
             continue;
 
         desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
