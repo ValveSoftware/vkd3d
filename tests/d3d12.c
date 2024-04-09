@@ -38385,9 +38385,9 @@ static void test_unused_interpolated_input(void)
 
 static void test_shader_cache(void)
 {
+    unsigned int refcount, base_refcount, value_size;
     ID3D12ShaderCacheSession *session, *session2;
     D3D12_SHADER_CACHE_SESSION_DESC desc = {0};
-    unsigned int refcount, base_refcount;
     struct test_context context;
     ID3D12Device9 *device;
     IUnknown *unk, *unk2;
@@ -38395,6 +38395,13 @@ static void test_shader_cache(void)
 
     static const GUID test_guid
             = {0xfdb37466, 0x428f, 0x4edf, {0xa3, 0x7f, 0x9b, 0x1d, 0xf4, 0x88, 0xc5, 0xfc}};
+
+    static const char key1[] = "1234567890";
+    static const char key2[] = "ABCDEFGHIJ";
+    char blob1[20 * 1024];
+    char blob2[20 * 1024];
+    char blob3[30 * 1024];
+    char blob4[40 * 1024];
 
     if (!init_test_context(&context, NULL))
         return;
@@ -38570,6 +38577,159 @@ static void test_shader_cache(void)
     ok(session2 != session, "Expected different interface pointers, got %p for both.\n",
             session);
     ID3D12ShaderCacheSession_Release(session2);
+
+    memset(blob1, '1', sizeof(blob1));
+    memset(blob2, '2', sizeof(blob2));
+    memset(blob3, '3', sizeof(blob3));
+    memset(blob4, '4', sizeof(blob4));
+
+    /* Basic store and retrieval.
+     *
+     * Adding a key a second time is not allowed (unless the entry has been evicted), but there
+     * seems to be a bug in native: Despite returning an error and not changing the cache contents,
+     * the "added" entry counts towards the cache size, filling up the quota. Eventually native
+     * returns DXGI_ERROR_CACHE_FULL.
+     *
+     * To avoid relying on this bug or being hit by it in the eviction tests below, destroy the
+     * cache and recreate it after verifying the value. */
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key1, sizeof(key1), blob1, sizeof(blob1));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key1, sizeof(key1), blob1, sizeof(blob1));
+    ok(hr == DXGI_ERROR_ALREADY_EXISTS, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key1, sizeof(key1), blob2, sizeof(blob2));
+    ok(hr == DXGI_ERROR_ALREADY_EXISTS, "Got unexpected hr %#x.\n", hr);
+
+    value_size = sizeof(blob3);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), blob3, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob1), "Got unexpected size %#x.\n", value_size);
+    ok(!memcmp(blob3, blob1, sizeof(blob1)), "Unexpected value retrieved.\n");
+    ok(blob3[sizeof(blob1)] == '3', "Output buffer was modified beyond the stored value.\n");
+    memset(blob3, '3', sizeof(blob3));
+
+    ID3D12ShaderCacheSession_Release(session);
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key1, sizeof(key1), blob1, sizeof(blob1));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    /* Try to retrieve the value from another session sharing the same name. */
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session2);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    hr = ID3D12ShaderCacheSession_FindValue(session2, key1, sizeof(key1), blob3, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob1), "Got unexpected size %#x.\n", value_size);
+    ok(!memcmp(blob3, blob1, sizeof(blob1)), "Unexpected value retrieved.\n");
+    ok(blob3[sizeof(blob1)] == '3', "Output buffer was modified beyond the stored value.\n");
+    hr = ID3D12ShaderCacheSession_FindValue(session2, key1, sizeof(key1), blob3, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    ID3D12ShaderCacheSession_Release(session2);
+
+    /* value_size must be set. */
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), blob3, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), NULL, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), blob3, NULL);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* Test how the output size is handled. - A NULL data ptr returns S_OK and sets
+     * *value_size to the required size. */
+    value_size = 0;
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob1), "Got unexpected size %#x.\n", value_size);
+    value_size = sizeof(blob1) + 1;
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob1), "Got unexpected size %#x.\n", value_size);
+    /* It remains untouched if the item was not found. */
+    value_size = 0xdeadbeef;
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), NULL, &value_size);
+    ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == 0xdeadbeef, "Got unexpected size %#x.\n", value_size);
+    /* If a too small data pointer is passed, *value_size is set, but no data is written. */
+    value_size = sizeof(blob1) - 1;
+    memset(blob3, 'C', sizeof(blob3));
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), blob3, &value_size);
+    ok(hr == DXGI_ERROR_MORE_DATA, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob1), "Got unexpected size %#x.\n", value_size);
+    ok(blob3[0] == 'C', "Output buffer was modified.\n");
+
+    /* Test evicition due to lack of room in the cache. */
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, sizeof(key2), blob2, sizeof(blob2));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    value_size = sizeof(blob3);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), blob3, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(blob2), "Got unexpected size %#x.\n", value_size);
+    value_size = sizeof(blob3);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), blob3, &value_size);
+    todo ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+
+    /* The full key is stored as well. Use a huge key for a small value. It counts towards the
+     * size and will evict existing data. */
+    hr = ID3D12ShaderCacheSession_StoreValue(session, blob1, sizeof(blob1), &desc, sizeof(desc));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    value_size = 0xdeadbeef;
+    hr = ID3D12ShaderCacheSession_FindValue(session, blob1, sizeof(blob1), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(value_size == sizeof(desc), "Got unexpected size %#x.\n", value_size);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), NULL, &value_size);
+    todo ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+
+    /* Keys are not truncated. */
+    blob1[sizeof(blob1) - 1] = 'X';
+    hr = ID3D12ShaderCacheSession_FindValue(session, blob1, sizeof(blob1), NULL, &value_size);
+    ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+    /* Make sure the huge key was not accidentally evicted. */
+    blob1[sizeof(blob1) - 1] = '1';
+    hr = ID3D12ShaderCacheSession_FindValue(session, blob1, sizeof(blob1), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    /* Reset the cache so we don't get collisions on 'key1' if eviction failed. */
+    ID3D12ShaderCacheSession_Release(session);
+    desc.Mode = D3D12_SHADER_CACHE_MODE_MEMORY;
+    hr = ID3D12Device9_CreateShaderCacheSession(device, &desc,
+            &IID_ID3D12ShaderCacheSession, (void **)&session);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    /* Store a blob that is too big. It goes in at first but gets evicted next time.
+     *
+     * Why are we not getting DXGI_ERROR_CACHE_FULL here? I don't know. */
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key1, sizeof(key1), blob4, sizeof(blob4));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, sizeof(key2), &desc, sizeof(desc));
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key1, sizeof(key1), NULL, &value_size);
+    todo ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_FindValue(session, key2, sizeof(key2), NULL, &value_size);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    /* Can we delete specific entries? It doesn't look like it. In fact, anything with a zero length
+     * or pointer is invalid. There is device::ShaderCacheControl with CONTROL_FLAG_CLEAR and
+     * SetDeleteOnDestroy, but those nuke the entire cache, not single entries. */
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, sizeof(key2), NULL, 0);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, sizeof(key2), &desc, 0);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, sizeof(key2), NULL, sizeof(desc));
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, NULL, sizeof(key2), &desc, sizeof(desc));
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, key2, 0, &desc, 1);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D12ShaderCacheSession_StoreValue(session, NULL, sizeof(key2), &desc, sizeof(desc));
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
     ID3D12ShaderCacheSession_Release(session);
 
     ID3D12Device9_Release(device);
