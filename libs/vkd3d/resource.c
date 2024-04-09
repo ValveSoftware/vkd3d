@@ -1893,6 +1893,13 @@ HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC1 *desc, struct d3
                 WARN("Invalid sample count 0.\n");
                 return E_INVALIDARG;
             }
+            if (desc->SampleDesc.Count > 1
+                    && !(desc->Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)))
+            {
+                WARN("Sample count %u invalid without ALLOW_RENDER_TARGET or ALLOW_DEPTH_STENCIL.\n",
+                        desc->SampleDesc.Count);
+                return E_INVALIDARG;
+            }
 
             if (!(format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0)))
             {
