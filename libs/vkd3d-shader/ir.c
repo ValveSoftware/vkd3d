@@ -2922,7 +2922,7 @@ struct vsir_cfg_structure
             struct vsir_cfg_structure_list body;
             unsigned idx;
         } loop;
-        struct
+        struct vsir_cfg_structure_selection
         {
             struct vkd3d_shader_src_param *condition;
             struct vsir_cfg_structure_list if_body;
@@ -4536,6 +4536,49 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_loop(struct vsir_cfg *cfg,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_cfg_structure_list_emit_selection(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_selection *selection, unsigned int loop_idx)
+{
+    struct vsir_cfg_emit_target *target = cfg->target;
+    const struct vkd3d_shader_location no_loc = {0};
+    enum vkd3d_result ret;
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+            &no_loc, VKD3DSIH_IF, 0, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    target->instructions[target->ins_count].src[0] = *selection->condition;
+
+    if (selection->invert_condition)
+        target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+
+    ++target->ins_count;
+
+    if ((ret = vsir_cfg_structure_list_emit(cfg, &selection->if_body, loop_idx)) < 0)
+        return ret;
+
+    if (selection->else_body.count != 0)
+    {
+        if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ELSE);
+
+        if ((ret = vsir_cfg_structure_list_emit(cfg, &selection->else_body, loop_idx)) < 0)
+            return ret;
+    }
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDIF);
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
         struct vsir_cfg_structure_list *list, unsigned int loop_idx)
 {
@@ -4561,38 +4604,9 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
                 break;
 
             case STRUCTURE_TYPE_SELECTION:
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count], &no_loc,
-                        VKD3DSIH_IF, 0, 1))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                target->instructions[target->ins_count].src[0] = *structure->u.selection.condition;
-
-                if (structure->u.selection.invert_condition)
-                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
-
-                ++target->ins_count;
-
-                if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.if_body, loop_idx)) < 0)
+                if ((ret = vsir_cfg_structure_list_emit_selection(cfg, &structure->u.selection,
+                        loop_idx)) < 0)
                     return ret;
-
-                if (structure->u.selection.else_body.count != 0)
-                {
-                    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                    vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ELSE);
-
-                    if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.else_body, loop_idx)) < 0)
-                        return ret;
-                }
-
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDIF);
                 break;
 
             case STRUCTURE_TYPE_JUMP:
