@@ -2917,7 +2917,7 @@ struct vsir_cfg_structure
     union
     {
         struct vsir_block *block;
-        struct
+        struct vsir_cfg_structure_loop
         {
             struct vsir_cfg_structure_list body;
             unsigned idx;
@@ -4441,6 +4441,9 @@ static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
     return ret;
 }
 
+static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list, unsigned int loop_idx);
+
 static enum vkd3d_result vsir_cfg_structure_list_emit_block(struct vsir_cfg *cfg,
         struct vsir_block *block)
 {
@@ -4454,6 +4457,81 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_block(struct vsir_cfg *cfg
             (char *)block->end - (char *)block->begin);
 
     target->ins_count += block->end - block->begin;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_cfg_structure_list_emit_loop(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_loop *loop, unsigned int loop_idx)
+{
+    struct vsir_cfg_emit_target *target = cfg->target;
+    const struct vkd3d_shader_location no_loc = {0};
+    enum vkd3d_result ret;
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_LOOP);
+
+    if ((ret = vsir_cfg_structure_list_emit(cfg, &loop->body, loop->idx)) < 0)
+        return ret;
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 5))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDLOOP);
+
+    /* Add a trampoline to implement multilevel jumping depending on the stored
+     * jump_target value. */
+    if (loop_idx != UINT_MAX)
+    {
+        /* If the multilevel jump is a `continue' and the target is the loop we're inside
+         * right now, then we can finally do the `continue'. */
+        const unsigned int outer_continue_target = loop_idx << 1 | 1;
+        /* If the multilevel jump is a `continue' to any other target, or if it is a `break'
+         * and the target is not the loop we just finished emitting, then it means that
+         * we have to reach an outer loop, so we keep breaking. */
+        const unsigned int inner_break_target = loop->idx << 1;
+
+        if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+                &no_loc, VKD3DSIH_IEQ, 1, 2))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
+        src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
+        src_param_init_const_uint(&target->instructions[target->ins_count].src[1], outer_continue_target);
+
+        ++target->ins_count;
+
+        if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+                &no_loc, VKD3DSIH_CONTINUEP, 0, 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
+
+        ++target->ins_count;
+        ++target->temp_count;
+
+        if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+                &no_loc, VKD3DSIH_IEQ, 1, 2))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
+        src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
+        src_param_init_const_uint(&target->instructions[target->ins_count].src[1], inner_break_target);
+
+        ++target->ins_count;
+
+        if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+                &no_loc, VKD3DSIH_BREAKP, 0, 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+
+        src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
+
+        ++target->ins_count;
+        ++target->temp_count;
+    }
 
     return VKD3D_OK;
 }
@@ -4478,74 +4556,9 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
                 break;
 
             case STRUCTURE_TYPE_LOOP:
-            {
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_LOOP);
-
-                if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.loop.body, structure->u.loop.idx)) < 0)
+                if ((ret = vsir_cfg_structure_list_emit_loop(cfg, &structure->u.loop, loop_idx)) < 0)
                     return ret;
-
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 5))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDLOOP);
-
-                /* Add a trampoline to implement multilevel jumping depending on the stored
-                 * jump_target value. */
-                if (loop_idx != UINT_MAX)
-                {
-                    /* If the multilevel jump is a `continue' and the target is the loop we're inside
-                     * right now, then we can finally do the `continue'. */
-                    const unsigned int outer_continue_target = loop_idx << 1 | 1;
-                    /* If the multilevel jump is a `continue' to any other target, or if it is a `break'
-                     * and the target is not the loop we just finished emitting, then it means that
-                     * we have to reach an outer loop, so we keep breaking. */
-                    const unsigned int inner_break_target = structure->u.loop.idx << 1;
-
-                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                            &no_loc, VKD3DSIH_IEQ, 1, 2))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                    dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
-                    src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
-                    src_param_init_const_uint(&target->instructions[target->ins_count].src[1], outer_continue_target);
-
-                    ++target->ins_count;
-
-                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                            &no_loc, VKD3DSIH_CONTINUEP, 0, 1))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                    src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
-
-                    ++target->ins_count;
-                    ++target->temp_count;
-
-                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                            &no_loc, VKD3DSIH_IEQ, 1, 2))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                    dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
-                    src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
-                    src_param_init_const_uint(&target->instructions[target->ins_count].src[1], inner_break_target);
-
-                    ++target->ins_count;
-
-                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                            &no_loc, VKD3DSIH_BREAKP, 0, 1))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
-
-                    src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
-
-                    ++target->ins_count;
-                    ++target->temp_count;
-                }
-
                 break;
-            }
 
             case STRUCTURE_TYPE_SELECTION:
                 if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
