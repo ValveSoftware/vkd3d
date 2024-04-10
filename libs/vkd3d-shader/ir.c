@@ -3013,6 +3013,14 @@ static void vsir_cfg_structure_cleanup(struct vsir_cfg_structure *structure)
     }
 }
 
+struct vsir_cfg_emit_target
+{
+    struct vkd3d_shader_instruction *instructions;
+    size_t ins_capacity, ins_count;
+    unsigned int jump_target_temp_idx;
+    unsigned int temp_count;
+};
+
 struct vsir_cfg
 {
     struct vkd3d_shader_message_context *message_context;
@@ -3064,10 +3072,7 @@ struct vsir_cfg
 
     struct vsir_cfg_structure_list structured_program;
 
-    struct vkd3d_shader_instruction *instructions;
-    size_t ins_capacity, ins_count;
-    unsigned int jump_target_temp_idx;
-    unsigned int temp_count;
+    struct vsir_cfg_emit_target *target;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3262,7 +3267,7 @@ static void vsir_cfg_dump_structured_program(struct vsir_cfg *cfg)
 }
 
 static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target)
 {
     struct vsir_block *current_block = NULL;
     enum vkd3d_result ret;
@@ -3272,6 +3277,7 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     cfg->message_context = message_context;
     cfg->program = program;
     cfg->block_count = program->block_count;
+    cfg->target = target;
 
     vsir_block_list_init(&cfg->order);
 
@@ -4438,6 +4444,7 @@ static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
 static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
         struct vsir_cfg_structure_list *list, unsigned int loop_idx)
 {
+    struct vsir_cfg_emit_target *target = cfg->target;
     const struct vkd3d_shader_location no_loc = {0};
     enum vkd3d_result ret;
     size_t i;
@@ -4452,29 +4459,29 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
             {
                 struct vsir_block *block = structure->u.block;
 
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + (block->end - block->begin)))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + (block->end - block->begin)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                memcpy(&cfg->instructions[cfg->ins_count], block->begin, (char *)block->end - (char *)block->begin);
+                memcpy(&target->instructions[target->ins_count], block->begin, (char *)block->end - (char *)block->begin);
 
-                cfg->ins_count += block->end - block->begin;
+                target->ins_count += block->end - block->begin;
                 break;
             }
 
             case STRUCTURE_TYPE_LOOP:
             {
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_LOOP);
+                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_LOOP);
 
                 if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.loop.body, structure->u.loop.idx)) < 0)
                     return ret;
 
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 5))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 5))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_ENDLOOP);
+                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDLOOP);
 
                 /* Add a trampoline to implement multilevel jumping depending on the stored
                  * jump_target value. */
@@ -4488,82 +4495,82 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
                      * we have to reach an outer loop, so we keep breaking. */
                     const unsigned int inner_break_target = structure->u.loop.idx << 1;
 
-                    if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                             &no_loc, VKD3DSIH_IEQ, 1, 2))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                    dst_param_init_temp_bool(&cfg->instructions[cfg->ins_count].dst[0], cfg->temp_count);
-                    src_param_init_temp_uint(&cfg->instructions[cfg->ins_count].src[0], cfg->jump_target_temp_idx);
-                    src_param_init_const_uint(&cfg->instructions[cfg->ins_count].src[1], outer_continue_target);
+                    dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
+                    src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
+                    src_param_init_const_uint(&target->instructions[target->ins_count].src[1], outer_continue_target);
 
-                    ++cfg->ins_count;
+                    ++target->ins_count;
 
-                    if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                             &no_loc, VKD3DSIH_CONTINUEP, 0, 1))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                    src_param_init_temp_bool(&cfg->instructions[cfg->ins_count].src[0], cfg->temp_count);
+                    src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
 
-                    ++cfg->ins_count;
-                    ++cfg->temp_count;
+                    ++target->ins_count;
+                    ++target->temp_count;
 
-                    if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                             &no_loc, VKD3DSIH_IEQ, 1, 2))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                    dst_param_init_temp_bool(&cfg->instructions[cfg->ins_count].dst[0], cfg->temp_count);
-                    src_param_init_temp_uint(&cfg->instructions[cfg->ins_count].src[0], cfg->jump_target_temp_idx);
-                    src_param_init_const_uint(&cfg->instructions[cfg->ins_count].src[1], inner_break_target);
+                    dst_param_init_temp_bool(&target->instructions[target->ins_count].dst[0], target->temp_count);
+                    src_param_init_temp_uint(&target->instructions[target->ins_count].src[0], target->jump_target_temp_idx);
+                    src_param_init_const_uint(&target->instructions[target->ins_count].src[1], inner_break_target);
 
-                    ++cfg->ins_count;
+                    ++target->ins_count;
 
-                    if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                             &no_loc, VKD3DSIH_BREAKP, 0, 1))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
-                    cfg->instructions[cfg->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
 
-                    src_param_init_temp_bool(&cfg->instructions[cfg->ins_count].src[0], cfg->temp_count);
+                    src_param_init_temp_bool(&target->instructions[target->ins_count].src[0], target->temp_count);
 
-                    ++cfg->ins_count;
-                    ++cfg->temp_count;
+                    ++target->ins_count;
+                    ++target->temp_count;
                 }
 
                 break;
             }
 
             case STRUCTURE_TYPE_SELECTION:
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count], &no_loc,
+                if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count], &no_loc,
                         VKD3DSIH_IF, 0, 1))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                cfg->instructions[cfg->ins_count].src[0] = *structure->u.selection.condition;
+                target->instructions[target->ins_count].src[0] = *structure->u.selection.condition;
 
                 if (structure->u.selection.invert_condition)
-                    cfg->instructions[cfg->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
 
-                ++cfg->ins_count;
+                ++target->ins_count;
 
                 if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.if_body, loop_idx)) < 0)
                     return ret;
 
                 if (structure->u.selection.else_body.count != 0)
                 {
-                    if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                    vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_ELSE);
+                    vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ELSE);
 
                     if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.else_body, loop_idx)) < 0)
                         return ret;
                 }
 
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 1))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_ENDIF);
+                vsir_instruction_init(&target->instructions[target->ins_count++], &no_loc, VKD3DSIH_ENDIF);
                 break;
 
             case STRUCTURE_TYPE_JUMP:
@@ -4601,32 +4608,32 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
                         vkd3d_unreachable();
                 }
 
-                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 2))
+                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 2))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
                 if (opcode == VKD3DSIH_BREAK || opcode == VKD3DSIH_BREAKP)
                 {
-                    if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                             &no_loc, VKD3DSIH_MOV, 1, 1))
                         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                    dst_param_init_temp_uint(&cfg->instructions[cfg->ins_count].dst[0], cfg->jump_target_temp_idx);
-                    src_param_init_const_uint(&cfg->instructions[cfg->ins_count].src[0], jump_target);
+                    dst_param_init_temp_uint(&target->instructions[target->ins_count].dst[0], target->jump_target_temp_idx);
+                    src_param_init_const_uint(&target->instructions[target->ins_count].src[0], jump_target);
 
-                    ++cfg->ins_count;
+                    ++target->ins_count;
                 }
 
-                if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count],
+                if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                         &no_loc, opcode, 0, !!structure->u.jump.condition))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
                 if (structure->u.jump.invert_condition)
-                    cfg->instructions[cfg->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
 
                 if (structure->u.jump.condition)
-                    cfg->instructions[cfg->ins_count].src[0] = *structure->u.jump.condition;
+                    target->instructions[target->ins_count].src[0] = *structure->u.jump.condition;
 
-                ++cfg->ins_count;
+                ++target->ins_count;
                 break;
             }
 
@@ -4640,50 +4647,16 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
 
 static enum vkd3d_result vsir_cfg_emit_structured_program(struct vsir_cfg *cfg)
 {
-    enum vkd3d_result ret;
-    size_t i;
-
-    cfg->jump_target_temp_idx = cfg->program->temp_count;
-    cfg->temp_count = cfg->program->temp_count + 1;
-
-    if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->program->instructions.count))
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-    /* Copy declarations until the first block. */
-    for (i = 0; i < cfg->program->instructions.count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &cfg->program->instructions.elements[i];
-
-        if (ins->handler_idx == VKD3DSIH_LABEL)
-            break;
-
-        cfg->instructions[cfg->ins_count++] = *ins;
-    }
-
-    if ((ret = vsir_cfg_structure_list_emit(cfg, &cfg->structured_program, UINT_MAX)) < 0)
-        goto fail;
-
-    vkd3d_free(cfg->program->instructions.elements);
-    cfg->program->instructions.elements = cfg->instructions;
-    cfg->program->instructions.capacity = cfg->ins_capacity;
-    cfg->program->instructions.count = cfg->ins_count;
-    cfg->program->temp_count = cfg->temp_count;
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_free(cfg->instructions);
-
-    return ret;
+    return vsir_cfg_structure_list_emit(cfg, &cfg->structured_program, UINT_MAX);
 }
 
-static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+static enum vkd3d_result vsir_program_structurize_function(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target)
 {
     enum vkd3d_result ret;
     struct vsir_cfg cfg;
 
-    if ((ret = vsir_cfg_init(&cfg, program, message_context)) < 0)
+    if ((ret = vsir_cfg_init(&cfg, program, message_context, target)) < 0)
         return ret;
 
     vsir_cfg_compute_dominators(&cfg);
@@ -4707,6 +4680,47 @@ static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
 
 out:
     vsir_cfg_cleanup(&cfg);
+
+    return ret;
+}
+
+static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    struct vsir_cfg_emit_target target = {0};
+    enum vkd3d_result ret;
+    unsigned int i;
+
+    target.jump_target_temp_idx = program->temp_count;
+    target.temp_count = program->temp_count + 1;
+
+    if (!reserve_instructions(&target.instructions, &target.ins_capacity, program->instructions.count))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    /* Copy declarations until the first block. */
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        if (ins->handler_idx == VKD3DSIH_LABEL)
+            break;
+
+        target.instructions[target.ins_count++] = *ins;
+    }
+
+    if ((ret = vsir_program_structurize_function(program, message_context, &target)) < 0)
+        goto fail;
+
+    vkd3d_free(program->instructions.elements);
+    program->instructions.elements = target.instructions;
+    program->instructions.capacity = target.ins_capacity;
+    program->instructions.count = target.ins_count;
+    program->temp_count = target.temp_count;
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(target.instructions);
 
     return ret;
 }
@@ -4809,7 +4823,7 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
     enum vkd3d_result ret;
     struct vsir_cfg cfg;
 
-    if ((ret = vsir_cfg_init(&cfg, program, message_context)) < 0)
+    if ((ret = vsir_cfg_init(&cfg, program, message_context, NULL)) < 0)
         return ret;
 
     vsir_cfg_compute_dominators(&cfg);
