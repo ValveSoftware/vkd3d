@@ -733,7 +733,7 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     const struct hlsl_type *type = var->data_type;
-    uint32_t i, offset, size, elements_count = 1;
+    uint32_t offset, size, elements_count = 1;
 
     size = get_fx_2_type_size(type);
 
@@ -743,20 +743,27 @@ static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct f
         type = hlsl_get_multiarray_element_type(type);
     }
 
-    if (type->class == HLSL_CLASS_OBJECT)
+    /* Note that struct fields must all be numeric;
+     * this was validated in check_invalid_object_fields(). */
+    switch (type->class)
     {
-        /* Objects are given sequential ids. */
-        offset = put_u32(buffer, fx->object_variable_count++);
-        for (i = 1; i < elements_count; ++i)
-            put_u32(buffer, fx->object_variable_count++);
-    }
-    else
-    {
-        /* FIXME: write actual initial value */
-        offset = put_u32(buffer, 0);
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+        case HLSL_CLASS_STRUCT:
+            /* FIXME: write actual initial value */
+            offset = put_u32(buffer, 0);
 
-        for (i = 1; i < size / sizeof(uint32_t); ++i)
-            put_u32(buffer, 0);
+            for (uint32_t i = 1; i < size / sizeof(uint32_t); ++i)
+                put_u32(buffer, 0);
+            break;
+
+        default:
+            /* Objects are given sequential ids. */
+            offset = put_u32(buffer, fx->object_variable_count++);
+            for (uint32_t i = 1; i < elements_count; ++i)
+                put_u32(buffer, fx->object_variable_count++);
+            break;
     }
 
     return offset;
