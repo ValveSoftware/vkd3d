@@ -513,6 +513,10 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         {
             resource->dimension = RESOURCE_DIMENSION_2D;
         }
+        else if (sscanf(line, "( 2dms , %u , %u , %u ) ", &resource->sample_count, &resource->width, &resource->height) == 3)
+        {
+            resource->dimension = RESOURCE_DIMENSION_2D;
+        }
         else
         {
             fatal_error("Malformed resource size '%s'.\n", line);
@@ -604,6 +608,7 @@ void init_resource(struct resource *resource, const struct resource_params *para
     resource->texel_size = params->texel_size;
     resource->width = params->width;
     resource->height = params->height;
+    resource->sample_count = params->sample_count;
 }
 
 struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
@@ -622,9 +627,27 @@ struct resource *shader_runner_get_resource(struct shader_runner *runner, enum r
     return NULL;
 }
 
-static void set_resource(struct shader_runner *runner, struct resource *resource)
+static void set_resource(struct shader_runner *runner, const struct resource_params *params)
 {
+    struct resource *resource;
     size_t i;
+
+    if (!(resource = runner->ops->create_resource(runner, params)))
+    {
+        if (!bitmap_is_set(runner->failed_resources[params->type], params->slot))
+        {
+            ++runner->failed_resource_count;
+            bitmap_set(runner->failed_resources[params->type], params->slot);
+        }
+        return;
+    }
+
+    if (bitmap_is_set(runner->failed_resources[params->type], params->slot))
+    {
+        assert(runner->failed_resource_count);
+        --runner->failed_resource_count;
+        bitmap_clear(runner->failed_resources[params->type], params->slot);
+    }
 
     for (i = 0; i < runner->resource_count; ++i)
     {
@@ -838,7 +861,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.height = RENDER_TARGET_HEIGHT;
             params.level_count = 1;
 
-            set_resource(runner, runner->ops->create_resource(runner, &params));
+            set_resource(runner, &params);
         }
 
         for (i = 0; i < runner->input_element_count; ++i)
@@ -861,7 +884,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         params.data = malloc(sizeof(quad));
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
-        set_resource(runner, runner->ops->create_resource(runner, &params));
+        set_resource(runner, &params);
         free(params.data);
 
         if (!runner->vs_source)
@@ -891,7 +914,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.height = RENDER_TARGET_HEIGHT;
             params.level_count = 1;
 
-            set_resource(runner, runner->ops->create_resource(runner, &params));
+            set_resource(runner, &params);
         }
 
         if (match_string(line, "triangle list", &line))
@@ -1574,7 +1597,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                      * textures with data type other than float). */
                     if (!skip_tests)
                     {
-                        set_resource(runner, runner->ops->create_resource(runner, &current_resource));
+                        set_resource(runner, &current_resource);
                     }
                     free(current_resource.data);
                     break;
@@ -1922,7 +1945,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_TEST:
                     /* Compilation which fails with dxcompiler is not 'todo', therefore the tests are
                      * not 'todo' either. They cannot run, so skip them entirely. */
-                    if (!skip_tests && SUCCEEDED(expect_hr))
+                    if (!runner->failed_resource_count && !skip_tests && SUCCEEDED(expect_hr))
                         parse_test_directive(runner, line);
                     break;
             }

@@ -355,23 +355,37 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     return buffer;
 }
 
-static void init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
+static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
     D3D11_SUBRESOURCE_DATA resource_data[3];
     ID3D11Device *device = runner->device;
     D3D11_TEXTURE2D_DESC desc = {0};
+    UINT quality_levels;
     HRESULT hr;
 
     if (params->level_count > ARRAY_SIZE(resource_data))
         fatal_error("Level count %u is too high.\n", params->level_count);
+
+    if (params->sample_count > 1)
+    {
+        if (params->level_count > 1)
+            fatal_error("Multisampled texture has multiple levels.\n");
+
+        if (FAILED(ID3D11Device_CheckMultisampleQualityLevels(device,
+                params->format, params->sample_count, &quality_levels)) || !quality_levels)
+        {
+            trace("Format #%x with sample count %u is not supported; skipping.\n", params->format, params->sample_count);
+            return false;
+        }
+    }
 
     desc.Width = params->width;
     desc.Height = params->height;
     desc.MipLevels = params->level_count;
     desc.ArraySize = 1;
     desc.Format = params->format;
-    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Count = max(params->sample_count, 1);
     desc.Usage = D3D11_USAGE_DEFAULT;
     if (params->type == RESOURCE_TYPE_UAV)
         desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
@@ -383,6 +397,9 @@ static void init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     if (params->data)
     {
         unsigned int buffer_offset = 0;
+
+        if (params->sample_count > 1)
+            fatal_error("Cannot upload data to a multisampled texture.\n");
 
         for (unsigned int level = 0; level < params->level_count; ++level)
         {
@@ -410,6 +427,8 @@ static void init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     else
         hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
     ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
+
+    return true;
 }
 
 static void init_resource_srv_buffer(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
@@ -465,15 +484,15 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_TEXTURE:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_srv_buffer(runner, resource, params);
-            else
-                init_resource_2d(runner, resource, params);
+            else if (!init_resource_2d(runner, resource, params))
+                return NULL;
             break;
 
         case RESOURCE_TYPE_UAV:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_uav_buffer(runner, resource, params);
-            else
-                init_resource_2d(runner, resource, params);
+            else if (!init_resource_2d(runner, resource, params))
+                return NULL;
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -774,12 +793,15 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     struct d3d11_resource_readback *rb = malloc(sizeof(*rb));
+    ID3D11Resource *resolved_resource = NULL, *src_resource;
     struct d3d11_resource *resource = d3d11_resource(res);
     D3D11_TEXTURE2D_DESC texture_desc;
     D3D11_MAPPED_SUBRESOURCE map_desc;
     D3D11_BUFFER_DESC buffer_desc;
+    bool is_ms = false;
     HRESULT hr;
 
+    src_resource = resource->resource;
     switch (resource->r.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
@@ -797,12 +819,25 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
             else
             {
                 ID3D11Texture2D_GetDesc(resource->texture, &texture_desc);
+                is_ms = texture_desc.SampleDesc.Count > 1;
+                texture_desc.SampleDesc.Count = 1;
+                texture_desc.SampleDesc.Quality = 0;
                 texture_desc.Usage = D3D11_USAGE_STAGING;
                 texture_desc.BindFlags = 0;
                 texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
                 texture_desc.MiscFlags = 0;
                 hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
                 ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+                if (is_ms)
+                {
+                    texture_desc.Usage = D3D11_USAGE_DEFAULT;
+                    hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL,
+                            (ID3D11Texture2D **)&resolved_resource);
+                    ok(hr == S_OK, "Failed to create multisampled texture, hr %#lx.\n", hr);
+                    ID3D11DeviceContext_ResolveSubresource(runner->immediate_context, resolved_resource, 0,
+                            resource->resource, 0, texture_desc.Format);
+                    src_resource = resolved_resource;
+                }
             }
             break;
 
@@ -814,9 +849,12 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     if (resource->is_uav_counter)
         ID3D11DeviceContext_CopyStructureCount(runner->immediate_context, (ID3D11Buffer *)rb->resource, 0, resource->uav);
     else
-        ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, resource->resource);
+        ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, src_resource);
     hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
+
+    if (resolved_resource)
+        ID3D11Resource_Release(resolved_resource);
 
     rb->rb.data = map_desc.pData;
     rb->rb.row_pitch = map_desc.RowPitch;

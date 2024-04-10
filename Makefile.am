@@ -115,6 +115,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/fxgroup-syntax.shader_test \
 	tests/hlsl/gather-offset.shader_test \
 	tests/hlsl/gather.shader_test \
+	tests/hlsl/get-sample-pos.shader_test \
 	tests/hlsl/getdimensions.shader_test \
 	tests/hlsl/half.shader_test \
 	tests/hlsl/hard-copy-prop.shader_test \
@@ -171,6 +172,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/return-implicit-conversion.shader_test \
 	tests/hlsl/return.shader_test \
 	tests/hlsl/round.shader_test \
+	tests/hlsl/rt-get-sample-info.shader_test \
 	tests/hlsl/sample-bias.shader_test \
 	tests/hlsl/sample-cmp.shader_test \
 	tests/hlsl/sample-grad.shader_test \

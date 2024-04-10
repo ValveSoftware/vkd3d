@@ -112,6 +112,7 @@ static bool check_gl_extensions(struct gl_runner *runner)
         "GL_ARB_sampler_objects",
         "GL_ARB_shader_image_load_store",
         "GL_ARB_texture_storage",
+        "GL_ARB_internalformat_query",
     };
 
     glGetIntegerv(GL_NUM_EXTENSIONS, &count);
@@ -347,11 +348,24 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool i
     fatal_error("Failed to find format info for format %#x.\n", format);
 }
 
-static void init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
+static bool init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
 {
     unsigned int offset, w, h, i;
 
     resource->format = get_format_info(params->format, params->is_shadow);
+
+    if (params->sample_count > 1)
+    {
+        GLint max_sample_count;
+
+        glGetInternalformativ(GL_TEXTURE_2D_MULTISAMPLE, resource->format->internal_format, GL_SAMPLES, 1, &max_sample_count);
+        if (max_sample_count < params->sample_count)
+        {
+            trace("Format #%x with sample count %u is not supported; skipping.\n", params->format, params->sample_count);
+            return false;
+        }
+    }
+
     glGenTextures(1, &resource->id);
     glBindTexture(GL_TEXTURE_2D, resource->id);
     glTexStorage2D(GL_TEXTURE_2D, params->level_count,
@@ -359,7 +373,7 @@ static void init_resource_2d(struct gl_resource *resource, const struct resource
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     if (!params->data)
-        return;
+        return true;
 
     for (i = 0, offset = 0; i < params->level_count; ++i)
     {
@@ -369,6 +383,8 @@ static void init_resource_2d(struct gl_resource *resource, const struct resource
                 resource->format->type, params->data + offset);
         offset += w * h * params->texel_size;
     }
+
+    return true;
 }
 
 static void init_resource_buffer(struct gl_resource *resource, const struct resource_params *params)
@@ -398,8 +414,8 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
         case RESOURCE_TYPE_UAV:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_buffer(resource, params);
-            else
-                init_resource_2d(resource, params);
+            else if (!init_resource_2d(resource, params))
+                return NULL;
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:

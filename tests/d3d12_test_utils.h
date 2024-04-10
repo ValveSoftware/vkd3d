@@ -582,8 +582,8 @@ static inline ID3D12Resource *create_default_buffer_(unsigned int line, ID3D12De
 
 static ID3D12Resource *create_default_texture_(unsigned int line, ID3D12Device *device,
         D3D12_RESOURCE_DIMENSION dimension, unsigned int width, unsigned int height,
-        unsigned int depth_or_array_size, unsigned int miplevel_count, DXGI_FORMAT format,
-        D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
+        unsigned int depth_or_array_size, unsigned int miplevel_count, unsigned int sample_count,
+        DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
@@ -602,7 +602,7 @@ static ID3D12Resource *create_default_texture_(unsigned int line, ID3D12Device *
     resource_desc.DepthOrArraySize = depth_or_array_size;
     resource_desc.MipLevels = miplevel_count;
     resource_desc.Format = format;
-    resource_desc.SampleDesc.Count = 1;
+    resource_desc.SampleDesc.Count = max(sample_count, 1);
     resource_desc.Flags = flags;
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, initial_state, NULL, &IID_ID3D12Resource, (void **)&texture);
@@ -618,7 +618,7 @@ static inline ID3D12Resource *create_default_texture2d_(unsigned int line, ID3D1
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
     return create_default_texture_(line, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-            width, height, array_size, miplevel_count, format, flags, initial_state);
+            width, height, array_size, miplevel_count, 1, format, flags, initial_state);
 }
 
 #define create_default_texture3d(a, b, c, d, e, f, g, h) create_default_texture3d_(__LINE__, a, b, c, d, e, f, g, h)
@@ -627,7 +627,7 @@ static inline ID3D12Resource *create_default_texture3d_(unsigned int line, ID3D1
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
     return create_default_texture_(line, device, D3D12_RESOURCE_DIMENSION_TEXTURE3D,
-            width, height, depth, miplevel_count, format, flags, initial_state);
+            width, height, depth, miplevel_count, 1, format, flags, initial_state);
 }
 
 static void copy_sub_resource_data(const D3D12_MEMCPY_DEST *dst, const D3D12_SUBRESOURCE_DATA *src,

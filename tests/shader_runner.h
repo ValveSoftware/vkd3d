@@ -96,6 +96,7 @@ struct resource_params
     unsigned int stride;
     unsigned int width, height;
     unsigned int level_count;
+    unsigned int sample_count;
     uint8_t *data;
     size_t data_size, data_capacity;
 };
@@ -110,6 +111,7 @@ struct resource
     unsigned int size;
     unsigned int texel_size;
     unsigned int width, height;
+    unsigned int sample_count;
 };
 
 struct input_element
@@ -174,6 +176,8 @@ struct shader_runner
 
     struct resource *resources[MAX_RESOURCES];
     size_t resource_count;
+    uint32_t failed_resources[RESOURCE_TYPE_VERTEX_BUFFER + 1][(MAX_RESOURCES + 0x1f) / 0x20];
+    unsigned int failed_resource_count;
 
     struct sampler samplers[MAX_SAMPLERS];
     size_t sampler_count;

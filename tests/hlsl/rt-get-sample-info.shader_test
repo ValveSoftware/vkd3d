@@ -1,0 +1,34 @@
+[require]
+shader model >= 4.1
+
+
+[rtv 0]
+format r32g32b32a32 float
+size (2dms, 4, 640, 480)
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    return float4(GetRenderTargetSampleCount(), 0, 0, 0);
+}
+
+[test]
+todo draw quad
+probe all rgba (4.0, 0.0, 0.0, 0.0)
+
+
+[pixel shader todo]
+uniform uint u;
+
+float4 main() : sv_target
+{
+    return float4(GetRenderTargetSamplePosition(u), GetRenderTargetSamplePosition(u + 1));
+}
+
+[test]
+uniform 0 uint 0
+todo draw quad
+probe all rgba (-0.125, -0.375, 0.375, -0.125)
+uniform 0 uint 2
+todo draw quad
+probe all rgba (-0.375, 0.125, 0.125, 0.375)

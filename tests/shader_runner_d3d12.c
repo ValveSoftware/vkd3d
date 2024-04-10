@@ -135,9 +135,12 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
             if (params->slot >= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT)
                 fatal_error("RTV slot %u is too high.\n", params->slot);
+            if (params->sample_count > 1 && params->level_count > 1)
+                fatal_error("Multisampled texture has multiple levels.\n");
 
-            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                    params->format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                    params->width, params->height, 1, params->level_count, params->sample_count, params->format,
+                    D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot));
             break;
@@ -169,13 +172,26 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             }
             else
             {
-                resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                        params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-                upload_texture_data_with_states(resource->resource, resource_data,
-                        params->level_count, test_context->queue, test_context->list,
-                        RESOURCE_STATE_DO_NOT_CHANGE,
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                reset_command_list(test_context->list, test_context->allocator);
+                if (params->sample_count > 1 && params->level_count > 1)
+                    fatal_error("Multisampled texture has multiple levels.\n");
+
+                resource->resource = create_default_texture_(__LINE__, device, D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                        params->width, params->height, 1, params->level_count, params->sample_count, params->format,
+                        /* Multisampled textures must have ALLOW_RENDER_TARGET set. */
+                        (params->sample_count > 1) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : 0,
+                        D3D12_RESOURCE_STATE_COPY_DEST);
+
+                if (params->data)
+                {
+                    if (params->sample_count > 1)
+                        fatal_error("Cannot upload data to a multisampled texture.\n");
+                    upload_texture_data_with_states(resource->resource, resource_data,
+                            params->level_count, test_context->queue, test_context->list,
+                            RESOURCE_STATE_DO_NOT_CHANGE,
+                            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                    reset_command_list(test_context->list, test_context->allocator);
+                }
+
                 ID3D12Device_CreateShaderResourceView(device, resource->resource,
                         NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
             }
@@ -440,7 +456,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     ID3D12Device *device = test_context->device;
-    unsigned int uniform_index;
+    unsigned int uniform_index, sample_count;
     unsigned int rtv_count = 0;
     ID3D12PipelineState *pso;
     bool succeeded;
@@ -483,7 +499,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     test_context->root_signature = d3d12_runner_create_root_signature(runner,
             queue, test_context->allocator, command_list, &uniform_index);
 
-    for (i = 0; i < runner->r.resource_count; ++i)
+    for (i = 0, sample_count = 1; i < runner->r.resource_count; ++i)
     {
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
 
@@ -492,6 +508,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             pso_desc.RTVFormats[resource->r.slot] = resource->r.format;
             pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.slot + 1);
             pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+            if (resource->r.sample_count)
+                sample_count = resource->r.sample_count;
         }
     }
 
@@ -513,7 +531,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     }
     pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    pso_desc.SampleDesc.Count = 1;
+    pso_desc.SampleDesc.Count = sample_count;
     pso_desc.SampleMask = ~(UINT)0;
     pso_desc.pRootSignature = test_context->root_signature;
 

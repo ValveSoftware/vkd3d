@@ -1,0 +1,19 @@
+[require]
+shader model >= 4.1
+
+
+[srv 0]
+format r32g32b32a32 float
+size (2dms, 4, 2, 2)
+
+[pixel shader todo]
+Texture2DMS<float4, 2> t;
+
+float4 main() : sv_target
+{
+    return float4(t.GetSamplePosition(0), t.GetSamplePosition(1));
+}
+
+[test]
+todo draw quad
+probe all rgba (-0.125, -0.375, 0.375, -0.125)
