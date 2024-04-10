@@ -4677,6 +4677,40 @@ fail:
     return ret;
 }
 
+static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    enum vkd3d_result ret;
+    struct vsir_cfg cfg;
+
+    if ((ret = vsir_cfg_init(&cfg, program, message_context)) < 0)
+        return ret;
+
+    vsir_cfg_compute_dominators(&cfg);
+
+    if ((ret = vsir_cfg_compute_loops(&cfg)) < 0)
+        goto out;
+
+    if ((ret = vsir_cfg_sort_nodes(&cfg)) < 0)
+        goto out;
+
+    if ((ret = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
+        goto out;
+
+    if ((ret = vsir_cfg_build_structured_program(&cfg)) < 0)
+        goto out;
+
+    if ((ret = vsir_cfg_optimize(&cfg)) < 0)
+        goto out;
+
+    ret = vsir_cfg_emit_structured_program(&cfg);
+
+out:
+    vsir_cfg_cleanup(&cfg);
+
+    return ret;
+}
+
 static void register_map_undominated_use(struct vkd3d_shader_register *reg, struct ssas_to_temps_alloc *alloc,
         struct vsir_block *block, struct vsir_block **origin_blocks)
 {
@@ -5654,48 +5688,8 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
 
-        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
+        if ((result = vsir_program_structurize(program, message_context)) < 0)
             return result;
-
-        vsir_cfg_compute_dominators(&cfg);
-
-        if ((result = vsir_cfg_compute_loops(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_sort_nodes(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_build_structured_program(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_optimize(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        if ((result = vsir_cfg_emit_structured_program(&cfg)) < 0)
-        {
-            vsir_cfg_cleanup(&cfg);
-            return result;
-        }
-
-        vsir_cfg_cleanup(&cfg);
 
         if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
             return result;
