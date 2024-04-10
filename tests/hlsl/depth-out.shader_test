@@ -16,22 +16,22 @@ float main() : SV_Depth
 uniform 0 float 0.0
 clear dsv 1.0
 depth less
-todo(sm>=6 | glsl) draw quad
+todo(glsl) draw quad
 probe dsv all r (0.0)
 
 uniform 0 float 0.75
 clear dsv 1.0
-todo(sm>=6 | glsl) draw quad
+todo(glsl) draw quad
 probe dsv all r (0.75)
 
 clear dsv 0.5
 depth greater
-todo(sm>=6 | glsl) draw quad
+todo(glsl) draw quad
 probe dsv all r (0.75)
 
 depth less
 clear dsv 0.5
-todo(sm>=6 | glsl) draw quad
+todo(glsl) draw quad
 probe dsv all r (0.5)
 
 
@@ -65,14 +65,14 @@ uniform 0 float4 0.75 0.75 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
-todo draw quad
+todo(sm<6 | glsl) draw quad
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 probe dsv all r (0.75)
 
 uniform 0 float4 0.75 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo draw quad
+todo(sm<6 | glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 probe dsv all r (0.5)
 
@@ -91,20 +91,20 @@ uniform 0 float4 0.75 0.75 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
-todo draw quad
+todo(sm<6 | glsl) draw quad
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 probe dsv all r (0.75)
 
 uniform 0 float4 0.375 0.625 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo draw quad
+todo(sm<6 | glsl) draw quad
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 probe dsv all r (0.625)
 
 uniform 0 float4 0.375 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
-todo draw quad
+todo(sm<6 | glsl) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 probe dsv all r (0.5)
