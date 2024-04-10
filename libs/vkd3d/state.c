@@ -2452,7 +2452,7 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
 
     memset(&target_info, 0, sizeof(target_info));
     target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
-    target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    target_info.environment = device->environment;
     target_info.extensions = device->vk_info.shader_extensions;
     target_info.extension_count = device->vk_info.shader_extension_count;
 
@@ -3177,7 +3177,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     ps_target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
     ps_target_info.next = NULL;
     ps_target_info.entry_point = "main";
-    ps_target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    ps_target_info.environment = device->environment;
     ps_target_info.extensions = vk_info->shader_extensions;
     ps_target_info.extension_count = vk_info->shader_extension_count;
     ps_target_info.parameters = ps_shader_parameters;
@@ -3207,7 +3207,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
 
     memset(&target_info, 0, sizeof(target_info));
     target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
-    target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    target_info.environment = device->environment;
     target_info.extensions = vk_info->shader_extensions;
     target_info.extension_count = vk_info->shader_extension_count;
 

@@ -558,12 +558,14 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
     const struct vkd3d_optional_instance_extensions_info *optional_extensions;
     const struct vkd3d_application_info *vkd3d_application_info;
     const struct vkd3d_host_time_domain_info *time_domain_info;
+    PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
     bool *user_extension_supported = NULL;
     VkApplicationInfo application_info;
     VkInstanceCreateInfo instance_info;
     char application_name[PATH_MAX];
     uint32_t extension_count;
     const char **extensions;
+    uint32_t vk_api_version;
     VkInstance vk_instance;
     VkResult vr;
     HRESULT hr;
@@ -615,6 +617,16 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
     application_info.engineVersion = vkd3d_get_vk_version();
     application_info.apiVersion = VK_API_VERSION_1_0;
     instance->api_version = VKD3D_API_VERSION_1_0;
+
+    /* vkEnumerateInstanceVersion was added in Vulkan 1.1, and its absence indicates only 1.0 is supported. */
+    vkEnumerateInstanceVersion = (void *)vk_global_procs->vkGetInstanceProcAddr(NULL, "vkEnumerateInstanceVersion");
+    if (vkEnumerateInstanceVersion && vkEnumerateInstanceVersion(&vk_api_version) >= 0
+            && vk_api_version >= VK_API_VERSION_1_1)
+    {
+        TRACE("Vulkan API version 1.1 is available; requesting it.\n");
+        application_info.apiVersion = VK_API_VERSION_1_1;
+    }
+    instance->vk_api_version = application_info.apiVersion;
 
     if ((vkd3d_application_info = vkd3d_find_struct(create_info->next, APPLICATION_INFO)))
     {
@@ -5117,6 +5129,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     device->vk_info = instance->vk_info;
     device->signal_event = instance->signal_event;
     device->wchar_size = instance->wchar_size;
+    device->environment = (instance->vk_api_version >= VK_API_VERSION_1_1)
+            ? VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1 : VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
 
     device->adapter_luid = create_info->adapter_luid;
     device->removed_reason = S_OK;

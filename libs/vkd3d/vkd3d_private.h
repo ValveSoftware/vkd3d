@@ -185,6 +185,7 @@ struct vkd3d_instance
     struct vkd3d_vulkan_info vk_info;
     struct vkd3d_vk_global_procs vk_global_procs;
     void *libvulkan;
+    uint32_t vk_api_version;
 
     uint64_t config_flags;
     enum vkd3d_api_version api_version;
@@ -1678,6 +1679,7 @@ struct d3d12_device
     struct vkd3d_vk_device_procs vk_procs;
     PFN_vkd3d_signal_event signal_event;
     size_t wchar_size;
+    enum vkd3d_shader_spirv_environment environment;
 
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
 
