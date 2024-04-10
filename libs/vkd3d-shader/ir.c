@@ -4441,6 +4441,23 @@ static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
     return ret;
 }
 
+static enum vkd3d_result vsir_cfg_structure_list_emit_block(struct vsir_cfg *cfg,
+        struct vsir_block *block)
+{
+    struct vsir_cfg_emit_target *target = cfg->target;
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity,
+            target->ins_count + (block->end - block->begin)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    memcpy(&target->instructions[target->ins_count], block->begin,
+            (char *)block->end - (char *)block->begin);
+
+    target->ins_count += block->end - block->begin;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
         struct vsir_cfg_structure_list *list, unsigned int loop_idx)
 {
@@ -4456,17 +4473,9 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
         switch (structure->type)
         {
             case STRUCTURE_TYPE_BLOCK:
-            {
-                struct vsir_block *block = structure->u.block;
-
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + (block->end - block->begin)))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                memcpy(&target->instructions[target->ins_count], block->begin, (char *)block->end - (char *)block->begin);
-
-                target->ins_count += block->end - block->begin;
+                if ((ret = vsir_cfg_structure_list_emit_block(cfg, structure->u.block)) < 0)
+                    return ret;
                 break;
-            }
 
             case STRUCTURE_TYPE_LOOP:
             {
