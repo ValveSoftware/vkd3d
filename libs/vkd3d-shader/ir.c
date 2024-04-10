@@ -4803,6 +4803,24 @@ done:
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    enum vkd3d_result ret;
+    struct vsir_cfg cfg;
+
+    if ((ret = vsir_cfg_init(&cfg, program, message_context)) < 0)
+        return ret;
+
+    vsir_cfg_compute_dominators(&cfg);
+
+    ret = vsir_cfg_materialize_undominated_ssas_to_temps(&cfg);
+
+    vsir_cfg_cleanup(&cfg);
+
+    return ret;
+}
+
 struct validation_context
 {
     struct vkd3d_shader_message_context *message_context;
@@ -5680,8 +5698,6 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
 
     if (program->shader_version.major >= 6)
     {
-        struct vsir_cfg cfg;
-
         if ((result = vsir_program_materialise_phi_ssas_to_temps(program)) < 0)
             return result;
 
@@ -5694,15 +5710,7 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
             return result;
 
-        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
-            return result;
-        vsir_cfg_compute_dominators(&cfg);
-
-        result = vsir_cfg_materialize_undominated_ssas_to_temps(&cfg);
-
-        vsir_cfg_cleanup(&cfg);
-
-        if (result < 0)
+        if ((result = vsir_program_materialize_undominated_ssas_to_temps(program, message_context)) < 0)
             return result;
     }
     else
