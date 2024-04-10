@@ -1,7 +1,7 @@
 dnl VKD3D_PROG_WIDL(major, minor)
 AC_DEFUN([VKD3D_PROG_WIDL],
 
-[AC_CHECK_PROG([WIDL], [widl], [widl], [no])
+[AC_CHECK_TOOL([WIDL], [widl], [no])
 
 AS_IF([test "x$WIDL" != "xno"],
 [AC_MSG_CHECKING([checking whether widl version >= $1.$2])
