@@ -2929,7 +2929,7 @@ struct vsir_cfg_structure
             struct vsir_cfg_structure_list else_body;
             bool invert_condition;
         } selection;
-        struct
+        struct vsir_cfg_structure_jump
         {
             enum vsir_cfg_jump_type
             {
@@ -4579,11 +4579,77 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_selection(struct vsir_cfg 
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
-        struct vsir_cfg_structure_list *list, unsigned int loop_idx)
+static enum vkd3d_result vsir_cfg_structure_list_emit_jump(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_jump *jump, unsigned int loop_idx)
 {
     struct vsir_cfg_emit_target *target = cfg->target;
     const struct vkd3d_shader_location no_loc = {0};
+    /* Encode the jump target as the loop index plus a bit to remember whether
+     * we're breaking or continueing. */
+    unsigned int jump_target = jump->target << 1;
+    enum vkd3d_shader_opcode opcode;
+
+    switch (jump->type)
+    {
+        case JUMP_CONTINUE:
+            /* If we're continueing the loop we're directly inside, then we can emit a
+             * `continue'. Otherwise we first have to break all the loops between here
+             * and the loop to continue, recording our intention to continue
+             * in the lowest bit of jump_target. */
+            if (jump->target == loop_idx)
+            {
+                opcode = jump->condition ? VKD3DSIH_CONTINUEP : VKD3DSIH_CONTINUE;
+                break;
+            }
+            jump_target |= 1;
+            /* fall through */
+
+        case JUMP_BREAK:
+            opcode = jump->condition ? VKD3DSIH_BREAKP : VKD3DSIH_BREAK;
+            break;
+
+        case JUMP_RET:
+            assert(!jump->condition);
+            opcode = VKD3DSIH_RET;
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 2))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (opcode == VKD3DSIH_BREAK || opcode == VKD3DSIH_BREAKP)
+    {
+        if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+                &no_loc, VKD3DSIH_MOV, 1, 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        dst_param_init_temp_uint(&target->instructions[target->ins_count].dst[0], target->jump_target_temp_idx);
+        src_param_init_const_uint(&target->instructions[target->ins_count].src[0], jump_target);
+
+        ++target->ins_count;
+    }
+
+    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
+            &no_loc, opcode, 0, !!jump->condition))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (jump->invert_condition)
+        target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+
+    if (jump->condition)
+        target->instructions[target->ins_count].src[0] = *jump->condition;
+
+    ++target->ins_count;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list, unsigned int loop_idx)
+{
     enum vkd3d_result ret;
     size_t i;
 
@@ -4610,68 +4676,10 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
                 break;
 
             case STRUCTURE_TYPE_JUMP:
-            {
-                /* Encode the jump target as the loop index plus a bit to remember whether
-                 * we're breaking or continueing. */
-                unsigned int jump_target = structure->u.jump.target << 1;
-                enum vkd3d_shader_opcode opcode;
-
-                switch (structure->u.jump.type)
-                {
-                    case JUMP_CONTINUE:
-                        /* If we're continueing the loop we're directly inside, then we can emit a
-                         * `continue'. Otherwise we first have to break all the loops between here
-                         * and the loop to continue, recording our intention to continue
-                         * in the lowest bit of jump_target. */
-                        if (structure->u.jump.target == loop_idx)
-                        {
-                            opcode = structure->u.jump.condition ? VKD3DSIH_CONTINUEP : VKD3DSIH_CONTINUE;
-                            break;
-                        }
-                        jump_target |= 1;
-                        /* fall through */
-
-                    case JUMP_BREAK:
-                        opcode = structure->u.jump.condition ? VKD3DSIH_BREAKP : VKD3DSIH_BREAK;
-                        break;
-
-                    case JUMP_RET:
-                        assert(!structure->u.jump.condition);
-                        opcode = VKD3DSIH_RET;
-                        break;
-
-                    default:
-                        vkd3d_unreachable();
-                }
-
-                if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 2))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                if (opcode == VKD3DSIH_BREAK || opcode == VKD3DSIH_BREAKP)
-                {
-                    if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                            &no_loc, VKD3DSIH_MOV, 1, 1))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                    dst_param_init_temp_uint(&target->instructions[target->ins_count].dst[0], target->jump_target_temp_idx);
-                    src_param_init_const_uint(&target->instructions[target->ins_count].src[0], jump_target);
-
-                    ++target->ins_count;
-                }
-
-                if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
-                        &no_loc, opcode, 0, !!structure->u.jump.condition))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
-
-                if (structure->u.jump.invert_condition)
-                    target->instructions[target->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
-
-                if (structure->u.jump.condition)
-                    target->instructions[target->ins_count].src[0] = *structure->u.jump.condition;
-
-                ++target->ins_count;
+                if ((ret = vsir_cfg_structure_list_emit_jump(cfg, &structure->u.jump,
+                        loop_idx)) < 0)
+                    return ret;
                 break;
-            }
 
             default:
                 vkd3d_unreachable();
