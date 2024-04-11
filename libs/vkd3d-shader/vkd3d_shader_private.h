@@ -1761,6 +1761,31 @@ static inline unsigned int vkd3d_compact_swizzle(uint32_t swizzle, uint32_t writ
     return compacted_swizzle;
 }
 
+static inline uint32_t vsir_swizzle_from_writemask(unsigned int writemask)
+{
+    static const unsigned int swizzles[16] =
+    {
+        0,
+        VKD3D_SHADER_SWIZZLE(X, X, X, X),
+        VKD3D_SHADER_SWIZZLE(Y, Y, Y, Y),
+        VKD3D_SHADER_SWIZZLE(X, Y, X, X),
+        VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z),
+        VKD3D_SHADER_SWIZZLE(X, Z, X, X),
+        VKD3D_SHADER_SWIZZLE(Y, Z, X, X),
+        VKD3D_SHADER_SWIZZLE(X, Y, Z, X),
+        VKD3D_SHADER_SWIZZLE(W, W, W, W),
+        VKD3D_SHADER_SWIZZLE(X, W, X, X),
+        VKD3D_SHADER_SWIZZLE(Y, W, X, X),
+        VKD3D_SHADER_SWIZZLE(X, Y, W, X),
+        VKD3D_SHADER_SWIZZLE(Z, W, X, X),
+        VKD3D_SHADER_SWIZZLE(X, Z, W, X),
+        VKD3D_SHADER_SWIZZLE(Y, Z, W, X),
+        VKD3D_SHADER_SWIZZLE(X, Y, Z, W),
+    };
+
+    return swizzles[writemask & 0xf];
+}
+
 struct vkd3d_struct
 {
     enum vkd3d_shader_structure_type type;

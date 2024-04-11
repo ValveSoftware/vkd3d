@@ -17,6 +17,7 @@
  */
 
 #include "vkd3d_shader_private.h"
+#include "vkd3d_types.h"
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve)
 {
@@ -159,6 +160,56 @@ static enum vkd3d_result vsir_program_lower_texkill(struct vsir_program *program
     return VKD3D_OK;
 }
 
+/* The Shader Model 5 Assembly documentation states: "If components of a mad
+ * instruction are tagged as precise, the hardware must execute a mad instruction
+ * or the exact equivalent, and it cannot split it into a multiply followed by an add."
+ * But DXIL.rst states the opposite: "Floating point multiply & add. This operation is
+ * not fused for "precise" operations."
+ * Windows drivers seem to conform with the latter, for SM 4-5 and SM 6. */
+static enum vkd3d_result vsir_program_lower_precise_mad(struct vsir_program *program,
+        struct vkd3d_shader_instruction *mad, unsigned int *tmp_idx)
+{
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vkd3d_shader_instruction *mul_ins, *add_ins;
+    size_t pos = mad - instructions->elements;
+    struct vkd3d_shader_dst_param *mul_dst;
+
+    if (!(mad->flags & VKD3DSI_PRECISE_XYZW))
+        return VKD3D_OK;
+
+    if (!shader_instruction_array_insert_at(instructions, pos + 1, 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (*tmp_idx == ~0u)
+        *tmp_idx = program->temp_count++;
+
+    mul_ins = &instructions->elements[pos];
+    add_ins = &instructions->elements[pos + 1];
+
+    mul_ins->handler_idx = VKD3DSIH_MUL;
+    mul_ins->src_count = 2;
+
+    if (!(vsir_instruction_init_with_params(program, add_ins, &mul_ins->location, VKD3DSIH_ADD, 1, 2)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    add_ins->flags = mul_ins->flags & VKD3DSI_PRECISE_XYZW;
+
+    mul_dst = mul_ins->dst;
+    *add_ins->dst = *mul_dst;
+
+    mul_dst->modifiers = 0;
+    vsir_register_init(&mul_dst->reg, VKD3DSPR_TEMP, mul_ins->src[0].reg.data_type, 1);
+    mul_dst->reg.dimension = add_ins->dst->reg.dimension;
+    mul_dst->reg.idx[0].offset = *tmp_idx;
+
+    add_ins->src[0].reg = mul_dst->reg;
+    add_ins->src[0].swizzle = vsir_swizzle_from_writemask(mul_dst->write_mask);
+    add_ins->src[0].modifiers = 0;
+    add_ins->src[1] = mul_ins->src[2];
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *program)
 {
     struct vkd3d_shader_instruction_array *instructions = &program->instructions;
@@ -173,6 +224,11 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
         {
             case VKD3DSIH_TEXKILL:
                 if ((ret = vsir_program_lower_texkill(program, ins, &tmp_idx)) < 0)
+                    return ret;
+                break;
+
+            case VKD3DSIH_MAD:
+                if ((ret = vsir_program_lower_precise_mad(program, ins, &tmp_idx)) < 0)
                     return ret;
                 break;
 
