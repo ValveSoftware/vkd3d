@@ -3045,6 +3045,22 @@ static void test_create_compute_pipeline_state(void)
     ULONG refcount;
     HRESULT hr;
 
+    static const DWORD cs_with_rs[] =
+    {
+#if 0
+        [RootSignature("")]
+        [numthreads(1, 1, 1)]
+        void main()
+        {
+        }
+#endif
+        0x43425844, 0x215835dd, 0xdcf65f2e, 0x076d1ec0, 0xb1664d2b, 0x00000001, 0x00000098, 0x00000004,
+        0x00000030, 0x00000040, 0x00000050, 0x00000078, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000020, 0x00050050, 0x00000008,
+        0x0100086a, 0x0400009b, 0x00000001, 0x00000001, 0x00000001, 0x0100003e, 0x30535452, 0x00000018,
+        0x00000001, 0x00000000, 0x00000018, 0x00000000, 0x00000018, 0x00000000,
+    };
+
     static const char shader_code[] =
             "[numthreads(1, 1, 1)]\n"
             "void main() { }\n";
@@ -3110,6 +3126,18 @@ static void test_create_compute_pipeline_state(void)
     ok(!refcount, "ID3D12PipelineState has %u references left.\n", (unsigned int)refcount);
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+
+    pipeline_state_desc.pRootSignature = NULL;
+    hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+
+    pipeline_state_desc.CS = shader_bytecode(cs_with_rs, sizeof(cs_with_rs));
+    hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12PipelineState_Release(pipeline_state);
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
