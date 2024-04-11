@@ -1642,38 +1642,41 @@ static void shader_print_primitive_type(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, primitive_type, suffix);
 }
 
-static void shader_dump_interpolation_mode(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_shader_interpolation_mode interpolation_mode)
+static void shader_print_interpolation_mode(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, enum vkd3d_shader_interpolation_mode m, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *mode;
 
-    switch (interpolation_mode)
+    switch (m)
     {
         case VKD3DSIM_CONSTANT:
-            shader_addline(buffer, "constant");
+            mode = "constant";
             break;
         case VKD3DSIM_LINEAR:
-            shader_addline(buffer, "linear");
+            mode = "linear";
             break;
         case VKD3DSIM_LINEAR_CENTROID:
-            shader_addline(buffer, "linear centroid");
+            mode = "linear centroid";
             break;
         case VKD3DSIM_LINEAR_NOPERSPECTIVE:
-            shader_addline(buffer, "linear noperspective");
+            mode = "linear noperspective";
             break;
         case VKD3DSIM_LINEAR_SAMPLE:
-            shader_addline(buffer, "linear sample");
+            mode = "linear sample";
             break;
         case VKD3DSIM_LINEAR_NOPERSPECTIVE_CENTROID:
-            shader_addline(buffer, "linear noperspective centroid");
+            mode = "linear noperspective centroid";
             break;
         case VKD3DSIM_LINEAR_NOPERSPECTIVE_SAMPLE:
-            shader_addline(buffer, "linear noperspective sample");
+            mode = "linear noperspective sample";
             break;
         default:
-            shader_addline(buffer, "<unrecognized_interpolation_mode %#x>", interpolation_mode);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled interpolation mode %#x>%s%s",
+                    prefix, compiler->colours.error, m, compiler->colours.reset, suffix);
+            return;
     }
+    vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, mode, suffix);
 }
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type)
@@ -1920,8 +1923,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_INPUT_PS:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_interpolation_mode(compiler, ins->flags);
+            shader_print_interpolation_mode(compiler, " ", ins->flags, "");
             shader_print_dst_param(compiler, " ", &ins->declaration.dst, true, "");
             break;
 
@@ -1934,8 +1936,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_INPUT_PS_SIV:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_interpolation_mode(compiler, ins->flags);
+            shader_print_interpolation_mode(compiler, " ", ins->flags, "");
             shader_print_dst_param(compiler, " ", &ins->declaration.register_semantic.reg, true, "");
             shader_print_input_sysval_semantic(compiler, ", ", ins->declaration.register_semantic.sysval_semantic, "");
             break;
