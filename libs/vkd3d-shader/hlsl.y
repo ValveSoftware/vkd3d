@@ -2418,7 +2418,11 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
         if (v->initializer.args_count)
         {
-            bool is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
+            unsigned int store_index = 0;
+            bool is_default_values_initializer;
+            unsigned int size, k;
+
+            is_default_values_initializer = (ctx->cur_buffer != ctx->globals_buffer)
                     || (var->storage_modifiers & HLSL_STORAGE_UNIFORM);
 
             if (is_default_values_initializer)
@@ -2431,33 +2435,29 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
                 }
             }
 
-            if (v->initializer.braces)
+            if (!v->initializer.braces)
             {
-                unsigned int size = initializer_size(&v->initializer);
-                unsigned int store_index = 0;
-                unsigned int k;
-
-                if (component_count != size)
+                if (!(add_implicit_conversion(ctx, v->initializer.instrs, v->initializer.args[0], type, &v->loc)))
                 {
-                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Expected %u components in initializer, but got %u.", component_count, size);
                     free_parse_variable_def(v);
                     continue;
                 }
 
-                for (k = 0; k < v->initializer.args_count; ++k)
-                {
-                    initialize_var_components(ctx, v->initializer.instrs, var,
-                            &store_index, v->initializer.args[k]);
-                }
+                v->initializer.args[0] = node_from_block(v->initializer.instrs);
             }
-            else
-            {
-                struct hlsl_ir_load *load = hlsl_new_var_load(ctx, var, &var->loc);
 
-                assert(v->initializer.args_count == 1);
-                hlsl_block_add_instr(v->initializer.instrs, &load->node);
-                add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
+            size = initializer_size(&v->initializer);
+            if (component_count != size)
+            {
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Expected %u components in initializer, but got %u.", component_count, size);
+                free_parse_variable_def(v);
+                continue;
+            }
+
+            for (k = 0; k < v->initializer.args_count; ++k)
+            {
+                initialize_var_components(ctx, v->initializer.instrs, var, &store_index, v->initializer.args[k]);
             }
 
             if (is_default_values_initializer)

@@ -21,7 +21,7 @@ todo(glsl) draw quad
 probe all rgba (10, 20, 50, 60)
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<6)]
 float a = 7;
 float4 b = a; // initial value must be a literal expression.
 
@@ -138,7 +138,7 @@ todo(glsl) draw quad
 probe all rgba (10, 20, 50, 60)
 
 
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<6)]
 cbuffer buff
 {
     float a = 7;
