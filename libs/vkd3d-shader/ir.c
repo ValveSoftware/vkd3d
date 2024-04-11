@@ -3342,19 +3342,12 @@ static void vsir_cfg_dump_structured_program(struct vsir_cfg *cfg)
 }
 
 static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target)
+        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target,
+        size_t *pos)
 {
     struct vsir_block *current_block = NULL;
     enum vkd3d_result ret;
     size_t i;
-
-    if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
-    {
-        FIXME("Hull shaders are not supported.\n");
-        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                "The structurizer does not support hull shaders.");
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
 
     memset(cfg, 0, sizeof(*cfg));
     cfg->message_context = message_context;
@@ -3370,9 +3363,10 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     if (TRACE_ON())
         vkd3d_string_buffer_init(&cfg->debug_buffer);
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (i = *pos; i < program->instructions.count; ++i)
     {
         struct vkd3d_shader_instruction *instruction = &program->instructions.elements[i];
+        bool finish = false;
 
         switch (instruction->handler_idx)
         {
@@ -3404,10 +3398,22 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
                 current_block = NULL;
                 break;
 
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                assert(!current_block);
+                finish = true;
+                break;
+
             default:
                 break;
         }
+
+        if (finish)
+            break;
     }
+
+    *pos = i;
 
     for (i = 0; i < cfg->block_count; ++i)
     {
@@ -4881,12 +4887,13 @@ static enum vkd3d_result vsir_cfg_emit_structured_program(struct vsir_cfg *cfg)
 }
 
 static enum vkd3d_result vsir_program_structurize_function(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target)
+        struct vkd3d_shader_message_context *message_context, struct vsir_cfg_emit_target *target,
+        size_t *pos)
 {
     enum vkd3d_result ret;
     struct vsir_cfg cfg;
 
-    if ((ret = vsir_cfg_init(&cfg, program, message_context, target)) < 0)
+    if ((ret = vsir_cfg_init(&cfg, program, message_context, target, pos)) < 0)
         return ret;
 
     vsir_cfg_compute_dominators(&cfg);
@@ -4919,7 +4926,7 @@ static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
 {
     struct vsir_cfg_emit_target target = {0};
     enum vkd3d_result ret;
-    unsigned int i;
+    size_t i;
 
     target.jump_target_temp_idx = program->temp_count;
     target.temp_count = program->temp_count + 1;
@@ -4927,19 +4934,41 @@ static enum vkd3d_result vsir_program_structurize(struct vsir_program *program,
     if (!reserve_instructions(&target.instructions, &target.ins_capacity, program->instructions.count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    /* Copy declarations until the first block. */
-    for (i = 0; i < program->instructions.count; ++i)
+    for (i = 0; i < program->instructions.count;)
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
-        if (ins->handler_idx == VKD3DSIH_LABEL)
-            break;
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                assert(program->shader_version.type != VKD3D_SHADER_TYPE_HULL);
+                TRACE("Structurizing a non-hull shader.\n");
+                if ((ret = vsir_program_structurize_function(program, message_context,
+                        &target, &i)) < 0)
+                    goto fail;
+                assert(i == program->instructions.count);
+                break;
 
-        target.instructions[target.ins_count++] = *ins;
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                assert(program->shader_version.type == VKD3D_SHADER_TYPE_HULL);
+                TRACE("Structurizing phase %u of a hull shader.\n", ins->handler_idx);
+                target.instructions[target.ins_count++] = *ins;
+                ++i;
+                if ((ret = vsir_program_structurize_function(program, message_context,
+                        &target, &i)) < 0)
+                    goto fail;
+                break;
+
+            default:
+                if (!reserve_instructions(&target.instructions, &target.ins_capacity, target.ins_count + 1))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                target.instructions[target.ins_count++] = *ins;
+                ++i;
+                break;
+        }
     }
-
-    if ((ret = vsir_program_structurize_function(program, message_context, &target)) < 0)
-        goto fail;
 
     vkd3d_free(program->instructions.elements);
     program->instructions.elements = target.instructions;
@@ -5058,9 +5087,20 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
 {
     enum vkd3d_result ret;
     struct vsir_cfg cfg;
+    size_t stop_pos = 0;
 
-    if ((ret = vsir_cfg_init(&cfg, program, message_context, NULL)) < 0)
+    if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
+    {
+        FIXME("Hull shaders are not supported.\n");
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "The structurizer does not support hull shaders.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if ((ret = vsir_cfg_init(&cfg, program, message_context, NULL, &stop_pos)) < 0)
         return ret;
+
+    assert(stop_pos == program->instructions.count);
 
     vsir_cfg_compute_dominators(&cfg);
 
