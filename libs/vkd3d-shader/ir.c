@@ -56,19 +56,6 @@ static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *i
     vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
 }
 
-static void remove_dcl_temps(struct vsir_program *program)
-{
-    unsigned int i;
-
-    for (i = 0; i < program->instructions.count; ++i)
-    {
-        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
-
-        if (ins->handler_idx == VKD3DSIH_DCL_TEMPS)
-            vkd3d_shader_instruction_make_nop(ins);
-    }
-}
-
 static bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode handler_idx, unsigned int dst_count, unsigned int src_count)
@@ -187,6 +174,10 @@ static enum vkd3d_result vsir_program_lower_instructions(struct vsir_program *pr
             case VKD3DSIH_TEXKILL:
                 if ((ret = vsir_program_lower_texkill(program, ins, &tmp_idx)) < 0)
                     return ret;
+                break;
+
+            case VKD3DSIH_DCL_TEMPS:
+                vkd3d_shader_instruction_make_nop(ins);
                 break;
 
             default:
@@ -5766,8 +5757,6 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
     enum vkd3d_result result = VKD3D_OK;
-
-    remove_dcl_temps(program);
 
     if ((result = vsir_program_lower_instructions(program)) < 0)
         return result;
