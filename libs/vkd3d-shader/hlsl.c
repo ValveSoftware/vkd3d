@@ -558,10 +558,12 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
 
         switch (type->class)
         {
-            case HLSL_CLASS_SCALAR:
             case HLSL_CLASS_VECTOR:
-            case HLSL_CLASS_MATRIX:
                 offset[HLSL_REGSET_NUMERIC] += idx;
+                break;
+
+            case HLSL_CLASS_MATRIX:
+                offset[HLSL_REGSET_NUMERIC] += 4 * idx;
                 break;
 
             case HLSL_CLASS_STRUCT:
@@ -594,6 +596,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_PASS:
             case HLSL_CLASS_TECHNIQUE:
             case HLSL_CLASS_VOID:
+            case HLSL_CLASS_SCALAR:
                 vkd3d_unreachable();
         }
         type = next_type;
