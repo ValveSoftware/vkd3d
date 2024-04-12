@@ -220,6 +220,80 @@ todo(glsl) draw quad
 probe all rgba (70, 80, 90, 100)
 
 
+% In SM4, the values in the default values initializer of matrices end up in different components
+% than for regular initializers. The values are assigned to the matrix components in Chinese
+% reading order, i.e. the components of a whole column are assigned before the next column, unlike
+% regular initializers where the components of each row are assigned before the next row.
+[pixel shader]
+int2x3 m = {1, 2, 3, 4, 5, 6};
+//   int2x3 m;                          // Offset:    0 Size:    40
+//      = 0x00000001 0x00000002 0x00000000 0x00000000
+//        0x00000003 0x00000004 0x00000000 0x00000000
+//        0x00000005 0x00000006
+
+float4 main() : sv_target
+{
+    return m[0][0];
+}
+
+
+% The same happens for numeric constructors.
+[pixel shader]
+int2x3 m = int2x3(1, 2, 3, 4, 5, 6);
+//   int2x3 m;                          // Offset:    0 Size:    40
+//      = 0x00000001 0x00000002 0x00000000 0x00000000
+//        0x00000003 0x00000004 0x00000000 0x00000000
+//        0x00000005 0x00000006
+
+float4 main() : sv_target
+{
+    return m[0][0];
+}
+
+
+[pixel shader]
+cbuffer buff
+{
+    row_major int2x3 m = {1, 2, 3, 4, 5, 6};
+    //   row_major int2x3 m;                // Offset:    0 Size:    28
+    //      = 0x00000001 0x00000003 0x00000005 0x00000000
+    //        0x00000002 0x00000004 0x00000006
+}
+
+float4 main() : sv_target
+{
+    return m[0][0];
+}
+
+
+[pixel shader fail(sm>=6)]
+struct
+{
+    float2 a[2];
+    row_major int2x3 b;
+    float3 c[2];
+} apple = {100, 101, 110, 111, 1, 2, 3, 4, 5, 6, 200, 201, 202, 210, 211, 212};
+//   struct
+//   {
+//
+//       float2 a[2];                   // Offset:    0
+//       row_major int2x3 b;            // Offset:   32
+//       float3 c[2];                   // Offset:   64
+//
+//   } apple;                           // Offset:    0 Size:    92
+//      = 0x42c80000 0x42ca0000 0x00000000 0x00000000
+//        0x42dc0000 0x42de0000 0x00000000 0x00000000
+//        0x00000001 0x00000003 0x00000005 0x00000000
+//        0x00000002 0x00000004 0x00000006 0x00000000
+//        0x43480000 0x43490000 0x434a0000 0x00000000
+//        0x43520000 0x43530000 0x43540000
+
+float4 main() : sv_target
+{
+    return float4(apple.c[0], 0);
+}
+
+
 [require]
 shader model >= 5.0
 
