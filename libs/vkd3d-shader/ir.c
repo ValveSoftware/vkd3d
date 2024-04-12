@@ -3098,6 +3098,8 @@ struct vsir_cfg
 {
     struct vkd3d_shader_message_context *message_context;
     struct vsir_program *program;
+    size_t function_begin;
+    size_t function_end;
     struct vsir_block *blocks;
     struct vsir_block *entry;
     size_t block_count;
@@ -3354,6 +3356,7 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     cfg->program = program;
     cfg->block_count = program->block_count;
     cfg->target = target;
+    cfg->function_begin = *pos;
 
     vsir_block_list_init(&cfg->order);
 
@@ -3414,6 +3417,7 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     }
 
     *pos = i;
+    cfg->function_end = *pos;
 
     for (i = 0; i < cfg->block_count; ++i)
     {
@@ -5063,7 +5067,7 @@ static enum vkd3d_result vsir_cfg_materialize_undominated_ssas_to_temps(struct v
 
     TRACE("Emitting temps for %u values with undominated usage.\n", alloc.next_temp_idx - program->temp_count);
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (i = cfg->function_begin; i < cfg->function_end; ++i)
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
@@ -5082,25 +5086,15 @@ done:
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context)
+static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps_in_function(
+        struct vsir_program *program, struct vkd3d_shader_message_context *message_context,
+        size_t *pos)
 {
     enum vkd3d_result ret;
     struct vsir_cfg cfg;
-    size_t stop_pos = 0;
 
-    if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
-    {
-        FIXME("Hull shaders are not supported.\n");
-        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                "The structurizer does not support hull shaders.");
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
-
-    if ((ret = vsir_cfg_init(&cfg, program, message_context, NULL, &stop_pos)) < 0)
+    if ((ret = vsir_cfg_init(&cfg, program, message_context, NULL, pos)) < 0)
         return ret;
-
-    assert(stop_pos == program->instructions.count);
 
     vsir_cfg_compute_dominators(&cfg);
 
@@ -5109,6 +5103,47 @@ static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(stru
     vsir_cfg_cleanup(&cfg);
 
     return ret;
+}
+
+static enum vkd3d_result vsir_program_materialize_undominated_ssas_to_temps(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
+{
+    enum vkd3d_result ret;
+    size_t i;
+
+    for (i = 0; i < program->instructions.count;)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                assert(program->shader_version.type != VKD3D_SHADER_TYPE_HULL);
+                TRACE("Materializing undominated SSAs in a non-hull shader.\n");
+                if ((ret = vsir_program_materialize_undominated_ssas_to_temps_in_function(
+                        program, message_context, &i)) < 0)
+                    return ret;
+                assert(i == program->instructions.count);
+                break;
+
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                assert(program->shader_version.type == VKD3D_SHADER_TYPE_HULL);
+                TRACE("Materializing undominated SSAs in phase %u of a hull shader.\n", ins->handler_idx);
+                ++i;
+                if ((ret = vsir_program_materialize_undominated_ssas_to_temps_in_function(
+                        program, message_context, &i)) < 0)
+                    return ret;
+                break;
+
+            default:
+                ++i;
+                break;
+        }
+    }
+
+    return VKD3D_OK;
 }
 
 struct validation_context
