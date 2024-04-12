@@ -17,6 +17,30 @@ todo(sm<4 | glsl) draw quad
 probe all rgba (1, 2, 3, 4)
 
 [require]
+shader model >= 3.0
+
+% Check that derivatives are still computed after discarding
+% other pixels in the same quad
+[pixel shader todo(sm<4)]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    if (frac((floor(pos.x) + floor(pos.y)) / 2) == 0.5)
+        discard;
+    return float4(ddx(pos.x), ddx(pos.y), ddy(pos.x), ddy(pos.y));
+}
+
+[test]
+todo(sm<4 | glsl) draw quad
+probe (0, 0) rgba (1, 0, 0, 1)
+probe (1, 0) rgba (1, 2, 3, 4)
+probe (0, 1) rgba (1, 2, 3, 4)
+probe (1, 1) rgba (1, 0, 0, 1)
+probe (2, 0) rgba (1, 0, 0, 1)
+probe (3, 0) rgba (1, 2, 3, 4)
+probe (2, 1) rgba (1, 2, 3, 4)
+probe (3, 1) rgba (1, 0, 0, 1)
+
+[require]
 shader model >= 5.0
 
 [uav 1]
