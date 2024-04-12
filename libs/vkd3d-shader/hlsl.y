@@ -2079,6 +2079,50 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
     return true;
 }
 
+/* For some reason, for matrices, values from default value initializers end up in different
+ * components than from regular initializers. Default value initializers fill the matrix in
+ * vertical reading order (left-to-right top-to-bottom) instead of regular reading order
+ * (top-to-bottom left-to-right), so they have to be adjusted. */
+static unsigned int get_component_index_from_default_initializer_index(struct hlsl_ctx *ctx,
+        struct hlsl_type *type, unsigned int index)
+{
+    unsigned int element_comp_count, element, x, y, i;
+    unsigned int base = 0;
+
+    if (ctx->profile->major_version < 4)
+        return index;
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_MATRIX:
+            x = index / type->dimy;
+            y = index % type->dimy;
+            return y * type->dimx + x;
+
+        case HLSL_CLASS_ARRAY:
+            element_comp_count = hlsl_type_component_count(type->e.array.type);
+            element = index / element_comp_count;
+            base = element * element_comp_count;
+            return base + get_component_index_from_default_initializer_index(ctx, type->e.array.type, index - base);
+
+        case HLSL_CLASS_STRUCT:
+            for (i = 0; i < type->e.record.field_count; ++i)
+            {
+                struct hlsl_type *field_type = type->e.record.fields[i].type;
+
+                element_comp_count = hlsl_type_component_count(field_type);
+                if (index - base < element_comp_count)
+                    return base + get_component_index_from_default_initializer_index(ctx, field_type, index - base);
+                base += element_comp_count;
+            }
+            break;
+
+        default:
+            return index;
+    }
+    vkd3d_unreachable();
+}
+
 static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src)
 {
@@ -2102,12 +2146,14 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
         if (dst->default_values)
         {
             struct hlsl_default_value default_value = {0};
+            unsigned int dst_index;
 
             if (!hlsl_clone_block(ctx, &block, instrs))
                 return;
             default_value.value = evaluate_static_expression(ctx, &block, dst_comp_type, &src->loc);
 
-            dst->default_values[*store_index] = default_value;
+            dst_index = get_component_index_from_default_initializer_index(ctx, dst->data_type, *store_index);
+            dst->default_values[dst_index] = default_value;
 
             hlsl_block_cleanup(&block);
         }

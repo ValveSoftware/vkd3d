@@ -1872,7 +1872,7 @@ static void test_default_values_reflection(void)
                             unsigned int var_val = *((unsigned int *)var_desc.DefaultValue + k);
                             unsigned int expect_val = *((unsigned int *)expect->var_desc.DefaultValue + k);
 
-                            todo_if(var_val != expect_val) ok(var_val == expect_val, "Expected default value 0x%08x, but got 0x%08x, at offset %u.\n",
+                            ok(var_val == expect_val, "Expected default value 0x%08x, but got 0x%08x, at offset %u.\n",
                                     expect_val, var_val, 4 * k);
                         }
                     }
