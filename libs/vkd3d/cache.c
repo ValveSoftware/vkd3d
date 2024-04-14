@@ -28,6 +28,8 @@ struct vkd3d_cache_entry_header
 struct vkd3d_shader_cache
 {
     unsigned int refcount;
+    struct vkd3d_mutex lock;
+
     struct rb_tree tree;
 };
 
@@ -82,6 +84,7 @@ int vkd3d_shader_open_cache(struct vkd3d_shader_cache **cache)
 
     object->refcount = 1;
     rb_init(&object->tree, vkd3d_shader_cache_compare_key);
+    vkd3d_mutex_init(&object->lock);
 
     *cache = object;
 
@@ -111,6 +114,7 @@ unsigned int vkd3d_shader_cache_decref(struct vkd3d_shader_cache *cache)
         return refcount;
 
     rb_destroy(&cache->tree, vkd3d_shader_cache_destroy_entry, NULL);
+    vkd3d_mutex_destroy(&cache->lock);
 
     vkd3d_free(cache);
     return 0;
@@ -129,6 +133,16 @@ static uint64_t vkd3d_shader_cache_hash_key(const void *key, size_t size)
     return hash;
 }
 
+static void vkd3d_shader_cache_lock(struct vkd3d_shader_cache *cache)
+{
+    vkd3d_mutex_lock(&cache->lock);
+}
+
+static void vkd3d_shader_cache_unlock(struct vkd3d_shader_cache *cache)
+{
+    vkd3d_mutex_unlock(&cache->lock);
+}
+
 int vkd3d_shader_cache_put(struct vkd3d_shader_cache *cache,
         const void *key, size_t key_size, const void *value, size_t value_size)
 {
@@ -142,6 +156,9 @@ int vkd3d_shader_cache_put(struct vkd3d_shader_cache *cache,
     k.hash = vkd3d_shader_cache_hash_key(key, key_size);
     k.key = key;
     k.key_size = key_size;
+
+    vkd3d_shader_cache_lock(cache);
+
     entry = rb_get(&cache->tree, &k);
     e = entry ? RB_ENTRY_VALUE(entry, struct shader_cache_entry, entry) : NULL;
 
@@ -177,6 +194,7 @@ int vkd3d_shader_cache_put(struct vkd3d_shader_cache *cache,
     ret = VKD3D_OK;
 
 done:
+    vkd3d_shader_cache_unlock(cache);
     return ret;
 }
 
@@ -196,6 +214,9 @@ int vkd3d_shader_cache_get(struct vkd3d_shader_cache *cache,
     k.hash = vkd3d_shader_cache_hash_key(key, key_size);
     k.key = key;
     k.key_size = key_size;
+
+    vkd3d_shader_cache_lock(cache);
+
     entry = rb_get(&cache->tree, &k);
     if (!entry)
     {
@@ -228,5 +249,6 @@ int vkd3d_shader_cache_get(struct vkd3d_shader_cache *cache,
     TRACE("Returning cached item %#"PRIx64".\n", e->h.hash);
 
 done:
+    vkd3d_shader_cache_unlock(cache);
     return ret;
 }
