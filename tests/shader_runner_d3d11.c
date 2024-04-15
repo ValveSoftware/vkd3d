@@ -273,7 +273,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
 
     runner->caps.runner = "d3d11.dll";
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
-    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
+    runner->caps.maximum_shader_model = SHADER_MODEL_5_0;
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device, D3D11_FEATURE_DOUBLES,
             &doubles, sizeof(doubles));
