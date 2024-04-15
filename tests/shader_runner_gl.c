@@ -335,6 +335,7 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool i
         {DXGI_FORMAT_R32G32_SINT,        2, true,  false, GL_RG32I,              GL_RG_INTEGER,      GL_INT},
         {DXGI_FORMAT_R32_FLOAT,          1, false, false, GL_R32F,               GL_RED,             GL_FLOAT},
         {DXGI_FORMAT_R32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
+        {DXGI_FORMAT_D32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
         {DXGI_FORMAT_R32_UINT,           1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
         {DXGI_FORMAT_R32_SINT,           1, true,  false, GL_R32I,               GL_RED_INTEGER,     GL_INT},
     };
@@ -410,6 +411,7 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
     switch (params->type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
@@ -435,6 +437,7 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
     switch (resource->r.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
             if (res->dimension == RESOURCE_DIMENSION_BUFFER)
@@ -721,6 +724,7 @@ static bool gl_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
             case RESOURCE_TYPE_TEXTURE:
                 break;
@@ -932,6 +936,31 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
     return program_id;
 }
 
+static void gl_runner_clear(struct shader_runner *r, struct resource *res, const struct vec4 *clear_value)
+{
+    struct gl_resource *resource = gl_resource(res);
+    struct gl_runner *runner = gl_runner(r);
+
+    if (!runner->fbo_id)
+        glGenFramebuffers(1, &runner->fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, runner->fbo_id);
+
+    switch (resource->r.type)
+    {
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, resource->id, 0);
+            glDepthMask(GL_TRUE);
+            glClearDepthf(clear_value->x);
+            break;
+
+        default:
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+    }
+
+    glScissor(0, 0, res->width, res->height);
+    glClear(GL_DEPTH_BUFFER_BIT);
+}
+
 static bool gl_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count)
 {
@@ -1040,6 +1069,13 @@ static bool gl_runner_draw(struct shader_runner *r,
                     rt_count = resource->r.slot + 1;
                 break;
 
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+                glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, resource->id, 0);
+                glEnable(GL_DEPTH_TEST);
+                glDepthMask(GL_TRUE);
+                glDepthFunc(get_compare_op_gl(runner->r.depth_func));
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 break;
 
@@ -1135,7 +1171,8 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     struct gl_resource *resource = gl_resource(res);
     struct resource_readback *rb;
 
-    if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_UAV)
+    if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_DEPTH_STENCIL
+            && resource->r.type != RESOURCE_TYPE_UAV)
         fatal_error("Unhandled resource type %#x.\n", resource->r.type);
 
     rb = malloc(sizeof(*rb));
@@ -1172,6 +1209,7 @@ static const struct shader_runner_ops gl_runner_ops =
     .create_resource = gl_runner_create_resource,
     .destroy_resource = gl_runner_destroy_resource,
     .dispatch = gl_runner_dispatch,
+    .clear = gl_runner_clear,
     .draw = gl_runner_draw,
     .get_resource_readback = gl_runner_get_resource_readback,
     .release_readback = gl_runner_release_readback,

@@ -224,6 +224,10 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
             ok(hr == D3D_OK, "Failed to create render target, hr %#lx.\n", hr);
             break;
 
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            fatal_error("DSVs are not supported.\n");
+            break;
+
         case RESOURCE_TYPE_TEXTURE:
         {
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
@@ -320,6 +324,11 @@ static bool d3d9_runner_dispatch(struct shader_runner *r, unsigned int x, unsign
     fatal_error("Compute shaders are not supported.\n");
 }
 
+static void d3d9_runner_clear(struct shader_runner *r, struct resource *resource, const struct vec4 *clear_value)
+{
+    fatal_error("Clears are not implemented.\n");
+}
+
 static bool d3d9_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -381,6 +390,9 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 hr = IDirect3DDevice9_SetRenderTarget(device, resource->r.slot, resource->surface);
                 ok(hr == D3D_OK, "Failed to set render target, hr %#lx.\n", hr);
                 break;
+
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+                vkd3d_unreachable();
 
             case RESOURCE_TYPE_TEXTURE:
                 assert(resource->r.dimension != RESOURCE_DIMENSION_BUFFER);
@@ -528,6 +540,7 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .create_resource = d3d9_runner_create_resource,
     .destroy_resource = d3d9_runner_destroy_resource,
     .dispatch = d3d9_runner_dispatch,
+    .clear = d3d9_runner_clear,
     .draw = d3d9_runner_draw,
     .get_resource_readback = d3d9_runner_get_resource_readback,
     .release_readback = d3d9_runner_release_readback,

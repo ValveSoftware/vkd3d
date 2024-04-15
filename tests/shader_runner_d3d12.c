@@ -46,7 +46,7 @@ struct d3d12_shader_runner
 
     struct test_context test_context;
 
-    ID3D12DescriptorHeap *heap, *rtv_heap;
+    ID3D12DescriptorHeap *heap, *rtv_heap, *dsv_heap;
 
     ID3D12CommandQueue *compute_queue;
     ID3D12CommandAllocator *compute_allocator;
@@ -143,6 +143,16 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot));
+            break;
+
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            if (!runner->dsv_heap)
+                runner->dsv_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+
+            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
+                    params->format, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+            ID3D12Device_CreateDepthStencilView(device, resource->resource,
+                    NULL, get_cpu_dsv_handle(test_context, runner->dsv_heap, 0));
             break;
 
         case RESOURCE_TYPE_TEXTURE:
@@ -325,6 +335,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -422,6 +433,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -443,6 +455,36 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     return true;
 }
 
+static void d3d12_runner_clear(struct shader_runner *r, struct resource *resource, const struct vec4 *clear_value)
+{
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
+
+    ID3D12GraphicsCommandList *command_list = test_context->list;
+    ID3D12CommandQueue *queue = test_context->queue;
+    ID3D12Device *device = test_context->device;
+    D3D12_CPU_DESCRIPTOR_HANDLE view;
+    HRESULT hr;
+
+    switch (resource->type)
+    {
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            view = get_cpu_dsv_handle(test_context, runner->dsv_heap, 0);
+            ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, view,
+                    D3D12_CLEAR_FLAG_DEPTH, clear_value->x, 0, 0, NULL);
+            break;
+
+        default:
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->type);
+    }
+
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    ok(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+    reset_command_list(command_list, test_context->allocator);
+}
+
 static bool d3d12_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -452,12 +494,12 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
     ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL;
     ID3D12GraphicsCommandList *command_list = test_context->list;
+    unsigned int uniform_index, sample_count, rtv_count = 0;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     ID3D12Device *device = test_context->device;
-    unsigned int uniform_index, sample_count;
-    unsigned int rtv_count = 0;
+    D3D12_CPU_DESCRIPTOR_HANDLE dsv = {0};
     ID3D12PipelineState *pso;
     bool succeeded;
     HRESULT hr;
@@ -510,6 +552,14 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
             if (resource->r.sample_count)
                 sample_count = resource->r.sample_count;
+        }
+        else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        {
+            assert(!resource->r.slot);
+            pso_desc.DSVFormat = resource->r.format;
+            pso_desc.DepthStencilState.DepthEnable = true;
+            pso_desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            pso_desc.DepthStencilState.DepthFunc = runner->r.depth_func;
         }
     }
 
@@ -586,6 +636,10 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 rtv_count = max(rtv_count, resource->r.slot + 1);
                 break;
 
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+                dsv = get_cpu_dsv_handle(test_context, runner->dsv_heap, 0);
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
@@ -608,7 +662,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         }
     }
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, rtv_count, rtvs, false, NULL);
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, rtv_count, rtvs, false, dsv.ptr ? &dsv : NULL);
 
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &test_context->scissor_rect);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &test_context->viewport);
@@ -636,6 +690,8 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
 
     if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
         state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+        state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
     else
         state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
@@ -659,6 +715,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
     .dispatch = d3d12_runner_dispatch,
+    .clear = d3d12_runner_clear,
     .draw = d3d12_runner_draw,
     .get_resource_readback = d3d12_runner_get_resource_readback,
     .release_readback = d3d12_runner_release_readback,
@@ -737,5 +794,7 @@ void run_shader_tests_d3d12(void *dxc_compiler)
         ID3D12DescriptorHeap_Release(runner.heap);
     if (runner.rtv_heap)
         ID3D12DescriptorHeap_Release(runner.rtv_heap);
+    if (runner.dsv_heap)
+        ID3D12DescriptorHeap_Release(runner.dsv_heap);
     destroy_test_context(&runner.test_context);
 }

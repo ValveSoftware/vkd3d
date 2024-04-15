@@ -47,6 +47,7 @@ struct d3d11_resource
     ID3D11Buffer *buffer;
     ID3D11Texture2D *texture;
     ID3D11RenderTargetView *rtv;
+    ID3D11DepthStencilView *dsv;
     ID3D11ShaderResourceView *srv;
     ID3D11UnorderedAccessView *uav;
     bool is_uav_counter;
@@ -391,6 +392,8 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
         desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
     else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
         desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+    else if (params->type == RESOURCE_TYPE_DEPTH_STENCIL)
+        desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
     else
         desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
@@ -424,6 +427,8 @@ static bool init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
         hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
     else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
         hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
+    else if (params->type == RESOURCE_TYPE_DEPTH_STENCIL)
+        hr = ID3D11Device_CreateDepthStencilView(device, resource->resource, NULL, &resource->dsv);
     else
         hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
     ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
@@ -481,6 +486,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
     switch (params->type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_TEXTURE:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_srv_buffer(runner, resource, params);
@@ -511,6 +517,8 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     ID3D11Resource_Release(resource->resource);
     if (resource->rtv)
         ID3D11RenderTargetView_Release(resource->rtv);
+    if (resource->dsv)
+        ID3D11DepthStencilView_Release(resource->dsv);
     if (resource->srv)
         ID3D11ShaderResourceView_Release(resource->srv);
     if (resource->uav)
@@ -580,6 +588,7 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -603,6 +612,23 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     return true;
 }
 
+static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, const struct vec4 *clear_value)
+{
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    ID3D11DeviceContext *context = runner->immediate_context;
+    struct d3d11_resource *resource = d3d11_resource(res);
+
+    switch (resource->r.type)
+    {
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            ID3D11DeviceContext_ClearDepthStencilView(context, resource->dsv, D3D11_CLEAR_DEPTH, clear_value->x, 0);
+            break;
+
+        default:
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+    }
+}
+
 static bool d3d11_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -612,7 +638,10 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
     unsigned int min_uav_slot = ARRAY_SIZE(uavs);
+    ID3D11DepthStencilState *ds_state = NULL;
+    D3D11_DEPTH_STENCIL_DESC ds_desc = {0};
     ID3D11Device *device = runner->device;
+    ID3D11DepthStencilView *dsv = NULL;
     unsigned int rtv_count = 0;
     ID3D11Buffer *cb = NULL;
     ID3D11VertexShader *vs;
@@ -703,6 +732,16 @@ static bool d3d11_runner_draw(struct shader_runner *r,
                 rtv_count = max(rtv_count, resource->r.slot + 1);
                 break;
 
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+                dsv = resource->dsv;
+                ds_desc.DepthEnable = TRUE;
+                ds_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+                ds_desc.DepthFunc = runner->r.depth_func;
+                hr = ID3D11Device_CreateDepthStencilState(device, &ds_desc, &ds_state);
+                ok(hr == S_OK, "Failed to create depth/stencil state, hr %#lx.\n", hr);
+                ID3D11DeviceContext_OMSetDepthStencilState(context, ds_state, 0);
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 ID3D11DeviceContext_PSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
                 break;
@@ -719,7 +758,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         }
     }
 
-    ID3D11DeviceContext_OMSetRenderTargetsAndUnorderedAccessViews(context, rtv_count, rtvs, NULL,
+    ID3D11DeviceContext_OMSetRenderTargetsAndUnorderedAccessViews(context, rtv_count, rtvs, dsv,
             min_uav_slot, ARRAY_SIZE(uavs) - min_uav_slot, &uavs[min_uav_slot], NULL);
 
     for (i = 0; i < runner->r.sampler_count; ++i)
@@ -779,6 +818,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ID3D11DomainShader_Release(ds);
     if (cb)
         ID3D11Buffer_Release(cb);
+    if (ds_state)
+        ID3D11DepthStencilState_Release(ds_state);
 
     return true;
 }
@@ -805,6 +846,7 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     switch (resource->r.type)
     {
         case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_DEPTH_STENCIL:
         case RESOURCE_TYPE_UAV:
             if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
             {
@@ -879,6 +921,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
     .dispatch = d3d11_runner_dispatch,
+    .clear = d3d11_runner_clear,
     .draw = d3d11_runner_draw,
     .get_resource_readback = d3d11_runner_get_resource_readback,
     .release_readback = d3d11_runner_release_readback,

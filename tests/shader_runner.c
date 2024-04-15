@@ -385,6 +385,35 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     fatal_error("Unknown format '%s'.\n", line);
 }
 
+static D3D12_COMPARISON_FUNC parse_comparison_func(const char *line)
+{
+    static const struct
+    {
+        const char *string;
+        D3D12_COMPARISON_FUNC func;
+    }
+    funcs[] =
+    {
+        {"less equal", D3D12_COMPARISON_FUNC_LESS_EQUAL},
+        {"not equal", D3D12_COMPARISON_FUNC_NOT_EQUAL},
+        {"greater equal", D3D12_COMPARISON_FUNC_GREATER_EQUAL},
+        {"never", D3D12_COMPARISON_FUNC_NEVER},
+        {"less", D3D12_COMPARISON_FUNC_LESS},
+        {"equal", D3D12_COMPARISON_FUNC_EQUAL},
+        {"greater", D3D12_COMPARISON_FUNC_GREATER},
+        {"always", D3D12_COMPARISON_FUNC_ALWAYS},
+    };
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(funcs); ++i)
+    {
+        if (match_string(line, funcs[i].string, &line))
+            return funcs[i].func;
+    }
+
+    fatal_error("Unknown comparison func '%s'.\n", line);
+}
+
 static D3D12_TEXTURE_ADDRESS_MODE parse_sampler_address_mode(const char *line, const char **rest)
 {
     if (match_string(line, "border", rest))
@@ -444,35 +473,9 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
     }
     else if (match_string(line, "comparison", &line))
     {
-        static const struct
-        {
-            const char *string;
-            D3D12_COMPARISON_FUNC func;
-        }
-        funcs[] =
-        {
-            {"less equal", D3D12_COMPARISON_FUNC_LESS_EQUAL},
-            {"not equal", D3D12_COMPARISON_FUNC_NOT_EQUAL},
-            {"greater equal", D3D12_COMPARISON_FUNC_GREATER_EQUAL},
-            {"never", D3D12_COMPARISON_FUNC_NEVER},
-            {"less", D3D12_COMPARISON_FUNC_LESS},
-            {"equal", D3D12_COMPARISON_FUNC_EQUAL},
-            {"greater", D3D12_COMPARISON_FUNC_GREATER},
-            {"always", D3D12_COMPARISON_FUNC_ALWAYS},
-        };
-        unsigned int i;
-
-        for (i = 0; i < ARRAY_SIZE(funcs); ++i)
-        {
-            if (match_string(line, funcs[i].string, &line))
-            {
-                sampler->filter |= D3D12_FILTER_REDUCTION_TYPE_COMPARISON << D3D12_FILTER_REDUCTION_TYPE_SHIFT;
-                sampler->func = funcs[i].func;
-                return;
-            }
-        }
-
-        fatal_error("Unknown sampler func '%s'.\n", line);
+        sampler->filter |= D3D12_FILTER_REDUCTION_TYPE_COMPARISON << D3D12_FILTER_REDUCTION_TYPE_SHIFT;
+        sampler->func = parse_comparison_func(line);
+        return;
     }
     else
     {
@@ -625,6 +628,12 @@ struct resource *shader_runner_get_resource(struct shader_runner *runner, enum r
     }
 
     return NULL;
+}
+
+static bool shader_runner_has_target(struct shader_runner *runner)
+{
+    return shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0)
+            || shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0);
 }
 
 static void set_resource(struct shader_runner *runner, const struct resource_params *params)
@@ -825,6 +834,22 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
     }
+    else if (match_string(line, "clear dsv", &line))
+    {
+        struct resource *resource;
+        struct vec4 v = {0};
+
+        if (!sscanf(line, "%f", &v.x))
+            fatal_error("Malformed dsv clear arguments '%s'.\n", line);
+
+        if (!(resource = shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0)))
+            fatal_error("Resource not found.\n");
+        runner->ops->clear(runner, resource, &v);
+    }
+    else if (match_string(line, "depth", &line))
+    {
+        runner->depth_func = parse_comparison_func(line);
+    }
     else if (match_string(line, "draw quad", &line))
     {
         struct resource_params params;
@@ -848,7 +873,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->hs_source != !runner->ds_source)
             fatal_error("Have a domain or hull shader but not both.\n");
 
-        if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        if (!shader_runner_has_target(runner))
         {
             memset(&params, 0, sizeof(params));
             params.slot = 0;
@@ -901,7 +926,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->hs_source != !runner->ds_source)
             fatal_error("Have a domain or hull shader but not both.\n");
 
-        if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        if (!shader_runner_has_target(runner))
         {
             memset(&params, 0, sizeof(params));
             params.slot = 0;
@@ -969,6 +994,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             line = rest;
 
             resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot);
+        }
+        else if (match_string(line, "dsv", &line))
+        {
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_DEPTH_STENCIL, 0);
         }
         else
         {
@@ -1811,6 +1840,20 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
+                current_resource.level_count = 1;
+            }
+            else if (!strcmp(line, "[dsv]\n"))
+            {
+                state = STATE_RESOURCE;
+
+                memset(&current_resource, 0, sizeof(current_resource));
+
+                current_resource.slot = 0;
+                current_resource.type = RESOURCE_TYPE_DEPTH_STENCIL;
+                current_resource.format = DXGI_FORMAT_D32_FLOAT;
+                current_resource.is_shadow = true;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.texel_size = 4;
                 current_resource.level_count = 1;
             }
             else if (sscanf(line, "[srv %u]\n", &index))

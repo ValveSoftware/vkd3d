@@ -71,6 +71,7 @@ struct sampler
 enum resource_type
 {
     RESOURCE_TYPE_RENDER_TARGET,
+    RESOURCE_TYPE_DEPTH_STENCIL,
     RESOURCE_TYPE_TEXTURE,
     RESOURCE_TYPE_UAV,
     RESOURCE_TYPE_VERTEX_BUFFER,
@@ -186,12 +187,15 @@ struct shader_runner
     size_t input_element_count, input_element_capacity;
 
     unsigned int compile_options;
+
+    D3D12_COMPARISON_FUNC depth_func;
 };
 
 struct shader_runner_ops
 {
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
+    void (*clear)(struct shader_runner *runner, struct resource *resource, const struct vec4 *clear_value);
     bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
     bool (*dispatch)(struct shader_runner *runner, unsigned int x, unsigned int y, unsigned int z);
     struct resource_readback *(*get_resource_readback)(struct shader_runner *runner, struct resource *resource);

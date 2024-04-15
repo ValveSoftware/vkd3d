@@ -1,0 +1,35 @@
+[require]
+shader model >= 4.0
+
+[dsv]
+size (2d, 640, 480)
+
+[pixel shader]
+float depth;
+
+float main() : SV_Depth
+{
+    return depth;
+}
+
+[test]
+uniform 0 float 0.0
+clear dsv 1.0
+depth less
+todo(sm>=6 | glsl) draw quad
+probe dsv all r (0.0)
+
+uniform 0 float 0.75
+clear dsv 1.0
+todo(sm>=6 | glsl) draw quad
+probe dsv all r (0.75)
+
+clear dsv 0.5
+depth greater
+todo(sm>=6 | glsl) draw quad
+probe dsv all r (0.75)
+
+depth less
+clear dsv 0.5
+todo(sm>=6 | glsl) draw quad
+probe dsv all r (0.5)

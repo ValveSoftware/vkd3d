@@ -120,7 +120,7 @@ static void end_command_buffer(struct vulkan_shader_runner *runner)
 }
 
 static void transition_image_layout(struct vulkan_shader_runner *runner,
-        VkImage image, VkImageLayout src_layout, VkImageLayout dst_layout)
+        VkImage image, VkImageAspectFlags aspect_mask, VkImageLayout src_layout, VkImageLayout dst_layout)
 {
     VkImageMemoryBarrier barrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
 
@@ -131,7 +131,7 @@ static void transition_image_layout(struct vulkan_shader_runner *runner,
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.aspectMask = aspect_mask;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;
@@ -240,7 +240,8 @@ static VkImage create_2d_image(const struct vulkan_shader_runner *runner, uint32
     return image;
 }
 
-static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runner, VkImage image, VkFormat format)
+static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runner, VkImage image, VkFormat format,
+        VkImageAspectFlags aspect_mask)
 {
     VkImageViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     VkImageView view;
@@ -252,7 +253,7 @@ static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runne
     view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.aspectMask = aspect_mask;
     view_info.subresourceRange.baseMipLevel = 0;
     view_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     view_info.subresourceRange.baseArrayLayer = 0;
@@ -282,12 +283,12 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 
     resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
             usage, format, &resource->memory);
-    resource->image_view = create_2d_image_view(runner, resource->image, format);
+    resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
     if (!params->data)
     {
         begin_command_buffer(runner);
-        transition_image_layout(runner, resource->image,
+        transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
                 VK_IMAGE_LAYOUT_UNDEFINED, layout);
         end_command_buffer(runner);
         return;
@@ -301,7 +302,7 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
 
     begin_command_buffer(runner);
 
-    transition_image_layout(runner, resource->image,
+    transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     for (unsigned int level = 0; level < params->level_count; ++level)
@@ -323,7 +324,7 @@ static void resource_init_2d(struct vulkan_shader_runner *runner, struct vulkan_
         buffer_offset += level_width * level_height * params->texel_size;
     }
 
-    transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
+    transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
 
     end_command_buffer(runner);
 
@@ -375,11 +376,25 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
             resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
-            resource->image_view = create_2d_image_view(runner, resource->image, format);
+            resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
             begin_command_buffer(runner);
-            transition_image_layout(runner, resource->image,
+            transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            end_command_buffer(runner);
+            break;
+
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            format = vkd3d_get_vk_format(params->format);
+
+            resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, format,
+                    &resource->memory);
+            resource->image_view = create_2d_image_view(runner, resource->image, format, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+            begin_command_buffer(runner);
+            transition_image_layout(runner, resource->image, VK_IMAGE_ASPECT_DEPTH_BIT,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
             end_command_buffer(runner);
             break;
 
@@ -541,6 +556,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
 
@@ -669,6 +685,31 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
     return pipeline_layout;
 }
 
+static enum VkCompareOp vk_compare_op_from_d3d12(D3D12_COMPARISON_FUNC op)
+{
+    switch (op)
+    {
+        case D3D12_COMPARISON_FUNC_NEVER:
+            return VK_COMPARE_OP_NEVER;
+        case D3D12_COMPARISON_FUNC_LESS:
+            return VK_COMPARE_OP_LESS;
+        case D3D12_COMPARISON_FUNC_EQUAL:
+            return VK_COMPARE_OP_EQUAL;
+        case D3D12_COMPARISON_FUNC_LESS_EQUAL:
+            return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER:
+            return VK_COMPARE_OP_GREATER;
+        case D3D12_COMPARISON_FUNC_NOT_EQUAL:
+            return VK_COMPARE_OP_NOT_EQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER_EQUAL:
+            return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        case D3D12_COMPARISON_FUNC_ALWAYS:
+            return VK_COMPARE_OP_ALWAYS;
+        default:
+            fatal_error("Unhandled compare op %#x.\n", op);
+    }
+}
+
 static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, VkRenderPass render_pass,
         VkPipelineLayout pipeline_layout, D3D_PRIMITIVE_TOPOLOGY primitive_topology)
 {
@@ -685,6 +726,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
     VkPipelineTessellationStateCreateInfo tessellation_info;
     VkVertexInputAttributeDescription input_attributes[32];
+    VkPipelineDepthStencilStateCreateInfo ds_desc = {0};
     VkVertexInputBindingDescription input_bindings[32];
     VkPipelineShaderStageCreateInfo stage_desc[4];
     struct vkd3d_shader_code vs_dxbc;
@@ -750,6 +792,20 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
                 attachment_desc[blend_desc.attachmentCount++].colorWriteMask =
                         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                         | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+                break;
+
+            case RESOURCE_TYPE_DEPTH_STENCIL:
+                ds_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+                ds_desc.pNext = NULL;
+                ds_desc.flags = 0;
+                ds_desc.depthTestEnable = VK_TRUE;
+                ds_desc.depthWriteEnable = VK_TRUE;
+                ds_desc.depthCompareOp = vk_compare_op_from_d3d12(runner->r.depth_func);
+                ds_desc.depthBoundsTestEnable = VK_FALSE;
+                ds_desc.stencilTestEnable = VK_FALSE;
+                ds_desc.minDepthBounds = 0.0f;
+                ds_desc.maxDepthBounds = 1.0f;
+                pipeline_desc.pDepthStencilState = &ds_desc;
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -858,31 +914,6 @@ static VkSamplerAddressMode vk_address_mode_from_d3d12(D3D12_TEXTURE_ADDRESS_MOD
     }
 }
 
-static enum VkCompareOp vk_compare_op_from_d3d12(D3D12_COMPARISON_FUNC op)
-{
-    switch (op)
-    {
-        case D3D12_COMPARISON_FUNC_NEVER:
-            return VK_COMPARE_OP_NEVER;
-        case D3D12_COMPARISON_FUNC_LESS:
-            return VK_COMPARE_OP_LESS;
-        case D3D12_COMPARISON_FUNC_EQUAL:
-            return VK_COMPARE_OP_EQUAL;
-        case D3D12_COMPARISON_FUNC_LESS_EQUAL:
-            return VK_COMPARE_OP_LESS_OR_EQUAL;
-        case D3D12_COMPARISON_FUNC_GREATER:
-            return VK_COMPARE_OP_GREATER;
-        case D3D12_COMPARISON_FUNC_NOT_EQUAL:
-            return VK_COMPARE_OP_NOT_EQUAL;
-        case D3D12_COMPARISON_FUNC_GREATER_EQUAL:
-            return VK_COMPARE_OP_GREATER_OR_EQUAL;
-        case D3D12_COMPARISON_FUNC_ALWAYS:
-            return VK_COMPARE_OP_ALWAYS;
-        default:
-            fatal_error("Unhandled compare op %#x.\n", op);
-    }
-}
-
 static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_runner *runner)
 {
     VkDescriptorSetLayoutCreateInfo set_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -904,6 +935,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
 
@@ -1035,6 +1067,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_DEPTH_STENCIL:
                 break;
         }
     }
@@ -1053,21 +1086,25 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
 {
     VkRenderPassCreateInfo render_pass_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     VkFramebufferCreateInfo fb_desc = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    VkAttachmentReference ds_ref = {0}, color_refs[MAX_RESOURCES] = {0};
     VkAttachmentDescription attachment_descs[MAX_RESOURCES] = {0};
-    VkAttachmentReference color_refs[MAX_RESOURCES] = {0};
+    unsigned int i, color_ref_count = 0, view_count = 0;
     VkSubpassDescription subpass_desc = {0};
-    VkImageView rtvs[MAX_RESOURCES];
-    unsigned int rt_count = 0;
-    unsigned int i;
+    VkImageView views[MAX_RESOURCES];
+    VkImageLayout layout;
+    bool is_ds;
 
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
-        VkAttachmentDescription *attachment_desc = &attachment_descs[rt_count];
-        VkAttachmentReference *color_ref = &color_refs[rt_count];
+        VkAttachmentDescription *attachment_desc = &attachment_descs[view_count];
+        VkAttachmentReference *color_ref = &color_refs[color_ref_count];
 
-        if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET)
+        if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_DEPTH_STENCIL)
             continue;
+
+        is_ds = resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL;
+        layout = is_ds ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         attachment_desc->format = vkd3d_get_vk_format(resource->r.format);
         attachment_desc->samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1075,22 +1112,30 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
         attachment_desc->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment_desc->initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        attachment_desc->finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment_desc->initialLayout = layout;
+        attachment_desc->finalLayout = layout;
 
-        color_ref->attachment = rt_count;
-        color_ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        if (is_ds)
+        {
+            ds_ref.attachment = view_count;
+            ds_ref.layout = layout;
+            subpass_desc.pDepthStencilAttachment = &ds_ref;
+        }
+        else
+        {
+            color_ref->attachment = view_count;
+            color_ref->layout = layout;
+            ++color_ref_count;
+        }
 
-        rtvs[rt_count] = resource->image_view;
-
-        ++rt_count;
+        views[view_count++] = resource->image_view;
     }
 
     subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass_desc.colorAttachmentCount = rt_count;
+    subpass_desc.colorAttachmentCount = color_ref_count;
     subpass_desc.pColorAttachments = color_refs;
 
-    render_pass_desc.attachmentCount = rt_count;
+    render_pass_desc.attachmentCount = view_count;
     render_pass_desc.pAttachments = attachment_descs;
     render_pass_desc.subpassCount = 1;
     render_pass_desc.pSubpasses = &subpass_desc;
@@ -1098,8 +1143,8 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     VK_CALL(vkCreateRenderPass(runner->device, &render_pass_desc, NULL, render_pass));
 
     fb_desc.renderPass = *render_pass;
-    fb_desc.attachmentCount = rt_count;
-    fb_desc.pAttachments = rtvs;
+    fb_desc.attachmentCount = view_count;
+    fb_desc.pAttachments = views;
     fb_desc.width = RENDER_TARGET_WIDTH;
     fb_desc.height = RENDER_TARGET_HEIGHT;
     fb_desc.layers = 1;
@@ -1148,6 +1193,91 @@ out:
     VK_CALL(vkDestroyDescriptorSetLayout(device, set_layout, NULL));
 
     return ret;
+}
+
+static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, const struct vec4 *clear_value)
+{
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    struct vulkan_resource *resource = vulkan_resource(res);
+
+    size_t width = resource->r.width, height = resource->r.height;
+    VkSubpassDescription sub_pass_desc = {0};
+    VkAttachmentDescription attachment_desc;
+    VkRenderPassCreateInfo pass_desc = {0};
+    VkAttachmentReference attachment_ref;
+    VkDevice device = runner->device;
+    VkRenderPassBeginInfo begin_desc;
+    VkFramebufferCreateInfo fb_desc;
+    VkClearValue vk_clear_value;
+    VkRenderPass render_pass;
+    VkFramebuffer fb;
+
+    attachment_desc.flags = 0;
+    attachment_desc.format = vkd3d_get_vk_format(resource->r.format);
+    attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    /* TODO: formats with a stencil component would a clear op here. */
+    attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+    sub_pass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+    switch (resource->r.type)
+    {
+        case RESOURCE_TYPE_DEPTH_STENCIL:
+            attachment_desc.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            sub_pass_desc.pDepthStencilAttachment = &attachment_ref;
+            vk_clear_value.depthStencil.depth = clear_value->x;
+            vk_clear_value.depthStencil.stencil = 0;
+            break;
+
+        default:
+            fatal_error("Clears are not implemented for resource type %u.\n", resource->r.type);
+    }
+
+    attachment_desc.finalLayout = attachment_desc.initialLayout;
+
+    attachment_ref.attachment = 0;
+    attachment_ref.layout = attachment_desc.initialLayout;
+
+    begin_command_buffer(runner);
+
+    pass_desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    pass_desc.attachmentCount = 1;
+    pass_desc.pAttachments = &attachment_desc;
+    pass_desc.subpassCount = 1;
+    pass_desc.pSubpasses = &sub_pass_desc;
+    VK_CALL(vkCreateRenderPass(device, &pass_desc, NULL, &render_pass));
+
+    fb_desc.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fb_desc.pNext = NULL;
+    fb_desc.flags = 0;
+    fb_desc.renderPass = render_pass;
+    fb_desc.attachmentCount = 1;
+    fb_desc.pAttachments = &resource->image_view;
+    fb_desc.width = width;
+    fb_desc.height = height;
+    fb_desc.layers = 1;
+    VK_CALL(vkCreateFramebuffer(device, &fb_desc, NULL, &fb));
+
+    begin_desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin_desc.pNext = NULL;
+    begin_desc.renderPass = render_pass;
+    begin_desc.framebuffer = fb;
+    begin_desc.clearValueCount = 1;
+    begin_desc.pClearValues = &vk_clear_value;
+    begin_desc.renderArea.offset.x = 0;
+    begin_desc.renderArea.offset.y = 0;
+    begin_desc.renderArea.extent.width = width;
+    begin_desc.renderArea.extent.height = height;
+    VK_CALL(vkCmdBeginRenderPass(runner->cmd_buffer, &begin_desc, VK_SUBPASS_CONTENTS_INLINE));
+    VK_CALL(vkCmdEndRenderPass(runner->cmd_buffer));
+
+    end_command_buffer(runner);
+
+    VK_CALL(vkDestroyRenderPass(device, render_pass, NULL));
+    VK_CALL(vkDestroyFramebuffer(device, fb, NULL));
 }
 
 static bool vulkan_runner_draw(struct shader_runner *r,
@@ -1222,6 +1352,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     struct vulkan_resource_readback *rb = malloc(sizeof(*rb));
     struct vulkan_resource *resource = vulkan_resource(res);
     VkDevice device = runner->device;
+    VkImageAspectFlags aspect_mask;
     VkBufferImageCopy region = {0};
     VkImageLayout layout;
 
@@ -1245,16 +1376,21 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     }
     else
     {
+        aspect_mask = (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+                ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
         if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
             layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        else if (resource->r.type == RESOURCE_TYPE_DEPTH_STENCIL)
+            layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         else
             layout = VK_IMAGE_LAYOUT_GENERAL;
 
         begin_command_buffer(runner);
 
-        transition_image_layout(runner, resource->image, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        transition_image_layout(runner, resource->image, aspect_mask, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.aspectMask = aspect_mask;
         region.imageSubresource.layerCount = 1;
         region.imageExtent.width = resource->r.width;
         region.imageExtent.height = resource->r.height;
@@ -1263,7 +1399,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
         VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
 
-        transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
+        transition_image_layout(runner, resource->image, aspect_mask, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
 
         end_command_buffer(runner);
 
@@ -1291,6 +1427,7 @@ static const struct shader_runner_ops vulkan_runner_ops =
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
     .dispatch = vulkan_runner_dispatch,
+    .clear = vulkan_runner_clear,
     .draw = vulkan_runner_draw,
     .get_resource_readback = vulkan_runner_get_resource_readback,
     .release_readback = vulkan_runner_release_readback,
