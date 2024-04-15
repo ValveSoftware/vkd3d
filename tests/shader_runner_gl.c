@@ -940,6 +940,7 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
 {
     struct gl_resource *resource = gl_resource(res);
     struct gl_runner *runner = gl_runner(r);
+    GLbitfield clear_mask;
 
     if (!runner->fbo_id)
         glGenFramebuffers(1, &runner->fbo_id);
@@ -947,10 +948,18 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
 
     switch (resource->r.type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, resource->id, 0);
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            glClearColor(clear_value->x, clear_value->y, clear_value->z, clear_value->w);
+            clear_mask = GL_COLOR_BUFFER_BIT;
+            break;
+
         case RESOURCE_TYPE_DEPTH_STENCIL:
             glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, resource->id, 0);
             glDepthMask(GL_TRUE);
             glClearDepthf(clear_value->x);
+            clear_mask = GL_DEPTH_BUFFER_BIT;
             break;
 
         default:
@@ -958,7 +967,7 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
     }
 
     glScissor(0, 0, res->width, res->height);
-    glClear(GL_DEPTH_BUFFER_BIT);
+    glClear(clear_mask);
 }
 
 static bool gl_runner_draw(struct shader_runner *r,

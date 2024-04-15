@@ -1225,6 +1225,13 @@ static void vulkan_runner_clear(struct shader_runner *r, struct resource *res, c
 
     switch (resource->r.type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            attachment_desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            sub_pass_desc.colorAttachmentCount = 1;
+            sub_pass_desc.pColorAttachments = &attachment_ref;
+            memcpy(vk_clear_value.color.float32, clear_value, sizeof(vk_clear_value.color.float32));
+            break;
+
         case RESOURCE_TYPE_DEPTH_STENCIL:
             attachment_desc.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
             sub_pass_desc.pDepthStencilAttachment = &attachment_ref;

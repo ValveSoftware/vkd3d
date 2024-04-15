@@ -620,6 +620,10 @@ static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, co
 
     switch (resource->r.type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            ID3D11DeviceContext_ClearRenderTargetView(context, resource->rtv, (const float *)clear_value);
+            break;
+
         case RESOURCE_TYPE_DEPTH_STENCIL:
             ID3D11DeviceContext_ClearDepthStencilView(context, resource->dsv, D3D11_CLEAR_DEPTH, clear_value->x, 0);
             break;

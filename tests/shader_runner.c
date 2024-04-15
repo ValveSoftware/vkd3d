@@ -834,6 +834,19 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
     }
+    else if (match_string(line, "clear rtv", &line))
+    {
+        struct resource *resource;
+        unsigned int slot;
+        struct vec4 v;
+
+        if (sscanf(line, "%u %f %f %f %f", &slot, &v.x, &v.y, &v.z, &v.w) < 5)
+            fatal_error("Malformed rtv clear arguments '%s'.\n", line);
+
+        if (!(resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot)))
+            fatal_error("Resource not found.\n");
+        runner->ops->clear(runner, resource, &v);
+    }
     else if (match_string(line, "clear dsv", &line))
     {
         struct resource *resource;

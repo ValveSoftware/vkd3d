@@ -33,3 +33,78 @@ depth less
 clear dsv 0.5
 todo(sm>=6 | glsl) draw quad
 probe dsv all r (0.5)
+
+
+[require]
+shader model >= 5.0
+
+[rtv 0]
+format r32g32b32a32 float
+size (2d, 640, 480)
+
+[vertex shader]
+float2 depth;
+
+void main(float4 in_position : POSITION, out float4 out_position : SV_Position)
+{
+    out_position = in_position;
+    out_position.z = depth.x;
+}
+
+[pixel shader todo]
+float2 depth;
+
+float4 main(out float out_depth : SV_DepthLessEqual) : SV_Target
+{
+    out_depth = depth.y;
+    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+}
+
+[test]
+uniform 0 float4 0.75 0.75 0.0 0.0
+clear rtv 0 1.0 1.0 1.0 1.0
+clear dsv 0.5
+depth greater equal
+todo draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv all r (0.75)
+
+uniform 0 float4 0.75 0.375 0.0 0.0
+clear rtv 0 1.0 1.0 1.0 1.0
+clear dsv 0.5
+todo draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+probe dsv all r (0.5)
+
+
+[pixel shader todo]
+float2 depth;
+
+float4 main(out float out_depth : SV_DepthGreaterEqual) : SV_Target
+{
+    out_depth = depth.y;
+    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+}
+
+[test]
+uniform 0 float4 0.75 0.75 0.0 0.0
+clear rtv 0 1.0 1.0 1.0 1.0
+clear dsv 0.5
+depth greater equal
+todo draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv all r (0.75)
+
+uniform 0 float4 0.375 0.625 0.0 0.0
+clear rtv 0 1.0 1.0 1.0 1.0
+clear dsv 0.5
+todo draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv all r (0.625)
+
+uniform 0 float4 0.375 0.375 0.0 0.0
+clear rtv 0 1.0 1.0 1.0 1.0
+clear dsv 0.5
+todo draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+probe dsv all r (0.5)

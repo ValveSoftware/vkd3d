@@ -468,6 +468,11 @@ static void d3d12_runner_clear(struct shader_runner *r, struct resource *resourc
 
     switch (resource->type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            view = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->slot);
+            ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, view, (const float *)clear_value, 0, NULL);
+            break;
+
         case RESOURCE_TYPE_DEPTH_STENCIL:
             view = get_cpu_dsv_handle(test_context, runner->dsv_heap, 0);
             ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, view,
