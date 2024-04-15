@@ -5414,6 +5414,12 @@ static const struct vkd3d_format *vkd3d_fixup_clear_uav_uint_colour(struct d3d12
                     | ((colour->uint32[2] & 0x3ff) << 22);
             return vkd3d_get_format(device, DXGI_FORMAT_R32_UINT, false);
 
+        case DXGI_FORMAT_B5G6R5_UNORM:
+            colour->uint32[0] = (colour->uint32[2] & 0x1f)
+                    | ((colour->uint32[1] & 0x3f) << 5)
+                    | ((colour->uint32[0] & 0x1f) << 11);
+            return vkd3d_get_format(device, DXGI_FORMAT_R16_UINT, false);
+
         default:
             return NULL;
     }

@@ -954,7 +954,6 @@ static void test_check_feature_support(void)
         is_todo = format == DXGI_FORMAT_R9G9B9E5_SHAREDEXP
                 || format == DXGI_FORMAT_R8G8_B8G8_UNORM
                 || format == DXGI_FORMAT_G8R8_G8B8_UNORM
-                || format == DXGI_FORMAT_B5G6R5_UNORM
                 || format == DXGI_FORMAT_B5G5R5A1_UNORM
                 || format == DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM
                 || (DXGI_FORMAT_AYUV <= format && format <= DXGI_FORMAT_B4G4R4A4_UNORM);
@@ -5750,7 +5749,7 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R8G8B8A8_UINT,   1, 1, 0, 0, 1, 0, {}, {0x123,   0, 0, 0}, 0x00000023, false, true},
         {DXGI_FORMAT_R8G8B8A8_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x04030201},
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00c01001},
-        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843, false, true},
+        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843},
         {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00008443, false, true},
         {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00001123, false, true, true},
         /* Test float clears with formats. */
@@ -5767,7 +5766,7 @@ static void test_clear_unordered_access_view_image(void)
                 0x00000380, true},
         {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {},
                 {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0x40000000 /* -1.0f */, 0},
-                0x87ff, true, true},
+                0x87ff, true},
         {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {},
                 {0x3f000000 /* 0.5f */, 0x3e800000 /* 0.25f */, 0x3e000000 /* 0.125f */, 0x3f800000 /* 1.0f */},
                 0xc104, true, true},
