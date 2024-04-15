@@ -89,6 +89,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE, KHR_sampler_mirror_clamp_to_edge),
     VK_EXTENSION(KHR_TIMELINE_SEMAPHORE, KHR_timeline_semaphore),
     /* EXT extensions */
+    VK_EXTENSION(EXT_4444_FORMATS, EXT_4444_formats),
     VK_EXTENSION(EXT_CALIBRATED_TIMESTAMPS, EXT_calibrated_timestamps),
     VK_EXTENSION(EXT_CONDITIONAL_RENDERING, EXT_conditional_rendering),
     VK_EXTENSION(EXT_DEBUG_MARKER, EXT_debug_marker),
@@ -810,6 +811,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vertex_divisor_features;
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_features;
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_features;
+    VkPhysicalDevice4444FormatsFeaturesEXT formats4444_features;
 
     VkPhysicalDeviceFeatures2 features2;
 };
@@ -833,6 +835,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDeviceMaintenance3Properties *maintenance3_properties;
     VkPhysicalDeviceTransformFeedbackPropertiesEXT *xfb_properties;
     VkPhysicalDevice physical_device = device->vk_physical_device;
+    VkPhysicalDevice4444FormatsFeaturesEXT *formats4444_features;
     VkPhysicalDeviceTransformFeedbackFeaturesEXT *xfb_features;
     struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
 
@@ -851,6 +854,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vertex_divisor_properties = &info->vertex_divisor_properties;
     timeline_semaphore_features = &info->timeline_semaphore_features;
     mutable_features = &info->mutable_features;
+    formats4444_features = &info->formats4444_features;
     xfb_features = &info->xfb_features;
     xfb_properties = &info->xfb_properties;
 
@@ -878,6 +882,8 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->features2, timeline_semaphore_features);
     mutable_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT;
     vk_prepend_struct(&info->features2, mutable_features);
+    formats4444_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT;
+    vk_prepend_struct(&info->features2, formats4444_features);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceFeatures2KHR(physical_device, &info->features2));
@@ -1666,6 +1672,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vulkan_info->EXT_mutable_descriptor_type = false;
     if (!physical_device_info->timeline_semaphore_features.timelineSemaphore)
         vulkan_info->KHR_timeline_semaphore = false;
+
+    physical_device_info->formats4444_features.formatA4B4G4R4 = VK_FALSE;
 
     vulkan_info->texel_buffer_alignment_properties = physical_device_info->texel_buffer_alignment_properties;
 

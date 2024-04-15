@@ -118,6 +118,9 @@ static const struct vkd3d_format vkd3d_formats[] =
     {DXGI_FORMAT_BC7_UNORM_SRGB,        VK_FORMAT_BC7_SRGB_BLOCK,           1,  4, 4, 16, COLOR, 1},
 };
 
+static const struct vkd3d_format format_b4g4r4a4 =
+    {DXGI_FORMAT_B4G4R4A4_UNORM,        VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT, 2,  1, 1,  1, COLOR, 1};
+
 /* Each depth/stencil format is only compatible with itself in Vulkan. */
 static const struct vkd3d_format vkd3d_depth_stencil_formats[] =
 {
@@ -450,6 +453,11 @@ const struct vkd3d_format *vkd3d_get_format(const struct d3d12_device *device,
         if (vkd3d_formats[i].dxgi_format == dxgi_format)
             return &vkd3d_formats[i];
     }
+
+    /* Do not check VkPhysicalDevice4444FormatsFeaturesEXT because apps
+     * should query format support, which returns more detailed info. */
+    if (dxgi_format == format_b4g4r4a4.dxgi_format && device->vk_info.EXT_4444_formats)
+        return &format_b4g4r4a4;
 
     return NULL;
 }

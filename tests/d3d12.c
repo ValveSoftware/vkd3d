@@ -542,7 +542,6 @@ static bool is_typed_uav_format_supported(ID3D12Device *device, DXGI_FORMAT form
     format_support.Format = format;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_FORMAT_SUPPORT,
             &format_support, sizeof(format_support));
-    todo
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     return format_support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
@@ -955,7 +954,7 @@ static void test_check_feature_support(void)
                 || format == DXGI_FORMAT_R8G8_B8G8_UNORM
                 || format == DXGI_FORMAT_G8R8_G8B8_UNORM
                 || format == DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM
-                || (DXGI_FORMAT_AYUV <= format && format <= DXGI_FORMAT_B4G4R4A4_UNORM);
+                || (DXGI_FORMAT_AYUV <= format && format <= DXGI_FORMAT_A8P8);
 
         memset(&format_info, 0, sizeof(format_info));
         format_info.Format = format;
@@ -5750,7 +5749,7 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00c01001},
         {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843},
         {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00008443},
-        {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00001123, false, true, true},
+        {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00001123, false, false, true},
         /* Test float clears with formats. */
         {DXGI_FORMAT_R16G16_UNORM,    1, 1, 0, 0, 1, 0, {},
                 {0x3e800000 /* 0.25f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff4000, true},
@@ -5771,7 +5770,7 @@ static void test_clear_unordered_access_view_image(void)
                 0xc104, true},
         {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {},
                 {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0x40000000 /* 2.0f */, 0x40000000 /* -1.0f */},
-                0xf8ff, true, true, true},
+                0xf8ff, true, false, true},
     };
 
     static const struct
