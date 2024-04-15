@@ -534,6 +534,20 @@ static bool is_vs_array_index_supported(ID3D12Device *device)
     return options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation;
 }
 
+static bool is_typed_uav_format_supported(ID3D12Device *device, DXGI_FORMAT format)
+{
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT format_support = {0};
+    HRESULT hr;
+
+    format_support.Format = format;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_FORMAT_SUPPORT,
+            &format_support, sizeof(format_support));
+    todo
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    return format_support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -5665,13 +5679,13 @@ static void test_clear_unordered_access_view_buffer(void)
 
 static void test_clear_unordered_access_view_image(void)
 {
+    unsigned int image_size, image_depth, texel_size;
     unsigned int expected_colour, actual_colour;
     D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
     ID3D12DescriptorHeap *cpu_heap, *gpu_heap;
     ID3D12GraphicsCommandList *command_list;
     unsigned int i, j, d, p, x, y, z, layer;
     D3D12_HEAP_PROPERTIES heap_properties;
-    unsigned int image_size, image_depth;
     struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context_desc desc;
@@ -5699,6 +5713,7 @@ static void test_clear_unordered_access_view_image(void)
         unsigned int expected;
         bool is_float;
         bool is_todo;
+        bool check_support;
     }
     tests[] =
     {
@@ -5735,6 +5750,9 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R8G8B8A8_UINT,   1, 1, 0, 0, 1, 0, {}, {0x123,   0, 0, 0}, 0x00000023, false, true},
         {DXGI_FORMAT_R8G8B8A8_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x04030201},
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00c01001},
+        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00000843, false, true},
+        {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00008443, false, true},
+        {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 1}, 0x00001123, false, true, true},
         /* Test float clears with formats. */
         {DXGI_FORMAT_R16G16_UNORM,    1, 1, 0, 0, 1, 0, {},
                 {0x3e800000 /* 0.25f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff4000, true},
@@ -5747,6 +5765,15 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {},
                 {0x3f000000 /* 1.0f */, 0 /* 0.0f */, 0xbf800000 /* -1.0f */, 0x3f000000 /* 1.0f */},
                 0x00000380, true},
+        {DXGI_FORMAT_B5G6R5_UNORM,    1, 1, 0, 0, 1, 0, {},
+                {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0x40000000 /* -1.0f */, 0},
+                0x87ff, true, true},
+        {DXGI_FORMAT_B5G5R5A1_UNORM,  1, 1, 0, 0, 1, 0, {},
+                {0x3f000000 /* 0.5f */, 0x3e800000 /* 0.25f */, 0x3e000000 /* 0.125f */, 0x3f800000 /* 1.0f */},
+                0xc104, true, true},
+        {DXGI_FORMAT_B4G4R4A4_UNORM,  1, 1, 0, 0, 1, 0, {},
+                {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0x40000000 /* 2.0f */, 0x40000000 /* -1.0f */},
+                0xf8ff, true, true, true},
     };
 
     static const struct
@@ -5785,6 +5812,12 @@ static void test_clear_unordered_access_view_image(void)
             if (tests[i].image_layers > 1 && !uav_dimensions[d].is_layered)
                 continue;
 
+            if (tests[i].check_support && !is_typed_uav_format_supported(device, tests[i].format))
+            {
+                skip("Device does not support format %#x; skipping.\n", tests[i].format);
+                continue;
+            }
+
             vkd3d_test_push_context("Dim %u, Test %u", d, i);
 
             is_1d = uav_dimensions[d].resource_dim == D3D12_RESOURCE_DIMENSION_TEXTURE1D;
@@ -5812,6 +5845,8 @@ static void test_clear_unordered_access_view_image(void)
 
             uav_desc.Format = tests[i].format;
             uav_desc.ViewDimension = uav_dimensions[d].view_dim;
+
+            texel_size = format_size(uav_desc.Format);
 
             for (j = 0; j < 2; ++j)
             {
@@ -5920,7 +5955,8 @@ static void test_clear_unordered_access_view_image(void)
                                 && layer < tests[i].first_layer + tests[i].layer_count;
 
                     expected_colour = is_inside ? tests[i].expected : clear_value[0];
-                    actual_colour = get_readback_uint(&rb.rb, x, y, z);
+                    actual_colour = (texel_size == 2) ? get_readback_uint16(&rb.rb, x, y)
+                            : get_readback_uint(&rb.rb, x, y, z);
                     success = compare_color(actual_colour, expected_colour, tests[i].is_float ? 1 : 0);
 
                     todo_if(tests[i].is_todo && expected_colour)

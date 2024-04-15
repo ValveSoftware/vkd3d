@@ -357,6 +357,10 @@ static unsigned int format_size(DXGI_FORMAT format)
         case DXGI_FORMAT_BC4_UNORM:
         case DXGI_FORMAT_BC4_SNORM:
             return 8;
+        case DXGI_FORMAT_B5G6R5_UNORM:
+        case DXGI_FORMAT_B5G5R5A1_UNORM:
+        case DXGI_FORMAT_B4G4R4A4_UNORM:
+            return 2;
 
         default:
             trace("Unhandled format %#x.\n", format);
