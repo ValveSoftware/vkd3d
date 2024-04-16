@@ -1,0 +1,304 @@
+[require]
+shader model >= 6.0
+
+[uav 0]
+format r32 uint
+size (buffer, 4)
+
+8 15 8 10
+
+[uav 1]
+format r32 uint
+size (buffer, 8)
+
+0 0 0 0 0 0 0 0
+
+[compute shader]
+RWBuffer<uint> u1 : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveIsFirstLane();
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (1)
+probe uav 1 (1) rui (0)
+probe uav 1 (2) rui (0)
+probe uav 1 (3) rui (0)
+
+
+[compute shader]
+RWBuffer<uint> u1 : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    if (!id)
+    {
+        u1[0] = 0;
+        return;
+    }
+    u1[id] = WaveIsFirstLane();
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (0)
+probe uav 1 (1) rui (1)
+probe uav 1 (2) rui (0)
+probe uav 1 (3) rui (0)
+
+
+[compute shader]
+RWBuffer<uint> u1 : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveGetLaneIndex();
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (0)
+probe uav 1 (1) rui (1)
+probe uav 1 (2) rui (2)
+probe uav 1 (3) rui (3)
+
+
+[compute shader]
+RWBuffer<uint> u1 : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    // Between 4 and 128, and includes inactive and/or helper lanes.
+    uint count = WaveGetLaneCount();
+    u1[id] = count >= 4 && count <= 128;
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (1)
+probe uav 1 (1) rui (1)
+probe uav 1 (2) rui (1)
+probe uav 1 (3) rui (1)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint i = (id & 1) ? -u0[id] : u0[id];
+    u1[id] = WaveActiveMin(i);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (8)
+probe uav 1 (1) rui (8)
+probe uav 1 (2) rui (8)
+probe uav 1 (3) rui (8)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    bool b = u0[id] == 8;
+    u1[id] = WaveActiveBallot(b).x;
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (5)
+probe uav 1 (1) rui (5)
+probe uav 1 (2) rui (5)
+probe uav 1 (3) rui (5)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint i = u0[id] + u0[id ^ 1];
+    u1[id] = WaveReadLaneFirst(i);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (23)
+probe uav 1 (1) rui (23)
+probe uav 1 (2) rui (23)
+probe uav 1 (3) rui (23)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint i = u0[id] + u0[id ^ 1];
+    u1[id] = WaveReadLaneAt(i, 3);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (18)
+probe uav 1 (1) rui (18)
+probe uav 1 (2) rui (18)
+probe uav 1 (3) rui (18)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    bool b = u0[id] == 8;
+    u1[id] = WaveActiveCountBits(b);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (2)
+probe uav 1 (1) rui (2)
+probe uav 1 (2) rui (2)
+probe uav 1 (3) rui (2)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    bool b = u0[id] == 8;
+    u1[id] = WavePrefixCountBits(b);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (0)
+probe uav 1 (1) rui (1)
+probe uav 1 (2) rui (1)
+probe uav 1 (3) rui (2)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveActiveSum(u0[id]);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (41)
+probe uav 1 (1) rui (41)
+probe uav 1 (2) rui (41)
+probe uav 1 (3) rui (41)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveActiveBitAnd(u0[id]);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (8)
+probe uav 1 (1) rui (8)
+probe uav 1 (2) rui (8)
+probe uav 1 (3) rui (8)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveActiveBitOr(u0[id]);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (15)
+probe uav 1 (1) rui (15)
+probe uav 1 (2) rui (15)
+probe uav 1 (3) rui (15)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    u1[id] = WaveActiveBitXor(u0[id]);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (5)
+probe uav 1 (1) rui (5)
+probe uav 1 (2) rui (5)
+probe uav 1 (3) rui (5)
+
+
+[compute shader]
+uniform uint2 u;
+
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    uint table[] = {u.x, u.y};
+    uint i;
+
+    // Value depends on control flow.
+    if (id & 1)
+        i = table[id / 2u];
+    else
+        i = u0[id / 2u];
+
+    u1[id] = WaveActiveSum(i);
+}
+
+[test]
+uniform 0 uint4 1 5 0 0
+todo dispatch 4 1 1
+probe uav 1 (0) rui (29)
+probe uav 1 (1) rui (29)
+probe uav 1 (2) rui (29)
+probe uav 1 (3) rui (29)
