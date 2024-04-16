@@ -1698,6 +1698,201 @@ static void test_reflection(void)
     }
 }
 
+static void test_default_values_reflection(void)
+{
+    unsigned int refcount;
+    HRESULT hr;
+
+    static const char ps1_source[] =
+        "struct\n"
+        "{\n"
+        "    float2 aa;\n"
+        "    float2x1 bb;\n"
+        "    int3 cc, dd;\n"
+        "    float2x3 ee;\n"
+        "    row_major float2x3 ff;\n"
+        "    struct {\n"
+        "        float2 aa[3];\n"
+        "        float3 bb;\n"
+        "    } gg;\n"
+        "} st = {1, 2, 3, 4, 5, 6, 7, 8, float4(9.5, 10.6, 11, 12), 13, 14, 15, 16, 17, 18,\n"
+        "    19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};\n"
+        "float2 unused = {1, 2};\n"
+        "float3x2 another = {1, 2, 3, 4, 5, 6};\n"
+        "cbuffer b1\n"
+        "{\n"
+        "    float2 hh = {1, 2};\n"
+        "    float3x2 ii[2] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};\n"
+        "}\n"
+        "cbuffer b2_unused\n"
+        "{\n"
+        "    float jj = {5};\n"
+        "}\n"
+        "float nondefault_unused;\n"
+        "float nondefault;\n"
+        "float4 main() : sv_target\n"
+        "{\n"
+        "    return another[0][1] + st.gg.aa[1].y + nondefault + hh.y;\n"
+        "}";
+
+    struct shader_variable
+    {
+        D3D12_SHADER_VARIABLE_DESC var_desc;
+    };
+
+    struct shader_buffer
+    {
+        D3D12_SHADER_BUFFER_DESC desc;
+        const struct shader_variable *vars;
+    };
+
+    static const unsigned int ps1_globals_st_default_value[] =
+    {
+        0x3f800000, 0x40000000, 0x40400000, 0x40800000,
+        0x00000005, 0x00000006, 0x00000007, 0x00000000,
+        0x00000008, 0x00000009, 0x0000000a, 0x00000000,
+        0x41300000, 0x41400000, 0x00000000, 0x00000000,
+        0x41500000, 0x41600000, 0x00000000, 0x00000000,
+        0x41700000, 0x41800000, 0x00000000, 0x00000000,
+        0x41880000, 0x41980000, 0x41a80000, 0x00000000,
+        0x41900000, 0x41a00000, 0x41b00000, 0x00000000,
+        0x41b80000, 0x41c00000, 0x00000000, 0x00000000,
+        0x41c80000, 0x41d00000, 0x00000000, 0x00000000,
+        0x41d80000, 0x41e00000, 0x00000000, 0x00000000,
+        0x41e80000, 0x41f00000, 0x41f80000,
+    };
+
+    static const unsigned int ps1_globals_unused_default_value[] =
+    {
+        0x3f800000, 0x40000000,
+    };
+
+    static const unsigned int ps1_globals_another_default_value[] =
+    {
+        0x3f800000, 0x40000000, 0x40400000, 0x00000000,
+        0x40800000, 0x40a00000, 0x40c00000,
+    };
+
+    static const struct shader_variable ps1_globals_vars[] =
+    {
+        {{"st",                  0, 188, D3D_SVF_USED, (void *)ps1_globals_st_default_value}},
+        {{"unused",            192,   8,            0, (void *)ps1_globals_unused_default_value}},
+        {{"another",           208,  28, D3D_SVF_USED, (void *)ps1_globals_another_default_value}},
+        {{"nondefault_unused", 236,   4,            0, NULL}},
+        {{"nondefault",        240,   4, D3D_SVF_USED, NULL}},
+    };
+
+    static const unsigned int ps1_b1_hh_default_value[] =
+    {
+        0x3f800000, 0x40000000,
+    };
+
+    static const unsigned int ps1_b1_ii_default_value[] =
+    {
+        0x3f800000, 0x40000000, 0x40400000, 0x00000000,
+        0x40800000, 0x40a00000, 0x40c00000, 0x00000000,
+        0x40e00000, 0x41000000, 0x41100000, 0x00000000,
+        0x41200000, 0x41300000, 0x41400000,
+    };
+
+    static const struct shader_variable ps1_b1_vars[] =
+    {
+        {{"hh",                  0,   8, D3D_SVF_USED, (void *)ps1_b1_hh_default_value}},
+        {{"ii",                 16,  60,            0, (void *)ps1_b1_ii_default_value}},
+    };
+
+    static const struct shader_buffer ps1_buffers[] =
+    {
+        {{"$Globals", D3D_CT_CBUFFER, ARRAY_SIZE(ps1_globals_vars), 256}, ps1_globals_vars},
+        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(ps1_b1_vars), 80}, ps1_b1_vars},
+    };
+
+    static const struct
+    {
+        const char *source;
+        const char *profile;
+        const struct shader_buffer *buffers;
+        size_t buffer_count;
+    }
+    tests[] =
+    {
+        {ps1_source, "ps_5_0", ps1_buffers, ARRAY_SIZE(ps1_buffers)},
+    };
+
+    for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
+    {
+        ID3D10Blob *code = compile_shader_flags(tests[t].source,
+                tests[t].profile, D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY);
+        ID3D12ShaderReflection *reflection;
+        D3D12_SHADER_DESC shader_desc;
+
+        hr = D3DReflect(ID3D10Blob_GetBufferPointer(code), ID3D10Blob_GetBufferSize(code),
+                &IID_ID3D12ShaderReflection, (void **)&reflection);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+        hr = ID3D12ShaderReflection_GetDesc(reflection, &shader_desc);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+        ok(shader_desc.ConstantBuffers == tests[t].buffer_count, "Got %u buffers.\n", shader_desc.ConstantBuffers);
+
+        for (unsigned int i = 0; i < shader_desc.ConstantBuffers; ++i)
+        {
+            const struct shader_buffer *expect_buffer = &tests[t].buffers[i];
+            ID3D12ShaderReflectionConstantBuffer *cbuffer;
+            D3D12_SHADER_BUFFER_DESC buffer_desc;
+
+            vkd3d_test_push_context("Buffer %u", i);
+
+            cbuffer = ID3D12ShaderReflection_GetConstantBufferByIndex(reflection, i);
+            hr = ID3D12ShaderReflectionConstantBuffer_GetDesc(cbuffer, &buffer_desc);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            ok(buffer_desc.Type == expect_buffer->desc.Type, "Got type %#x.\n", buffer_desc.Type);
+            ok(buffer_desc.Variables == expect_buffer->desc.Variables, "Got %u variables.\n", buffer_desc.Variables);
+
+            for (unsigned int j = 0; j < buffer_desc.Variables; ++j)
+            {
+                const struct shader_variable *expect = &expect_buffer->vars[j];
+                ID3D12ShaderReflectionVariable *var;
+                D3D12_SHADER_VARIABLE_DESC var_desc;
+
+                vkd3d_test_push_context("Variable %u", j);
+
+                var = ID3D12ShaderReflectionConstantBuffer_GetVariableByIndex(cbuffer, j);
+                hr = ID3D12ShaderReflectionVariable_GetDesc(var, &var_desc);
+                ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+                ok(var_desc.Size == expect->var_desc.Size, "Got size %u.\n", var_desc.Size);
+
+                if (expect->var_desc.DefaultValue)
+                {
+                    todo ok(var_desc.DefaultValue, "Didn't get default value.\n");
+
+                    if (var_desc.DefaultValue && var_desc.Size == expect->var_desc.Size)
+                    {
+                        for (unsigned int k = 0; k < var_desc.Size/4; ++k)
+                        {
+                            unsigned int var_val = *((unsigned int *)var_desc.DefaultValue + k);
+                            unsigned int expect_val = *((unsigned int *)expect->var_desc.DefaultValue + k);
+
+                            ok(var_val == expect_val, "Expected default value 0x%08x, but got 0x%08x, at offset %u.\n",
+                                    expect_val, var_val, 4 * k);
+                        }
+                    }
+                }
+                else
+                {
+                    ok(!var_desc.DefaultValue, "Got default value %p.\n", var_desc.DefaultValue);
+                }
+
+                vkd3d_test_pop_context();
+            }
+            vkd3d_test_pop_context();
+        }
+
+        ID3D10Blob_Release(code);
+        refcount = ID3D12ShaderReflection_Release(reflection);
+        ok(!refcount, "Got unexpected refcount %u.\n", refcount);
+    }
+}
+
 static void check_signature_element_(int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
         const D3D12_SIGNATURE_PARAMETER_DESC *expect)
 {
@@ -2002,6 +2197,7 @@ START_TEST(hlsl_d3d12)
     run_test(test_create_blob);
     run_test(test_get_blob_part);
     run_test(test_reflection);
+    run_test(test_default_values_reflection);
     run_test(test_signature_reflection);
     run_test(test_disassemble_shader);
 }
