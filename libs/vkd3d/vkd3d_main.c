@@ -493,11 +493,10 @@ HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGN
     if ((ret = vkd3d_shader_serialize_root_signature(vkd3d_desc, &dxbc, &messages)) < 0)
     {
         WARN("Failed to serialize root signature, vkd3d result %d.\n", ret);
-        if (error_blob && messages)
-        {
-            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), error_blob)))
-                ERR("Failed to create error blob, hr %s.\n", debugstr_hresult(hr));
-        }
+        if (!error_blob)
+            vkd3d_shader_free_messages(messages);
+        else if (messages && FAILED(hr = vkd3d_blob_create(messages, strlen(messages), error_blob)))
+            ERR("Failed to create error blob, hr %s.\n", debugstr_hresult(hr));
         return hresult_from_vkd3d_result(ret);
     }
     vkd3d_shader_free_messages(messages);
