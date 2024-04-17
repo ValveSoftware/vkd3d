@@ -55,6 +55,7 @@ struct vulkan_shader_runner
 {
     struct shader_runner r;
     struct shader_runner_caps caps;
+    bool demote_to_helper_invocation;
 
     VkInstance instance;
     VkPhysicalDevice phys_device;
@@ -89,6 +90,7 @@ struct physical_device_info
 {
     VkPhysicalDeviceFeatures2 features2;
     VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock_features;
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_to_helper_invocation_features;
 };
 
 static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r)
@@ -431,6 +433,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
     struct vkd3d_shader_push_constant_buffer push_constants;
+    enum vkd3d_shader_spirv_extension spirv_extensions[2];
     struct vkd3d_shader_resource_binding *binding;
     struct vkd3d_shader_compile_option options[3];
     struct vkd3d_shader_compile_option *option;
@@ -517,16 +520,13 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     spirv_info.next = &interface_info;
     spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
-    if (runner->caps.rov)
-    {
-        static const enum vkd3d_shader_spirv_extension extensions[] =
-        {
-            VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK,
-        };
+    spirv_info.extensions = spirv_extensions;
+    spirv_info.extension_count = 0;
 
-        spirv_info.extensions = extensions;
-        spirv_info.extension_count = ARRAY_SIZE(extensions);
-    }
+    if (runner->caps.rov)
+        spirv_extensions[spirv_info.extension_count++] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK;
+    if (runner->demote_to_helper_invocation)
+        spirv_extensions[spirv_info.extension_count++] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION;
 
     push_constants.register_space = 0;
     push_constants.register_index = 0;
@@ -1374,6 +1374,7 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner, struct 
     device_extensions[] =
     {
         {VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME},
+        {VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME},
         {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME, true},
         {VK_KHR_MAINTENANCE1_EXTENSION_NAME, true},
     };
@@ -1394,6 +1395,8 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner, struct 
             enabled_extensions->names[enabled_extensions->count++] = name;
             if (!strcmp(name, VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME))
                 runner->caps.rov = true;
+            if (!strcmp(name, VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME))
+                runner->demote_to_helper_invocation = true;
             continue;
         }
 
@@ -1421,6 +1424,15 @@ static void get_physical_device_info(struct vulkan_shader_runner *runner, struct
         info->interlock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
     }
 
+    if (runner->demote_to_helper_invocation)
+    {
+        void *list = info->features2.pNext;
+
+        info->features2.pNext = &info->demote_to_helper_invocation_features;
+        info->demote_to_helper_invocation_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
+        info->demote_to_helper_invocation_features.pNext = list;
+    }
+
     if (runner->vkGetPhysicalDeviceFeatures2KHR)
         VK_CALL(vkGetPhysicalDeviceFeatures2KHR(runner->phys_device, &info->features2));
     else
@@ -1432,6 +1444,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkDescriptorPoolCreateInfo descriptor_pool_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     VkCommandBufferAllocateInfo cmd_buffer_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     VkCommandPoolCreateInfo command_pool_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_to_helper_invocation_features;
     VkDeviceQueueCreateInfo queue_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
@@ -1559,6 +1572,19 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     else
     {
         runner->caps.rov = false;
+    }
+
+    if (device_info.demote_to_helper_invocation_features.shaderDemoteToHelperInvocation)
+    {
+        memset(&demote_to_helper_invocation_features, 0, sizeof(demote_to_helper_invocation_features));
+        demote_to_helper_invocation_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
+        demote_to_helper_invocation_features.pNext = (void *)device_desc.pNext;
+        demote_to_helper_invocation_features.shaderDemoteToHelperInvocation = VK_TRUE;
+        device_desc.pNext = &demote_to_helper_invocation_features;
+    }
+    else
+    {
+        runner->demote_to_helper_invocation = false;
     }
 
     vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device));
