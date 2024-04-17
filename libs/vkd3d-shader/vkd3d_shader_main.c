@@ -1556,7 +1556,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
+int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
@@ -1879,6 +1879,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 
     static const enum vkd3d_shader_target_type hlsl_types[] =
     {
+        VKD3D_SHADER_TARGET_D3D_ASM,
         VKD3D_SHADER_TARGET_D3D_BYTECODE,
         VKD3D_SHADER_TARGET_DXBC_TPF,
         VKD3D_SHADER_TARGET_FX,

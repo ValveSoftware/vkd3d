@@ -3814,6 +3814,7 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
+    enum vkd3d_shader_target_type target_type = compile_info->target_type;
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
     struct hlsl_ir_function_decl *decl, *entry_func = NULL;
     const struct hlsl_profile_info *profile;
@@ -3835,25 +3836,25 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
-    if (compile_info->target_type != VKD3D_SHADER_TARGET_FX && profile->type == VKD3D_SHADER_TYPE_EFFECT)
+    if (target_type != VKD3D_SHADER_TARGET_FX && profile->type == VKD3D_SHADER_TYPE_EFFECT)
     {
         vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "The '%s' target profile is only compatible with the 'fx' target type.", profile->name);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
-    else if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE && profile->major_version > 3)
+    else if (target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE && profile->major_version > 3)
     {
         vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "The '%s' target profile is incompatible with the 'd3dbc' target type.", profile->name);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
-    else if (compile_info->target_type == VKD3D_SHADER_TARGET_DXBC_TPF && profile->major_version < 4)
+    else if (target_type == VKD3D_SHADER_TARGET_DXBC_TPF && profile->major_version < 4)
     {
         vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "The '%s' target profile is incompatible with the 'dxbc-tpf' target type.", profile->name);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
-    else if (compile_info->target_type == VKD3D_SHADER_TARGET_FX && profile->type != VKD3D_SHADER_TYPE_EFFECT)
+    else if (target_type == VKD3D_SHADER_TARGET_FX && profile->type != VKD3D_SHADER_TYPE_EFFECT)
     {
         vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
                 "The '%s' target profile is incompatible with the 'fx' target type.", profile->name);
@@ -3917,8 +3918,38 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    ret = hlsl_emit_bytecode(&ctx, entry_func, compile_info->target_type, out);
+    if (target_type == VKD3D_SHADER_TARGET_D3D_ASM)
+    {
+        struct vkd3d_shader_compile_info info = *compile_info;
+        struct vkd3d_shader_parser *parser;
 
+        if (profile->major_version < 4)
+        {
+            if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_D3D_BYTECODE, &info.source)) < 0)
+                goto done;
+            info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+            ret = vkd3d_shader_sm1_parser_create(&info, message_context, &parser);
+        }
+        else
+        {
+            if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_DXBC_TPF, &info.source)) < 0)
+                goto done;
+            info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+            ret = vkd3d_shader_sm4_parser_create(&info, message_context, &parser);
+        }
+        if (ret >= 0)
+        {
+            ret = vkd3d_shader_parser_compile(parser, &info, out, message_context);
+            vkd3d_shader_parser_destroy(parser);
+        }
+        vkd3d_shader_free_shader_code(&info.source);
+    }
+    else
+    {
+        ret = hlsl_emit_bytecode(&ctx, entry_func, target_type, out);
+    }
+
+done:
     hlsl_ctx_cleanup(&ctx);
     return ret;
 }

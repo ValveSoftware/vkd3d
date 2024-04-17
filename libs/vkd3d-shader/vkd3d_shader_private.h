@@ -1373,6 +1373,9 @@ struct vkd3d_shader_parser_ops
     void (*parser_destroy)(struct vkd3d_shader_parser *parser);
 };
 
+int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context);
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
