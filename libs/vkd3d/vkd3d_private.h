@@ -24,10 +24,6 @@
 #define VK_NO_PROTOTYPES
 #define CONST_VTABLE
 
-#ifdef _WIN32
-# define _WIN32_WINNT 0x0600  /* for condition variables */
-#endif
-
 #include "vkd3d_common.h"
 #include "vkd3d_blob.h"
 #include "vkd3d_memory.h"
@@ -205,36 +201,6 @@ union vkd3d_thread_handle
     void *handle;
 };
 
-struct vkd3d_cond
-{
-    CONDITION_VARIABLE cond;
-};
-
-static inline void vkd3d_cond_init(struct vkd3d_cond *cond)
-{
-    InitializeConditionVariable(&cond->cond);
-}
-
-static inline void vkd3d_cond_signal(struct vkd3d_cond *cond)
-{
-    WakeConditionVariable(&cond->cond);
-}
-
-static inline void vkd3d_cond_broadcast(struct vkd3d_cond *cond)
-{
-    WakeAllConditionVariable(&cond->cond);
-}
-
-static inline void vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
-{
-    if (!SleepConditionVariableCS(&cond->cond, &lock->lock, INFINITE))
-        ERR("Could not sleep on the condition variable, error %lu.\n", GetLastError());
-}
-
-static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
-{
-}
-
 static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)
 {
     return InterlockedCompareExchange((LONG volatile *)x, xchg, cmp) == cmp;
@@ -264,56 +230,6 @@ union vkd3d_thread_handle
     pthread_t pthread;
     void *handle;
 };
-
-struct vkd3d_cond
-{
-    pthread_cond_t cond;
-};
-
-static inline void vkd3d_cond_init(struct vkd3d_cond *cond)
-{
-    int ret;
-
-    ret = pthread_cond_init(&cond->cond, NULL);
-    if (ret)
-        ERR("Could not initialize the condition variable, error %d.\n", ret);
-}
-
-static inline void vkd3d_cond_signal(struct vkd3d_cond *cond)
-{
-    int ret;
-
-    ret = pthread_cond_signal(&cond->cond);
-    if (ret)
-        ERR("Could not signal the condition variable, error %d.\n", ret);
-}
-
-static inline void vkd3d_cond_broadcast(struct vkd3d_cond *cond)
-{
-    int ret;
-
-    ret = pthread_cond_broadcast(&cond->cond);
-    if (ret)
-        ERR("Could not broadcast the condition variable, error %d.\n", ret);
-}
-
-static inline void vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
-{
-    int ret;
-
-    ret = pthread_cond_wait(&cond->cond, &lock->lock);
-    if (ret)
-        ERR("Could not wait on the condition variable, error %d.\n", ret);
-}
-
-static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
-{
-    int ret;
-
-    ret = pthread_cond_destroy(&cond->cond);
-    if (ret)
-        ERR("Could not destroy the condition variable, error %d.\n", ret);
-}
 
 # if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
 static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)

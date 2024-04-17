@@ -492,6 +492,76 @@ static inline void vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
 #endif
 }
 
+struct vkd3d_cond
+{
+#ifdef _WIN32
+    CONDITION_VARIABLE cond;
+#else
+    pthread_cond_t cond;
+#endif
+};
+
+static inline void vkd3d_cond_init(struct vkd3d_cond *cond)
+{
+#ifdef _WIN32
+    InitializeConditionVariable(&cond->cond);
+#else
+    int ret;
+
+    if ((ret = pthread_cond_init(&cond->cond, NULL)))
+        ERR("Failed to initialise the condition variable, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_cond_signal(struct vkd3d_cond *cond)
+{
+#ifdef _WIN32
+    WakeConditionVariable(&cond->cond);
+#else
+    int ret;
+
+    if ((ret = pthread_cond_signal(&cond->cond)))
+        ERR("Failed to signal the condition variable, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_cond_broadcast(struct vkd3d_cond *cond)
+{
+#ifdef _WIN32
+    WakeAllConditionVariable(&cond->cond);
+#else
+    int ret;
+
+    if ((ret = pthread_cond_broadcast(&cond->cond)))
+        ERR("Failed to broadcast the condition variable, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
+{
+#ifdef _WIN32
+    if (!SleepConditionVariableCS(&cond->cond, &lock->lock, INFINITE))
+        ERR("Failed to wait on the condition variable, error %lu.\n", GetLastError());
+#else
+    int ret;
+
+    if ((ret = pthread_cond_wait(&cond->cond, &lock->lock)))
+        ERR("Failed to wait on the condition variable, ret %d.\n", ret);
+#endif
+}
+
+static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
+{
+#ifdef _WIN32
+    /* Nothing to do. */
+#else
+    int ret;
+
+    if ((ret = pthread_cond_destroy(&cond->cond)))
+        ERR("Failed to destroy the condition variable, ret %d.\n", ret);
+#endif
+}
+
 static inline void vkd3d_parse_version(const char *version, int *major, int *minor)
 {
     *major = atoi(version);
