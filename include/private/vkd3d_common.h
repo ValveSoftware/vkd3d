@@ -340,6 +340,8 @@ static inline int vkd3d_u32_compare(uint32_t x, uint32_t y)
     return (x > y) - (x < y);
 }
 
+#define VKD3D_BITMAP_SIZE(x) (((x) + 0x1f) >> 5)
+
 static inline bool bitmap_clear(uint32_t *map, unsigned int idx)
 {
     return map[idx >> 5] &= ~(1u << (idx & 0x1f));

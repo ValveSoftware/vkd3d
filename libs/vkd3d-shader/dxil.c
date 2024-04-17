@@ -805,7 +805,7 @@ struct sm6_parser
     struct vkd3d_shader_dst_param *output_params;
     struct vkd3d_shader_dst_param *input_params;
     struct vkd3d_shader_dst_param *patch_constant_params;
-    uint32_t io_regs_declared[(VKD3DSPR_COUNT + 0x1f) / 0x20];
+    uint32_t io_regs_declared[VKD3D_BITMAP_SIZE(VKD3DSPR_COUNT)];
 
     struct sm6_function *functions;
     size_t function_count;

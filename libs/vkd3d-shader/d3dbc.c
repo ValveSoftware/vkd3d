@@ -216,7 +216,7 @@ struct vkd3d_shader_sm1_parser
     struct vkd3d_shader_parser p;
 
 #define MAX_CONSTANT_COUNT 8192
-    uint32_t constant_def_mask[3][MAX_CONSTANT_COUNT / 32];
+    uint32_t constant_def_mask[3][VKD3D_BITMAP_SIZE(MAX_CONSTANT_COUNT)];
 };
 
 /* This table is not order or position dependent. */

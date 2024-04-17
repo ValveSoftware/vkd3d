@@ -177,7 +177,7 @@ struct shader_runner
 
     struct resource *resources[MAX_RESOURCES];
     size_t resource_count;
-    uint32_t failed_resources[RESOURCE_TYPE_VERTEX_BUFFER + 1][(MAX_RESOURCES + 0x1f) / 0x20];
+    uint32_t failed_resources[RESOURCE_TYPE_VERTEX_BUFFER + 1][VKD3D_BITMAP_SIZE(MAX_RESOURCES)];
     unsigned int failed_resource_count;
 
     struct sampler samplers[MAX_SAMPLERS];

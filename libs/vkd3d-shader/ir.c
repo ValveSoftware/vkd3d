@@ -2917,8 +2917,7 @@ static enum vkd3d_result vsir_block_init(struct vsir_block *block, unsigned int 
     if (block_count > SIZE_MAX - (sizeof(*block->dominates) * CHAR_BIT - 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    block_count = align(block_count, sizeof(*block->dominates) * CHAR_BIT);
-    byte_count = block_count / CHAR_BIT;
+    byte_count = VKD3D_BITMAP_SIZE(block_count) * sizeof(*block->dominates);
 
     assert(label);
     memset(block, 0, sizeof(*block));
