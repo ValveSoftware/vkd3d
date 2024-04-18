@@ -1345,8 +1345,11 @@ struct vsir_program
     size_t block_name_count;
 };
 
-bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);
 void vsir_program_cleanup(struct vsir_program *program);
+int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context);
+bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);
 enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context);
 enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,
@@ -1381,9 +1384,6 @@ struct vkd3d_shader_parser_ops
     void (*parser_destroy)(struct vkd3d_shader_parser *parser);
 };
 
-int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
-        struct vkd3d_shader_message_context *message_context);
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,

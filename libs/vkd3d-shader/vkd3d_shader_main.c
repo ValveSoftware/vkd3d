@@ -1556,13 +1556,11 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+int vsir_program_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info1 scan_descriptor_info;
-    struct vsir_program *program = &parser->program;
-    uint64_t config_flags = parser->config_flags;
     struct vkd3d_shader_compile_info scan_info;
     int ret;
 
@@ -1667,7 +1665,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         }
         else
         {
-            ret = vkd3d_shader_parser_compile(parser, compile_info, out, &message_context);
+            ret = vsir_program_compile(&parser->program, parser->config_flags, compile_info, out, &message_context);
             vkd3d_shader_parser_destroy(parser);
         }
     }
