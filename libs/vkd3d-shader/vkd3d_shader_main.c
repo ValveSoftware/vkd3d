@@ -1395,15 +1395,14 @@ static void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_des
     vkd3d_free(scan_descriptor_info->descriptors);
 }
 
-static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info,
+static int vsir_program_scan(struct vsir_program *program, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context,
-        struct vkd3d_shader_scan_descriptor_info1 *descriptor_info1, struct vkd3d_shader_parser *parser)
+        struct vkd3d_shader_scan_descriptor_info1 *descriptor_info1)
 {
     struct vkd3d_shader_scan_combined_resource_sampler_info *combined_sampler_info;
     struct vkd3d_shader_scan_descriptor_info1 local_descriptor_info1 = {0};
     struct vkd3d_shader_scan_descriptor_info *descriptor_info;
     struct vkd3d_shader_scan_signature_info *signature_info;
-    struct vsir_program *program = &parser->program;
     struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
     int ret = VKD3D_OK;
@@ -1545,7 +1544,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
         }
         else
         {
-            ret = scan_with_parser(compile_info, &message_context, NULL, parser);
+            ret = vsir_program_scan(&parser->program, compile_info, &message_context, NULL);
             vkd3d_shader_parser_destroy(parser);
         }
     }
@@ -1576,7 +1575,7 @@ int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
-            if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
                 return ret;
             ret = glsl_compile(program, config_flags, compile_info, out, message_context);
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
@@ -1584,7 +1583,7 @@ int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
 
         case VKD3D_SHADER_TARGET_SPIRV_BINARY:
         case VKD3D_SHADER_TARGET_SPIRV_TEXT:
-            if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
+            if ((ret = vsir_program_scan(program, &scan_info, message_context, &scan_descriptor_info)) < 0)
                 return ret;
             ret = spirv_compile(program, config_flags, &scan_descriptor_info,
                     compile_info, out, message_context);
