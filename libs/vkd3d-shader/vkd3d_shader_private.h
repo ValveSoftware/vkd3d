@@ -1061,14 +1061,6 @@ struct dxbc_shader_desc
     struct shader_signature patch_constant_signature;
 };
 
-struct vkd3d_shader_desc
-{
-    struct
-    {
-        uint32_t used, external;
-    } flat_constant_count[3];
-};
-
 struct vkd3d_shader_register_semantic
 {
     struct vkd3d_shader_dst_param reg;
@@ -1332,6 +1324,7 @@ struct vsir_program
     struct shader_signature patch_constant_signature;
 
     unsigned int input_control_point_count, output_control_point_count;
+    unsigned int flat_constant_count[3];
     unsigned int block_count;
     unsigned int temp_count;
     unsigned int ssa_count;
@@ -1366,7 +1359,6 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_location location;
     bool failed;
 
-    struct vkd3d_shader_desc shader_desc;
     const struct vkd3d_shader_parser_ops *ops;
     struct vsir_program program;
 

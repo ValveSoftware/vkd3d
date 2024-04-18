@@ -215,8 +215,12 @@ struct vkd3d_shader_sm1_parser
 
     struct vkd3d_shader_parser p;
 
+    struct
+    {
 #define MAX_CONSTANT_COUNT 8192
-    uint32_t constant_def_mask[3][VKD3D_BITMAP_SIZE(MAX_CONSTANT_COUNT)];
+        uint32_t def_mask[VKD3D_BITMAP_SIZE(MAX_CONSTANT_COUNT)];
+        uint32_t count;
+    } constants[3];
 };
 
 /* This table is not order or position dependent. */
@@ -750,15 +754,13 @@ static bool add_signature_element_from_semantic(struct vkd3d_shader_sm1_parser *
 static void record_constant_register(struct vkd3d_shader_sm1_parser *sm1,
         enum vkd3d_shader_d3dbc_constant_register set, uint32_t index, bool from_def)
 {
-    struct vkd3d_shader_desc *desc = &sm1->p.shader_desc;
-
-    desc->flat_constant_count[set].used = max(desc->flat_constant_count[set].used, index + 1);
+    sm1->constants[set].count = max(sm1->constants[set].count, index + 1);
     if (from_def)
     {
         /* d3d shaders have a maximum of 8192 constants; we should not overrun
          * this array. */
-        assert((index / 32) <= ARRAY_SIZE(sm1->constant_def_mask[set]));
-        bitmap_set(sm1->constant_def_mask[set], index);
+        assert((index / 32) <= ARRAY_SIZE(sm1->constants[set].def_mask));
+        bitmap_set(sm1->constants[set].def_mask, index);
     }
 }
 
@@ -1301,9 +1303,9 @@ static uint32_t get_external_constant_count(struct vkd3d_shader_sm1_parser *sm1,
     /* Find the highest constant index which is not written by a DEF
      * instruction. We can't (easily) use an FFZ function for this since it
      * needs to be limited by the highest used register index. */
-    for (j = sm1->p.shader_desc.flat_constant_count[set].used; j > 0; --j)
+    for (j = sm1->constants[set].count; j > 0; --j)
     {
-        if (!bitmap_is_set(sm1->constant_def_mask[set], j - 1))
+        if (!bitmap_is_set(sm1->constants[set].def_mask, j - 1))
             return j;
     }
 
@@ -1354,8 +1356,8 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
         ++instructions->count;
     }
 
-    for (i = 0; i < ARRAY_SIZE(sm1->p.shader_desc.flat_constant_count); ++i)
-        sm1->p.shader_desc.flat_constant_count[i].external = get_external_constant_count(sm1, i);
+    for (i = 0; i < ARRAY_SIZE(sm1->p.program.flat_constant_count); ++i)
+        sm1->p.program.flat_constant_count[i] = get_external_constant_count(sm1, i);
 
     if (!sm1->p.failed)
         ret = vkd3d_shader_parser_validate(&sm1->p);

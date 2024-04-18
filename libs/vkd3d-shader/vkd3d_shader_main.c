@@ -1403,6 +1403,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
     struct vkd3d_shader_scan_descriptor_info1 local_descriptor_info1 = {0};
     struct vkd3d_shader_scan_descriptor_info *descriptor_info;
     struct vkd3d_shader_scan_signature_info *signature_info;
+    struct vsir_program *program = &parser->program;
     struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
     int ret = VKD3D_OK;
@@ -1428,27 +1429,27 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
             descriptor_info1 = &local_descriptor_info1;
     }
 
-    vkd3d_shader_scan_context_init(&context, &parser->program.shader_version, compile_info,
+    vkd3d_shader_scan_context_init(&context, &program->shader_version, compile_info,
             descriptor_info1, combined_sampler_info, message_context);
 
     if (TRACE_ON())
-        vkd3d_shader_trace(&parser->program);
+        vkd3d_shader_trace(program);
 
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        instruction = &parser->program.instructions.elements[i];
+        instruction = &program->instructions.elements[i];
         if ((ret = vkd3d_shader_scan_instruction(&context, instruction)) < 0)
             break;
     }
 
-    for (i = 0; i < ARRAY_SIZE(parser->shader_desc.flat_constant_count); ++i)
+    for (i = 0; i < ARRAY_SIZE(program->flat_constant_count); ++i)
     {
-        unsigned int size = parser->shader_desc.flat_constant_count[i].external;
         struct vkd3d_shader_register_range range = {.space = 0, .first = i, .last = i};
         struct vkd3d_shader_register reg = {.idx[0].offset = i, .idx_count = 1};
+        unsigned int size = program->flat_constant_count[i];
         struct vkd3d_shader_descriptor_info1 *d;
 
-        if (parser->shader_desc.flat_constant_count[i].external)
+        if (size)
         {
             if ((d = vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
                     &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT)))
@@ -1458,11 +1459,11 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
 
     if (!ret && signature_info)
     {
-        if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &parser->program.input_signature)
+        if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &program->input_signature)
                 || !vkd3d_shader_signature_from_shader_signature(&signature_info->output,
-                        &parser->program.output_signature)
+                        &program->output_signature)
                 || !vkd3d_shader_signature_from_shader_signature(&signature_info->patch_constant,
-                        &parser->program.patch_constant_signature))
+                        &program->patch_constant_signature))
         {
             ret = VKD3D_ERROR_OUT_OF_MEMORY;
         }
