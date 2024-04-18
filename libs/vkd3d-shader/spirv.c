@@ -2631,6 +2631,11 @@ static bool spirv_compiler_is_opengl_target(const struct spirv_compiler *compile
     return spirv_compiler_get_target_environment(compiler) == VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5;
 }
 
+static bool spirv_compiler_is_spirv_min_1_3_target(const struct spirv_compiler *compiler)
+{
+    return spirv_compiler_get_target_environment(compiler) == VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1;
+}
+
 static bool spirv_compiler_is_target_extension_supported(const struct spirv_compiler *compiler,
         enum vkd3d_shader_spirv_extension extension)
 {
@@ -3148,6 +3153,9 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
             return false;
         case VKD3DSPR_OUTSTENCILREF:
             snprintf(buffer, buffer_size, "oStencilRef");
+            break;
+        case VKD3DSPR_WAVELANECOUNT:
+            snprintf(buffer, buffer_size, "vWaveLaneCount");
             break;
         default:
             FIXME("Unhandled register %#x.\n", reg->type);
@@ -4534,6 +4542,9 @@ static void spirv_compiler_decorate_builtin(struct spirv_compiler *compiler,
         case SpvBuiltInCullDistance:
             vkd3d_spirv_enable_capability(builder, SpvCapabilityCullDistance);
             break;
+        case SpvBuiltInSubgroupSize:
+            vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniform);
+            break;
         default:
             break;
     }
@@ -4723,6 +4734,8 @@ vkd3d_register_builtins[] =
     {VKD3DSPR_DEPTHOUTLE,       {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInFragDepth}},
 
     {VKD3DSPR_OUTSTENCILREF,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInFragStencilRefEXT}},
+
+    {VKD3DSPR_WAVELANECOUNT,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSubgroupSize}},
 };
 
 static void spirv_compiler_emit_register_execution_mode(struct spirv_compiler *compiler,
@@ -5769,6 +5782,23 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
                     "The target environment does not support 64-bit integers.");
         }
         flags &= ~VKD3DSGF_ENABLE_INT64;
+    }
+
+    if (flags & VKD3DSGF_ENABLE_WAVE_INTRINSICS)
+    {
+        if (!(compiler->features & VKD3D_SHADER_COMPILE_OPTION_FEATURE_WAVE_OPS))
+        {
+            WARN("Unsupported wave ops.\n");
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                    "The target environment does not support wave ops.");
+        }
+        else if (!spirv_compiler_is_spirv_min_1_3_target(compiler))
+        {
+            WARN("Wave ops enabled but environment does not support SPIR-V 1.3 or greater.\n");
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                    "The target environment uses wave ops but does not support SPIR-V 1.3 or greater.");
+        }
+        flags &= ~VKD3DSGF_ENABLE_WAVE_INTRINSICS;
     }
 
     if (flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS))
