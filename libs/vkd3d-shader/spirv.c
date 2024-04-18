@@ -10238,15 +10238,13 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
     }
 }
 
-static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_parser *parser,
-        struct vkd3d_shader_code *spirv)
+static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct vsir_program *program,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *spirv)
 {
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_shader_instruction_array instructions;
-    struct vsir_program *program = &parser->program;
     enum vkd3d_shader_spirv_environment environment;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
@@ -10332,7 +10330,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (!vkd3d_spirv_compile_module(builder, spirv, spirv_compiler_get_entry_point_name(compiler), environment))
         return VKD3D_ERROR;
 
-    if (TRACE_ON() || parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION)
+    if (TRACE_ON() || compiler->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION)
     {
         struct vkd3d_string_buffer buffer;
 
@@ -10375,17 +10373,18 @@ int spirv_compile(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
+    struct vsir_program *program = &parser->program;
     struct spirv_compiler *spirv_compiler;
     int ret;
 
-    if (!(spirv_compiler = spirv_compiler_create(&parser->program, compile_info,
+    if (!(spirv_compiler = spirv_compiler_create(program, compile_info,
             scan_descriptor_info, message_context, parser->config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;
     }
 
-    ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, parser, out);
+    ret = spirv_compiler_generate_spirv(spirv_compiler, program, compile_info, out);
 
     spirv_compiler_destroy(spirv_compiler);
     return ret;
