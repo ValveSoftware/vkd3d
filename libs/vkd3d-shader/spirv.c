@@ -9766,6 +9766,8 @@ static SpvOp map_wave_bool_op(enum vkd3d_shader_opcode handler_idx)
             return SpvOpGroupNonUniformAllEqual;
         case VKD3DSIH_WAVE_ALL_TRUE:
             return SpvOpGroupNonUniformAll;
+        case VKD3DSIH_WAVE_ANY_TRUE:
+            return SpvOpGroupNonUniformAny;
         default:
             vkd3d_unreachable();
     }
@@ -10137,6 +10139,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         case VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL:
         case VKD3DSIH_WAVE_ALL_TRUE:
+        case VKD3DSIH_WAVE_ANY_TRUE:
             spirv_compiler_emit_wave_bool_op(compiler, instruction);
             break;
         case VKD3DSIH_DCL:

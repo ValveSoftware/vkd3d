@@ -58,7 +58,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-todo dispatch 4 1 1
+dispatch 4 1 1
 probe uav 1 (0) rgbaui (1, 1, 0, 0)
 probe uav 1 (1) rgbaui (1, 1, 0, 0)
 probe uav 1 (2) rgbaui (1, 1, 0, 0)
