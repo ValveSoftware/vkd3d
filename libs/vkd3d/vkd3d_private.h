@@ -19,6 +19,9 @@
 #ifndef __VKD3D_PRIVATE_H
 #define __VKD3D_PRIVATE_H
 
+#ifndef __MINGW32__
+#define WIDL_C_INLINE_WRAPPERS
+#endif
 #define COBJMACROS
 #define NONAMELESSUNION
 #define VK_NO_PROTOTYPES

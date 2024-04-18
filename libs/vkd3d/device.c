@@ -2833,7 +2833,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_QueryInterface(ID3D12Device9 *ifac
             || IsEqualGUID(riid, &IID_ID3D12Object)
             || IsEqualGUID(riid, &IID_IUnknown))
     {
-        ID3D12Device_AddRef(iface);
+        ID3D12Device9_AddRef(iface);
         *object = iface;
         return S_OK;
     }
