@@ -2356,10 +2356,10 @@ static void *vkd3d_desc_object_cache_get(struct vkd3d_desc_object_cache *cache)
             {
                 vkd3d_atomic_decrement_u32(&cache->free_count);
                 cache->heads[i].head = u.header->next;
-                vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+                vkd3d_atomic_exchange_u32(&cache->heads[i].spinlock, 0);
                 return u.object;
             }
-            vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+            vkd3d_atomic_exchange_u32(&cache->heads[i].spinlock, 0);
         }
         /* Keeping a free count avoids uncertainty over when this loop should terminate,
          * which could result in excess allocations gradually increasing without limit. */
@@ -2389,7 +2389,7 @@ static void vkd3d_desc_object_cache_push(struct vkd3d_desc_object_cache *cache, 
     head = cache->heads[i].head;
     u.header->next = head;
     cache->heads[i].head = u.object;
-    vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+    vkd3d_atomic_exchange_u32(&cache->heads[i].spinlock, 0);
     vkd3d_atomic_increment_u32(&cache->free_count);
 }
 
@@ -2652,7 +2652,7 @@ void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descr
     union d3d12_desc_object u;
     unsigned int i, next;
 
-    if ((i = vkd3d_atomic_exchange(&descriptor_heap->dirty_list_head, UINT_MAX)) == UINT_MAX)
+    if ((i = vkd3d_atomic_exchange_u32(&descriptor_heap->dirty_list_head, UINT_MAX)) == UINT_MAX)
         return;
 
     writes.null_vk_cbv_info.buffer = VK_NULL_HANDLE;
@@ -2667,7 +2667,7 @@ void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descr
     for (; i != UINT_MAX; i = next)
     {
         src = &descriptors[i];
-        next = vkd3d_atomic_exchange(&src->next, 0);
+        next = vkd3d_atomic_exchange_u32(&src->next, 0);
         next = (int)next >> 1;
 
         /* A race exists here between updating src->next and getting the current object. The best
@@ -2701,7 +2701,7 @@ static void d3d12_desc_mark_as_modified(struct d3d12_desc *dst, struct d3d12_des
     while (!vkd3d_atomic_compare_exchange_u32(&descriptor_heap->dirty_list_head, head, i))
     {
         head = descriptor_heap->dirty_list_head;
-        vkd3d_atomic_exchange(&dst->next, (head << 1) | 1);
+        vkd3d_atomic_exchange_u32(&dst->next, (head << 1) | 1);
     }
 }
 

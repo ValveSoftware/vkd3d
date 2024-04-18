@@ -204,11 +204,6 @@ union vkd3d_thread_handle
     void *handle;
 };
 
-static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
-{
-    return InterlockedExchange((LONG volatile *)x, val);
-}
-
 static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
 {
     return InterlockedExchangePointer(x, val);
@@ -225,26 +220,11 @@ union vkd3d_thread_handle
 };
 
 # if HAVE_ATOMIC_EXCHANGE_N
-static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
-{
-    return __atomic_exchange_n(x, val, __ATOMIC_SEQ_CST);
-}
-
 static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
 {
     return __atomic_exchange_n(x, val, __ATOMIC_SEQ_CST);
 }
 # elif HAVE_SYNC_BOOL_COMPARE_AND_SWAP
-static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
-{
-    unsigned int i;
-    do
-    {
-        i = *x;
-    } while (!__sync_bool_compare_and_swap(x, i, val));
-    return i;
-}
-
 static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
 {
     void *p;

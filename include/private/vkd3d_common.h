@@ -442,6 +442,24 @@ static inline bool vkd3d_atomic_compare_exchange_u32(uint32_t volatile *x, uint3
 #endif
 }
 
+static inline uint32_t vkd3d_atomic_exchange_u32(uint32_t volatile *x, uint32_t val)
+{
+#if HAVE_ATOMIC_EXCHANGE_N
+    return __atomic_exchange_n(x, val, __ATOMIC_SEQ_CST);
+#elif defined(_WIN32)
+    return InterlockedExchange((LONG *)x, val);
+#else
+    uint32_t expected;
+
+    do
+    {
+        expected = *x;
+    } while (!vkd3d_atomic_compare_exchange_u32(x, expected, val));
+
+    return expected;
+#endif
+}
+
 struct vkd3d_mutex
 {
 #ifdef _WIN32
