@@ -18,6 +18,9 @@
 
 #include "config.h"
 #include <assert.h>
+#ifndef __MINGW32__
+#define WIDL_C_INLINE_WRAPPERS
+#endif
 #define COBJMACROS
 #define CONST_VTABLE
 #define VKD3D_TEST_NO_DEFS

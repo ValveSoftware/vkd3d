@@ -20,6 +20,9 @@
 
 #ifdef HAVE_OPENGL
 
+#ifndef __MINGW32__
+#define WIDL_C_INLINE_WRAPPERS
+#endif
 #define COBJMACROS
 #define VKD3D_TEST_NO_DEFS
 #define GL_GLEXT_PROTOTYPES

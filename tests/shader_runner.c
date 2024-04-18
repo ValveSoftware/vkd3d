@@ -45,6 +45,8 @@
 #ifdef __MINGW32__
 # define _HRESULT_DEFINED
 typedef int HRESULT;
+#else
+# define WIDL_C_INLINE_WRAPPERS
 #endif
 
 #define COBJMACROS
