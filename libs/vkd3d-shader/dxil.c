@@ -427,6 +427,8 @@ enum dx_intrinsic_opcode
     DX_STORE_PATCH_CONSTANT         = 106,
     DX_OUTPUT_CONTROL_POINT_ID      = 107,
     DX_PRIMITIVE_ID                 = 108,
+    DX_WAVE_GET_LANE_INDEX          = 111,
+    DX_WAVE_GET_LANE_COUNT          = 112,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -5899,6 +5901,26 @@ static void sm6_parser_emit_dx_texture_store(struct sm6_parser *sm6, enum dx_int
     dst_param_init_with_mask(dst_param, write_mask);
 }
 
+static void sm6_parser_emit_dx_wave_builtin(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    enum vkd3d_shader_register_type type;
+
+    switch (op)
+    {
+        case DX_WAVE_GET_LANE_COUNT:
+            type = VKD3DSPR_WAVELANECOUNT;
+            break;
+        case DX_WAVE_GET_LANE_INDEX:
+            type = VKD3DSPR_WAVELANEINDEX;
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, type, VKD3D_DATA_UINT);
+}
+
 struct sm6_dx_opcode_info
 {
     const char *ret_type;
@@ -6018,6 +6040,8 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_UMAD                          ] = {"m", "RRR",  sm6_parser_emit_dx_ma},
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_UMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
+    [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
+    [DX_WAVE_GET_LANE_INDEX           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,
