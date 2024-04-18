@@ -2473,7 +2473,7 @@ void vkd3d_view_decref(void *view, struct d3d12_device *device)
 
 static inline void d3d12_desc_replace(struct d3d12_desc *dst, void *view, struct d3d12_device *device)
 {
-    if ((view = vkd3d_atomic_exchange_pointer(&dst->s.u.object, view)))
+    if ((view = vkd3d_atomic_exchange_ptr(&dst->s.u.object, view)))
         vkd3d_view_decref(view, device);
 }
 

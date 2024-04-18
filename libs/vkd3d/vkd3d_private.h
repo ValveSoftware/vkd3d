@@ -197,48 +197,13 @@ struct vkd3d_instance
     unsigned int refcount;
 };
 
-#ifdef _WIN32
-
 union vkd3d_thread_handle
 {
-    void *handle;
-};
-
-static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
-{
-    return InterlockedExchangePointer(x, val);
-}
-
-#else  /* _WIN32 */
-
-#include <pthread.h>
-
-union vkd3d_thread_handle
-{
+#ifndef _WIN32
     pthread_t pthread;
+#endif
     void *handle;
 };
-
-# if HAVE_ATOMIC_EXCHANGE_N
-static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
-{
-    return __atomic_exchange_n(x, val, __ATOMIC_SEQ_CST);
-}
-# elif HAVE_SYNC_BOOL_COMPARE_AND_SWAP
-static inline void *vkd3d_atomic_exchange_pointer(void * volatile *x, void *val)
-{
-    void *p;
-    do
-    {
-        p = *x;
-    } while (!__sync_bool_compare_and_swap(x, p, val));
-    return p;
-}
-# else
-#   error "vkd3d_atomic_exchange() not implemented for this platform"
-# endif
-
-#endif  /* _WIN32 */
 
 HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
         PFN_vkd3d_thread thread_main, void *data, union vkd3d_thread_handle *thread);
