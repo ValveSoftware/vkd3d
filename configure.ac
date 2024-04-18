@@ -57,6 +57,7 @@ AC_SUBST([VKD3D_CFLAGS])
 AS_IF([test "x${GCC}" = "xyes"],
       [VKD3D_CFLAGS="-Wall -pipe -D_WIN32_WINNT=0x0600"
       VKD3D_CHECK_CFLAGS([-std=c99])
+      VKD3D_CHECK_CFLAGS([-flto=auto])
       VKD3D_CHECK_CFLAGS([-fvisibility=hidden])
       VKD3D_CHECK_CFLAGS([-Wdeclaration-after-statement])
       VKD3D_CHECK_CFLAGS([-Wempty-body])
