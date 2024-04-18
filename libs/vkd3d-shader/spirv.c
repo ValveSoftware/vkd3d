@@ -3157,6 +3157,9 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
         case VKD3DSPR_WAVELANECOUNT:
             snprintf(buffer, buffer_size, "vWaveLaneCount");
             break;
+        case VKD3DSPR_WAVELANEINDEX:
+            snprintf(buffer, buffer_size, "vWaveLaneIndex");
+            break;
         default:
             FIXME("Unhandled register %#x.\n", reg->type);
             snprintf(buffer, buffer_size, "unrecognized_%#x", reg->type);
@@ -4543,6 +4546,7 @@ static void spirv_compiler_decorate_builtin(struct spirv_compiler *compiler,
             vkd3d_spirv_enable_capability(builder, SpvCapabilityCullDistance);
             break;
         case SpvBuiltInSubgroupSize:
+        case SpvBuiltInSubgroupLocalInvocationId:
             vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniform);
             break;
         default:
@@ -4736,6 +4740,7 @@ vkd3d_register_builtins[] =
     {VKD3DSPR_OUTSTENCILREF,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInFragStencilRefEXT}},
 
     {VKD3DSPR_WAVELANECOUNT,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSubgroupSize}},
+    {VKD3DSPR_WAVELANEINDEX,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSubgroupLocalInvocationId}},
 };
 
 static void spirv_compiler_emit_register_execution_mode(struct spirv_compiler *compiler,
