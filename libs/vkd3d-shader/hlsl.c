@@ -3517,6 +3517,7 @@ static int compare_function_rb(const void *key, const struct rb_entry *entry)
 
 static void declare_predefined_types(struct hlsl_ctx *ctx)
 {
+    struct vkd3d_string_buffer *name;
     unsigned int x, y, bt, i, v;
     struct hlsl_type *type;
 
@@ -3529,7 +3530,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         "uint",
         "bool",
     };
-    char name[15];
 
     static const char *const variants_float[] = {"min10float", "min16float"};
     static const char *const variants_int[] = {"min12int", "min16int"};
@@ -3573,28 +3573,34 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"technique11", 11},
     };
 
+    if (!(name = hlsl_get_string_buffer(ctx)))
+        return;
+
     for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
     {
         for (y = 1; y <= 4; ++y)
         {
             for (x = 1; x <= 4; ++x)
             {
-                sprintf(name, "%s%ux%u", names[bt], y, x);
-                type = hlsl_new_type(ctx, name, HLSL_CLASS_MATRIX, bt, x, y);
+                vkd3d_string_buffer_clear(name);
+                vkd3d_string_buffer_printf(name, "%s%ux%u", names[bt], y, x);
+                type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_MATRIX, bt, x, y);
                 hlsl_scope_add_type(ctx->globals, type);
                 ctx->builtin_types.matrix[bt][x - 1][y - 1] = type;
 
                 if (y == 1)
                 {
-                    sprintf(name, "%s%u", names[bt], x);
-                    type = hlsl_new_type(ctx, name, HLSL_CLASS_VECTOR, bt, x, y);
+                    vkd3d_string_buffer_clear(name);
+                    vkd3d_string_buffer_printf(name, "%s%u", names[bt], x);
+                    type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_VECTOR, bt, x, y);
                     hlsl_scope_add_type(ctx->globals, type);
                     ctx->builtin_types.vector[bt][x - 1] = type;
 
                     if (x == 1)
                     {
-                        sprintf(name, "%s", names[bt]);
-                        type = hlsl_new_type(ctx, name, HLSL_CLASS_SCALAR, bt, x, y);
+                        vkd3d_string_buffer_clear(name);
+                        vkd3d_string_buffer_printf(name, "%s", names[bt]);
+                        type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_SCALAR, bt, x, y);
                         hlsl_scope_add_type(ctx->globals, type);
                         ctx->builtin_types.scalar[bt] = type;
                     }
@@ -3637,22 +3643,25 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
             {
                 for (x = 1; x <= 4; ++x)
                 {
-                    sprintf(name, "%s%ux%u", variants[v], y, x);
-                    type = hlsl_new_type(ctx, name, HLSL_CLASS_MATRIX, bt, x, y);
+                    vkd3d_string_buffer_clear(name);
+                    vkd3d_string_buffer_printf(name, "%s%ux%u", variants[v], y, x);
+                    type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_MATRIX, bt, x, y);
                     type->is_minimum_precision = 1;
                     hlsl_scope_add_type(ctx->globals, type);
 
                     if (y == 1)
                     {
-                        sprintf(name, "%s%u", variants[v], x);
-                        type = hlsl_new_type(ctx, name, HLSL_CLASS_VECTOR, bt, x, y);
+                        vkd3d_string_buffer_clear(name);
+                        vkd3d_string_buffer_printf(name, "%s%u", variants[v], x);
+                        type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_VECTOR, bt, x, y);
                         type->is_minimum_precision = 1;
                         hlsl_scope_add_type(ctx->globals, type);
 
                         if (x == 1)
                         {
-                            sprintf(name, "%s", variants[v]);
-                            type = hlsl_new_type(ctx, name, HLSL_CLASS_SCALAR, bt, x, y);
+                            vkd3d_string_buffer_clear(name);
+                            vkd3d_string_buffer_printf(name, "%s", variants[v]);
+                            type = hlsl_new_type(ctx, name->buffer, HLSL_CLASS_SCALAR, bt, x, y);
                             type->is_minimum_precision = 1;
                             hlsl_scope_add_type(ctx->globals, type);
                         }
@@ -3690,6 +3699,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         type->e.version = technique_types[i].version;
         hlsl_scope_add_type(ctx->globals, type);
     }
+
+    hlsl_release_string_buffer(ctx, name);
 }
 
 static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info *compile_info,
