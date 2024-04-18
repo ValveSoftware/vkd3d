@@ -1555,7 +1555,7 @@ int glsl_compile(struct vsir_program *program, uint64_t config_flags,
 
 #define SPIRV_MAX_SRC_COUNT 6
 
-int spirv_compile(struct vkd3d_shader_parser *parser,
+int spirv_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);

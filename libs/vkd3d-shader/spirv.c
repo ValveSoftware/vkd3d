@@ -10368,17 +10368,16 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler, struct
     return VKD3D_OK;
 }
 
-int spirv_compile(struct vkd3d_shader_parser *parser,
+int spirv_compile(struct vsir_program *program, uint64_t config_flags,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
-    struct vsir_program *program = &parser->program;
     struct spirv_compiler *spirv_compiler;
     int ret;
 
     if (!(spirv_compiler = spirv_compiler_create(program, compile_info,
-            scan_descriptor_info, message_context, parser->config_flags)))
+            scan_descriptor_info, message_context, config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;
