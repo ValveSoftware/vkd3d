@@ -328,6 +328,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_UTOF                            ] = "utof",
     [VKD3DSIH_UTOU                            ] = "utou",
     [VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL           ] = "wave_active_all_equal",
+    [VKD3DSIH_WAVE_ALL_TRUE                   ] = "wave_all_true",
     [VKD3DSIH_XOR                             ] = "xor",
 };
 
