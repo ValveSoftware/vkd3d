@@ -340,7 +340,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_reflection_QueryInterface(
     if (IsEqualGUID(riid, &IID_ID3D12ShaderReflection)
             || IsEqualGUID(riid, &IID_IUnknown))
     {
-        IUnknown_AddRef(iface);
+        ID3D12ShaderReflection_AddRef(iface);
         *object = iface;
         return S_OK;
     }
