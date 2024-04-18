@@ -1743,9 +1743,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
                 put_u32(buffer, var->bind_count[r]);
             }
             put_u32(buffer, 0); /* type */
-            put_u32(buffer, 0); /* FIXME: default value */
-            if (var->default_values)
-                FIXME("Write SM1 default values.\n");
+            put_u32(buffer, 0); /* default value */
         }
     }
 
@@ -1769,6 +1767,62 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
             write_sm1_type(buffer, var->data_type, ctab_start);
             set_u32(buffer, var_offset + 3 * sizeof(uint32_t), var->data_type->bytecode_offset - ctab_start);
+
+            if (var->default_values)
+            {
+                unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+                unsigned int comp_count = hlsl_type_component_count(var->data_type);
+                unsigned int default_value_offset;
+                unsigned int k;
+
+                default_value_offset = bytecode_reserve_bytes(buffer, reg_size * sizeof(uint32_t));
+                set_u32(buffer, var_offset + 4 * sizeof(uint32_t), default_value_offset - ctab_start);
+
+                for (k = 0; k < comp_count; ++k)
+                {
+                    struct hlsl_type *comp_type = hlsl_type_get_component_type(ctx, var->data_type, k);
+                    unsigned int comp_offset;
+                    enum hlsl_regset regset;
+
+                    comp_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
+                    if (regset == HLSL_REGSET_NUMERIC)
+                    {
+                        union
+                        {
+                            uint32_t u;
+                            float f;
+                        } uni;
+
+                        switch (comp_type->e.numeric.type)
+                        {
+                            case HLSL_TYPE_DOUBLE:
+                                hlsl_fixme(ctx, &var->loc, "Write double default values.");
+                                uni.u = 0;
+                                break;
+
+                            case HLSL_TYPE_INT:
+                                uni.f = var->default_values[k].value.i;
+                                break;
+
+                            case HLSL_TYPE_UINT:
+                            case HLSL_TYPE_BOOL:
+                                uni.f = var->default_values[k].value.u;
+                                break;
+
+                            case HLSL_TYPE_HALF:
+                            case HLSL_TYPE_FLOAT:
+                                uni.u = var->default_values[k].value.u;
+                                break;
+
+                            default:
+                                vkd3d_unreachable();
+                        }
+
+                        set_u32(buffer, default_value_offset + comp_offset * sizeof(uint32_t), uni.u);
+                    }
+                }
+            }
+
             ++uniform_count;
         }
     }
