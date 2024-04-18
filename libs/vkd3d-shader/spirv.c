@@ -2453,8 +2453,7 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
-        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location,
-        uint64_t config_flags)
+        struct vkd3d_shader_message_context *message_context, uint64_t config_flags)
 {
     const struct shader_signature *patch_constant_signature = &program->patch_constant_signature;
     const struct shader_signature *output_signature = &program->output_signature;
@@ -2470,7 +2469,7 @@ static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *p
 
     memset(compiler, 0, sizeof(*compiler));
     compiler->message_context = message_context;
-    compiler->location = *location;
+    compiler->location.source_name = compile_info->source_name;
     compiler->config_flags = config_flags;
 
     if ((target_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)))
@@ -9732,6 +9731,8 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
 {
     int ret = VKD3D_OK;
 
+    compiler->location = instruction->location;
+
     switch (instruction->handler_idx)
     {
         case VKD3DSIH_DCL_GLOBAL_FLAGS:
@@ -10175,9 +10176,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 
-    compiler->location.column = 0;
-    compiler->location.line = 1;
-
     if (program->block_count && !spirv_compiler_init_blocks(compiler, program->block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
@@ -10202,7 +10200,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     for (i = 0; i < instructions.count && result >= 0; ++i)
     {
-        compiler->location.line = i + 1;
         result = spirv_compiler_handle_instruction(compiler, &instructions.elements[i]);
     }
 
@@ -10296,7 +10293,7 @@ int spirv_compile(struct vkd3d_shader_parser *parser,
     int ret;
 
     if (!(spirv_compiler = spirv_compiler_create(&parser->program, compile_info,
-            scan_descriptor_info, message_context, &parser->location, parser->config_flags)))
+            scan_descriptor_info, message_context, parser->config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;
