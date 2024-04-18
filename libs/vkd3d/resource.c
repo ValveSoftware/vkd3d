@@ -2350,7 +2350,7 @@ static void *vkd3d_desc_object_cache_get(struct vkd3d_desc_object_cache *cache)
     i = vkd3d_atomic_increment_u32(&cache->next_index) & HEAD_INDEX_MASK;
     for (;;)
     {
-        if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
+        if (vkd3d_atomic_compare_exchange_u32(&cache->heads[i].spinlock, 0, 1))
         {
             if ((u.object = cache->heads[i].head))
             {
@@ -2381,7 +2381,7 @@ static void vkd3d_desc_object_cache_push(struct vkd3d_desc_object_cache *cache, 
     i = vkd3d_atomic_increment_u32(&cache->next_index) & HEAD_INDEX_MASK;
     for (;;)
     {
-        if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
+        if (vkd3d_atomic_compare_exchange_u32(&cache->heads[i].spinlock, 0, 1))
             break;
         i = (i + 1) & HEAD_INDEX_MASK;
     }
@@ -2695,10 +2695,10 @@ static void d3d12_desc_mark_as_modified(struct d3d12_desc *dst, struct d3d12_des
     head = descriptor_heap->dirty_list_head;
 
     /* Only one thread can swap the value away from zero. */
-    if (!vkd3d_atomic_compare_exchange(&dst->next, 0, (head << 1) | 1))
+    if (!vkd3d_atomic_compare_exchange_u32(&dst->next, 0, (head << 1) | 1))
         return;
     /* Now it is safe to modify 'next' to another nonzero value if necessary. */
-    while (!vkd3d_atomic_compare_exchange(&descriptor_heap->dirty_list_head, head, i))
+    while (!vkd3d_atomic_compare_exchange_u32(&descriptor_heap->dirty_list_head, head, i))
     {
         head = descriptor_heap->dirty_list_head;
         vkd3d_atomic_exchange(&dst->next, (head << 1) | 1);

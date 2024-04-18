@@ -431,6 +431,17 @@ static inline uint32_t vkd3d_atomic_increment_u32(uint32_t volatile *x)
     return vkd3d_atomic_add_fetch_u32(x, 1);
 }
 
+static inline bool vkd3d_atomic_compare_exchange_u32(uint32_t volatile *x, uint32_t expected, uint32_t val)
+{
+#if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
+    return __sync_bool_compare_and_swap(x, expected, val);
+#elif defined(_WIN32)
+    return InterlockedCompareExchange((LONG *)x, val, expected) == expected;
+#else
+# error "vkd3d_atomic_compare_exchange_u32() not implemented for this platform"
+#endif
+}
+
 struct vkd3d_mutex
 {
 #ifdef _WIN32

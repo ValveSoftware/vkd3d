@@ -204,11 +204,6 @@ union vkd3d_thread_handle
     void *handle;
 };
 
-static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)
-{
-    return InterlockedCompareExchange((LONG volatile *)x, xchg, cmp) == cmp;
-}
-
 static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
 {
     return InterlockedExchange((LONG volatile *)x, val);
@@ -228,15 +223,6 @@ union vkd3d_thread_handle
     pthread_t pthread;
     void *handle;
 };
-
-# if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
-static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)
-{
-    return __sync_bool_compare_and_swap(x, cmp, xchg);
-}
-# else
-#  error "vkd3d_atomic_compare_exchange() not implemented for this platform"
-# endif
 
 # if HAVE_ATOMIC_EXCHANGE_N
 static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
@@ -735,7 +721,7 @@ static inline bool vkd3d_view_incref(void *desc)
         if (refcount <= 0)
             return false;
     }
-    while (!vkd3d_atomic_compare_exchange(&h->refcount, refcount, refcount + 1));
+    while (!vkd3d_atomic_compare_exchange_u32(&h->refcount, refcount, refcount + 1));
 
     return true;
 }
