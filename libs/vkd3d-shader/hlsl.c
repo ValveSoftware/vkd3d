@@ -3918,7 +3918,9 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    if (target_type == VKD3D_SHADER_TARGET_D3D_ASM)
+    if (target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
+            || target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT
+            || target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         struct vkd3d_shader_compile_info info = *compile_info;
         struct vkd3d_shader_parser *parser;
