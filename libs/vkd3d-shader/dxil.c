@@ -429,6 +429,7 @@ enum dx_intrinsic_opcode
     DX_PRIMITIVE_ID                 = 108,
     DX_WAVE_GET_LANE_INDEX          = 111,
     DX_WAVE_GET_LANE_COUNT          = 112,
+    DX_WAVE_ACTIVE_ALL_EQUAL        = 115,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -4512,6 +4513,8 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_F32TOF16;
         case DX_LEGACY_F16TOF32:
             return VKD3DSIH_F16TOF32;
+        case DX_WAVE_ACTIVE_ALL_EQUAL:
+            return VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL;
         default:
             vkd3d_unreachable();
     }
@@ -5937,6 +5940,7 @@ struct sm6_dx_opcode_info
     C -> constant or undefined int8/16/32
     i -> int32
     m -> int16/32/64
+    n -> any numeric
     f -> float
     d -> double
     e -> half/float
@@ -6040,6 +6044,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_UMAD                          ] = {"m", "RRR",  sm6_parser_emit_dx_ma},
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_UMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
+    [DX_WAVE_ACTIVE_ALL_EQUAL         ] = {"1", "n",    sm6_parser_emit_dx_unary},
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
     [DX_WAVE_GET_LANE_INDEX           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
 };
@@ -6073,6 +6078,8 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
             return sm6_type_is_i32(type);
         case 'm':
             return sm6_type_is_i16_i32_i64(type);
+        case 'n':
+            return sm6_type_is_numeric(type);
         case 'f':
             return sm6_type_is_float(type);
         case 'd':
