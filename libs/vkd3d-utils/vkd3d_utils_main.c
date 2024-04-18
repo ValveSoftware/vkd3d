@@ -60,16 +60,14 @@ HRESULT WINAPI D3D12GetDebugInterface(REFIID iid, void **debug)
 HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL minimum_feature_level,
         REFIID iid, void **device, enum vkd3d_api_version api_version)
 {
-    struct vkd3d_optional_instance_extensions_info optional_extensions_info;
+    struct vkd3d_optional_instance_extensions_info optional_instance_extensions_info;
+    struct vkd3d_optional_device_extensions_info optional_device_extensions_info;
     struct vkd3d_instance_create_info instance_create_info;
     struct vkd3d_device_create_info device_create_info;
 
-    static const char * const instance_extensions[] =
-    {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-    };
     static const char * const optional_instance_extensions[] =
     {
+        VK_KHR_SURFACE_EXTENSION_NAME,
         "VK_KHR_android_surface",
         "VK_KHR_wayland_surface",
         "VK_KHR_win32_surface",
@@ -79,7 +77,7 @@ HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL minim
         "VK_MVK_macos_surface",
         "VK_MVK_ios_surface",
     };
-    static const char * const device_extensions[] =
+    static const char * const optional_device_extensions[] =
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
@@ -95,27 +93,28 @@ HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL minim
     if (adapter)
         FIXME("Ignoring adapter %p.\n", adapter);
 
-    memset(&optional_extensions_info, 0, sizeof(optional_extensions_info));
-    optional_extensions_info.type = VKD3D_STRUCTURE_TYPE_OPTIONAL_INSTANCE_EXTENSIONS_INFO;
-    optional_extensions_info.next = &application_info;
-    optional_extensions_info.extensions = optional_instance_extensions;
-    optional_extensions_info.extension_count = ARRAY_SIZE(optional_instance_extensions);
+    memset(&optional_instance_extensions_info, 0, sizeof(optional_instance_extensions_info));
+    optional_instance_extensions_info.type = VKD3D_STRUCTURE_TYPE_OPTIONAL_INSTANCE_EXTENSIONS_INFO;
+    optional_instance_extensions_info.next = &application_info;
+    optional_instance_extensions_info.extensions = optional_instance_extensions;
+    optional_instance_extensions_info.extension_count = ARRAY_SIZE(optional_instance_extensions);
 
     memset(&instance_create_info, 0, sizeof(instance_create_info));
     instance_create_info.type = VKD3D_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    instance_create_info.next = &optional_extensions_info;
+    instance_create_info.next = &optional_instance_extensions_info;
     instance_create_info.pfn_signal_event = vkd3d_signal_event;
     instance_create_info.wchar_size = sizeof(WCHAR);
-    instance_create_info.instance_extensions = instance_extensions;
-    instance_create_info.instance_extension_count = ARRAY_SIZE(instance_extensions);
+
+    memset(&optional_device_extensions_info, 0, sizeof(optional_device_extensions_info));
+    optional_device_extensions_info.type = VKD3D_STRUCTURE_TYPE_OPTIONAL_DEVICE_EXTENSIONS_INFO;
+    optional_device_extensions_info.extensions = optional_device_extensions;
+    optional_device_extensions_info.extension_count = ARRAY_SIZE(optional_device_extensions);
 
     memset(&device_create_info, 0, sizeof(device_create_info));
     device_create_info.type = VKD3D_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_create_info.next = NULL;
+    device_create_info.next = &optional_device_extensions_info;
     device_create_info.minimum_feature_level = minimum_feature_level;
     device_create_info.instance_create_info = &instance_create_info;
-    device_create_info.device_extensions = device_extensions;
-    device_create_info.device_extension_count = ARRAY_SIZE(device_extensions);
 
     return vkd3d_create_device(&device_create_info, iid, device);
 }
