@@ -39,6 +39,7 @@ static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
 
 static const unsigned int MAX_GS_INSTANCE_COUNT = 32; /* kMaxGSInstanceCount */
 static const unsigned int MAX_GS_OUTPUT_TOTAL_SCALARS = 1024; /* kMaxGSOutputTotalScalars */
+static const unsigned int MAX_GS_OUTPUT_STREAMS = 4;
 
 #define VKD3D_SHADER_SWIZZLE_64_MASK \
         (VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(0) \
@@ -434,6 +435,9 @@ enum dx_intrinsic_opcode
     DX_GROUP_ID                     =  94,
     DX_THREAD_ID_IN_GROUP           =  95,
     DX_FLATTENED_THREAD_ID_IN_GROUP =  96,
+    DX_EMIT_STREAM                  =  97,
+    DX_CUT_STREAM                   =  98,
+    DX_EMIT_THEN_CUT_STREAM         =  99,
     DX_MAKE_DOUBLE                  = 101,
     DX_SPLIT_DOUBLE                 = 102,
     DX_LOAD_OUTPUT_CONTROL_POINT    = 103,
@@ -4930,6 +4934,38 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static void sm6_parser_emit_dx_stream(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+    unsigned int i;
+
+    vsir_instruction_init(ins, &sm6->p.location, (op == DX_CUT_STREAM) ? VKD3DSIH_CUT_STREAM : VKD3DSIH_EMIT_STREAM);
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+
+    i = sm6_value_get_constant_uint(operands[0]);
+    if (i >= MAX_GS_OUTPUT_STREAMS)
+    {
+        WARN("Invalid stream index %u.\n", i);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Output stream index %u is invalid.", i);
+    }
+
+    /* VKD3D_DATA_UNUSED would be more reasonable, but TPF uses data type 0 here. */
+    register_init_with_id(&src_param->reg, VKD3DSPR_STREAM, 0, i);
+    src_param_init(src_param);
+
+    if (op == DX_EMIT_THEN_CUT_STREAM)
+    {
+        ++state->ins;
+        ++state->code_block->instruction_count;
+        sm6_parser_emit_dx_stream(sm6, DX_CUT_STREAM, operands, state);
+    }
+}
+
 static void sm6_parser_emit_dx_discard(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -6116,6 +6152,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_COVERAGE                      ] = {"i", "",     sm6_parser_emit_dx_coverage},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
+    [DX_CUT_STREAM                    ] = {"v", "c",    sm6_parser_emit_dx_stream},
     [DX_DERIV_COARSEX                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DERIV_COARSEY                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DERIV_FINEX                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
@@ -6125,6 +6162,8 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_DOT2                          ] = {"g", "RRRR", sm6_parser_emit_dx_dot},
     [DX_DOT3                          ] = {"g", "RRRRRR", sm6_parser_emit_dx_dot},
     [DX_DOT4                          ] = {"g", "RRRRRRRR", sm6_parser_emit_dx_dot},
+    [DX_EMIT_STREAM                   ] = {"v", "c",    sm6_parser_emit_dx_stream},
+    [DX_EMIT_THEN_CUT_STREAM          ] = {"v", "c",    sm6_parser_emit_dx_stream},
     [DX_EXP                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_FABS                          ] = {"g", "R",    sm6_parser_emit_dx_fabs},
     [DX_FIRST_BIT_HI                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
