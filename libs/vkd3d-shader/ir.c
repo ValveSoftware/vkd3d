@@ -5753,6 +5753,32 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         case VKD3DSIH_DCL_OUTPUT:
             return;
 
+        case VKD3DSIH_DCL_INPUT_PRIMITIVE:
+            if (instruction->declaration.primitive_type.type == VKD3D_PT_UNDEFINED
+                    || instruction->declaration.primitive_type.type >= VKD3D_PT_COUNT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS input primitive %u is invalid.",
+                        instruction->declaration.primitive_type.type);
+            return;
+
+        case VKD3DSIH_DCL_VERTICES_OUT:
+            if (instruction->declaration.count > 1024)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS output vertex count %u is invalid.",
+                        instruction->declaration.count);
+            return;
+
+        case VKD3DSIH_DCL_OUTPUT_TOPOLOGY:
+            if (instruction->declaration.primitive_type.type == VKD3D_PT_UNDEFINED
+                    || instruction->declaration.primitive_type.type >= VKD3D_PT_COUNT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS output primitive %u is invalid.",
+                        instruction->declaration.primitive_type.type);
+            return;
+
+        case VKD3DSIH_DCL_GS_INSTANCES:
+            if (!instruction->declaration.count || instruction->declaration.count > 32)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_GS, "GS instance count %u is invalid.",
+                        instruction->declaration.count);
+            return;
+
         case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
             if (!instruction->declaration.count || instruction->declaration.count > 32)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_TESSELLATION, "Output control point count %u is invalid.",
