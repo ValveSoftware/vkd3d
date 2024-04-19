@@ -1164,6 +1164,8 @@ enum vkd3d_primitive_type
     VKD3D_PT_TRIANGLELIST_ADJ             = 12,
     VKD3D_PT_TRIANGLESTRIP_ADJ            = 13,
     VKD3D_PT_PATCH                        = 14,
+
+    VKD3D_PT_COUNT                        = 15,
 };
 
 struct vkd3d_shader_primitive_type

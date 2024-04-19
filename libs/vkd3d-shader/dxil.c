@@ -37,6 +37,9 @@ static const size_t MAX_IR_INSTRUCTIONS_PER_DXIL_INSTRUCTION = 11;
 
 static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
 
+static const unsigned int MAX_GS_INSTANCE_COUNT = 32; /* kMaxGSInstanceCount */
+static const unsigned int MAX_GS_OUTPUT_TOTAL_SCALARS = 1024; /* kMaxGSOutputTotalScalars */
+
 #define VKD3D_SHADER_SWIZZLE_64_MASK \
         (VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(0) \
                 | VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(1))
@@ -281,6 +284,18 @@ enum dxil_element_additional_tag
     ADDITIONAL_TAG_GLOBAL_SYMBOL = 1, /* not used */
     ADDITIONAL_TAG_RELADDR_MASK  = 2,
     ADDITIONAL_TAG_USED_MASK     = 3,
+};
+
+enum dxil_input_primitive
+{
+    INPUT_PRIMITIVE_UNDEFINED            =  0,
+    INPUT_PRIMITIVE_POINT                =  1,
+    INPUT_PRIMITIVE_LINE                 =  2,
+    INPUT_PRIMITIVE_TRIANGLE             =  3,
+    INPUT_PRIMITIVE_LINEWITHADJACENCY    =  6,
+    INPUT_PRIMITIVE_TRIANGLEWITHADJACENY =  7,
+    INPUT_PRIMITIVE_PATCH1               =  8,
+    INPUT_PRIMITIVE_PATCH32              = 39,
 };
 
 enum dxil_shader_properties_tag
@@ -9467,6 +9482,17 @@ static void sm6_parser_emit_dcl_count(struct sm6_parser *sm6, enum vkd3d_shader_
     ins->declaration.count = count;
 }
 
+static void sm6_parser_emit_dcl_primitive_topology(struct sm6_parser *sm6,
+        enum vkd3d_shader_opcode handler_idx, enum vkd3d_primitive_type primitive_type,
+        unsigned int patch_vertex_count)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    ins = sm6_parser_add_instruction(sm6, handler_idx);
+    ins->declaration.primitive_type.type = primitive_type;
+    ins->declaration.primitive_type.patch_vertex_count = patch_vertex_count;
+}
+
 static void sm6_parser_emit_dcl_tessellator_domain(struct sm6_parser *sm6,
         enum vkd3d_tessellator_domain tessellator_domain)
 {
@@ -9549,6 +9575,128 @@ static void sm6_parser_emit_dcl_max_tessellation_factor(struct sm6_parser *sm6, 
 
     ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_HS_MAX_TESSFACTOR);
     ins->declaration.max_tessellation_factor = max_tessellation_factor;
+}
+
+static void sm6_parser_gs_properties_init(struct sm6_parser *sm6, const struct sm6_metadata_value *m)
+{
+    enum vkd3d_primitive_type input_primitive = VKD3D_PT_TRIANGLELIST, output_primitive;
+    unsigned int i, input_control_point_count = 1, patch_vertex_count = 0;
+    const struct sm6_metadata_node *node;
+    unsigned int operands[5] = {0};
+
+    if (!m || !sm6_metadata_value_is_node(m))
+    {
+        WARN("Missing or invalid GS properties.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Geometry shader properties node is missing or invalid.");
+        return;
+    }
+
+    node = m->u.node;
+    if (node->operand_count < ARRAY_SIZE(operands))
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Geometry shader properties operand count %u is invalid.", node->operand_count);
+        return;
+    }
+    if (node->operand_count > ARRAY_SIZE(operands))
+    {
+        WARN("Ignoring %zu extra operands.\n", node->operand_count - ARRAY_SIZE(operands));
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %zu extra operands for geometry shader properties.",
+                node->operand_count - ARRAY_SIZE(operands));
+    }
+
+    for (i = 0; i < node->operand_count; ++i)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &operands[i]))
+        {
+            WARN("GS property at index %u is not a uint value.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Geometry shader properties operand at index %u is not an integer.", i);
+        }
+    }
+
+    switch (i = operands[0])
+    {
+        case INPUT_PRIMITIVE_POINT:
+            input_primitive = VKD3D_PT_POINTLIST;
+            input_control_point_count = 1;
+            break;
+
+        case INPUT_PRIMITIVE_LINE:
+            input_primitive = VKD3D_PT_LINELIST;
+            input_control_point_count = 2;
+            break;
+
+        case INPUT_PRIMITIVE_TRIANGLE:
+            input_primitive = VKD3D_PT_TRIANGLELIST;
+            input_control_point_count = 3;
+            break;
+
+        case INPUT_PRIMITIVE_LINEWITHADJACENCY:
+            input_primitive = VKD3D_PT_LINELIST_ADJ;
+            input_control_point_count = 4;
+            break;
+
+        case INPUT_PRIMITIVE_TRIANGLEWITHADJACENY:
+            input_primitive = VKD3D_PT_TRIANGLELIST_ADJ;
+            input_control_point_count = 6;
+            break;
+
+        default:
+            if (i >= INPUT_PRIMITIVE_PATCH1 && i <= INPUT_PRIMITIVE_PATCH32)
+            {
+                input_primitive = VKD3D_PT_PATCH;
+                patch_vertex_count = i - INPUT_PRIMITIVE_PATCH1 + 1;
+                break;
+            }
+
+            WARN("Unhandled input primitive %u.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Geometry shader input primitive %u is unhandled.", i);
+            break;
+    }
+
+    sm6_parser_emit_dcl_primitive_topology(sm6, VKD3DSIH_DCL_INPUT_PRIMITIVE, input_primitive, patch_vertex_count);
+    sm6->p.program.input_control_point_count = input_control_point_count;
+
+    i = operands[1];
+    /* Max total scalar count sets an upper limit. We would need to scan outputs to be more precise. */
+    if (i > MAX_GS_OUTPUT_TOTAL_SCALARS)
+    {
+        WARN("GS output vertex count %u invalid.\n", i);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Geometry shader output vertex count %u is invalid.", i);
+    }
+    sm6_parser_emit_dcl_count(sm6, VKD3DSIH_DCL_VERTICES_OUT, i);
+
+    if (operands[2] > 1)
+    {
+        FIXME("Unhandled stream mask %#x.\n", operands[2]);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Geometry shader stream mask %#x is unhandled.", operands[2]);
+    }
+
+    output_primitive = operands[3];
+    if (output_primitive == VKD3D_PT_UNDEFINED || output_primitive >= VKD3D_PT_COUNT)
+    {
+        WARN("Unhandled output primitive %u.\n", output_primitive);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Geometry shader output primitive %u is unhandled.", output_primitive);
+        output_primitive = VKD3D_PT_TRIANGLELIST;
+    }
+    sm6_parser_emit_dcl_primitive_topology(sm6, VKD3DSIH_DCL_OUTPUT_TOPOLOGY, output_primitive, 0);
+
+    i = operands[4];
+    if (!i || i > MAX_GS_INSTANCE_COUNT)
+    {
+        WARN("GS instance count %u invalid.\n", i);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Geometry shader instance count %u is invalid.", i);
+    }
+    sm6_parser_emit_dcl_count(sm6, VKD3DSIH_DCL_GS_INSTANCES, i);
 }
 
 static enum vkd3d_tessellator_domain sm6_parser_ds_properties_init(struct sm6_parser *sm6,
@@ -9740,6 +9888,9 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
             {
                 case SHADER_PROPERTIES_FLAGS:
                     sm6_parser_emit_global_flags(sm6, node->operands[i + 1]);
+                    break;
+                case SHADER_PROPERTIES_GEOMETRY:
+                    sm6_parser_gs_properties_init(sm6, node->operands[i + 1]);
                     break;
                 case SHADER_PROPERTIES_DOMAIN:
                     tessellator_domain = sm6_parser_ds_properties_init(sm6, node->operands[i + 1]);
