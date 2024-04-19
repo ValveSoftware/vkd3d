@@ -493,14 +493,39 @@ static void d3d12_runner_clear(struct shader_runner *r, struct resource *resourc
     reset_command_list(command_list, test_context->allocator);
 }
 
+static D3D12_PRIMITIVE_TOPOLOGY_TYPE d3d12_primitive_topology_type_from_primitive_topology(
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology)
+{
+    switch (primitive_topology)
+    {
+        case D3D_PRIMITIVE_TOPOLOGY_POINTLIST:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+        case D3D_PRIMITIVE_TOPOLOGY_LINELIST:
+        case D3D_PRIMITIVE_TOPOLOGY_LINESTRIP:
+        case D3D_PRIMITIVE_TOPOLOGY_LINELIST_ADJ:
+        case D3D_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP:
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ:
+        case D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        default:
+            if (primitive_topology >= D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST
+                    && primitive_topology <= D3D_PRIMITIVE_TOPOLOGY_32_CONTROL_POINT_PATCHLIST)
+                return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+            fatal_error("Unhandled primitive topology %u.\n", primitive_topology);
+    }
+}
+
 static bool d3d12_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
 
+    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL, *gs_code = NULL;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
-    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL;
     ID3D12GraphicsCommandList *command_list = test_context->list;
     unsigned int uniform_index, sample_count, rtv_count = 0;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
@@ -527,6 +552,11 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         ds_code = compile_shader(runner, runner->r.ds_source, SHADER_TYPE_DS);
         succeeded = succeeded && ds_code;
     }
+    if (runner->r.gs_source)
+    {
+        gs_code = compile_shader(runner, runner->r.gs_source, SHADER_TYPE_GS);
+        succeeded = succeeded && gs_code;
+    }
 
     todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
     ok(succeeded, "Failed to compile shaders.\n");
@@ -541,6 +571,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             ID3D10Blob_Release(hs_code);
         if (ds_code)
             ID3D10Blob_Release(ds_code);
+        if (gs_code)
+            ID3D10Blob_Release(gs_code);
         return false;
     }
 
@@ -581,12 +613,13 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         pso_desc.HS.BytecodeLength = ID3D10Blob_GetBufferSize(hs_code);
         pso_desc.DS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ds_code);
         pso_desc.DS.BytecodeLength = ID3D10Blob_GetBufferSize(ds_code);
-        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
     }
-    else
+    if (gs_code)
     {
-        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        pso_desc.GS.pShaderBytecode = ID3D10Blob_GetBufferPointer(gs_code);
+        pso_desc.GS.BytecodeLength = ID3D10Blob_GetBufferSize(gs_code);
     }
+    pso_desc.PrimitiveTopologyType = d3d12_primitive_topology_type_from_primitive_topology(primitive_topology);
     pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     pso_desc.SampleDesc.Count = sample_count;
@@ -619,6 +652,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         ID3D10Blob_Release(hs_code);
     if (ds_code)
         ID3D10Blob_Release(ds_code);
+    if (gs_code)
+        ID3D10Blob_Release(gs_code);
     free(input_element_descs);
 
     if (FAILED(hr))

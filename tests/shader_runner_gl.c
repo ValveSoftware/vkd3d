@@ -827,7 +827,7 @@ static GLenum get_compare_op_gl(D3D12_COMPARISON_FUNC op)
 
 static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Blob **vs_blob)
 {
-    ID3D10Blob *fs_blob, *hs_blob = NULL, *ds_blob = NULL;
+    ID3D10Blob *fs_blob, *hs_blob = NULL, *ds_blob = NULL, *gs_blob = NULL;
     struct vkd3d_shader_code vs_code, fs_code;
     GLuint program_id, vs_id, fs_id;
     const GLchar *source;
@@ -850,6 +850,11 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
         ds_blob = compile_hlsl(&runner->r, runner->r.ds_source, "ds");
         succeeded = succeeded && ds_blob;
     }
+    if (runner->r.gs_source)
+    {
+        gs_blob = compile_hlsl(&runner->r, runner->r.gs_source, "gs");
+        succeeded = succeeded && gs_blob;
+    }
 
     if (!succeeded)
     {
@@ -861,6 +866,8 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
             ID3D10Blob_Release(hs_blob);
         if (ds_blob)
             ID3D10Blob_Release(ds_blob);
+        if (gs_blob)
+            ID3D10Blob_Release(gs_blob);
         return false;
     }
 
@@ -880,7 +887,7 @@ static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Bl
     }
     ID3D10Blob_Release(fs_blob);
 
-    /* TODO: compile and use the hs and ds blobs too, but currently this
+    /* TODO: compile and use the hs, ds and/or gs blobs too, but currently this
      * point is not reached because compile_hlsl() fails on these. */
     if (hs_blob)
         ID3D10Blob_Release(hs_blob);

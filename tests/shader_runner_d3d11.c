@@ -636,9 +636,9 @@ static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, co
 static bool d3d11_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
+    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL, *gs_code = NULL;
     ID3D11UnorderedAccessView *uavs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
     ID3D11RenderTargetView *rtvs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
-    ID3D10Blob *vs_code, *ps_code, *hs_code = NULL, *ds_code = NULL;
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
     unsigned int min_uav_slot = ARRAY_SIZE(uavs);
@@ -647,6 +647,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     ID3D11Device *device = runner->device;
     ID3D11DepthStencilView *dsv = NULL;
     unsigned int rtv_count = 0;
+    ID3D11GeometryShader *gs;
     ID3D11Buffer *cb = NULL;
     ID3D11VertexShader *vs;
     ID3D11DomainShader *ds;
@@ -670,6 +671,11 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ds_code = compile_shader(runner, runner->r.ds_source, "ds");
         succeeded = succeeded && ds_code;
     }
+    if (runner->r.gs_source)
+    {
+        gs_code = compile_shader(runner, runner->r.gs_source, "gs");
+        succeeded = succeeded && gs_code;
+    }
 
     if (!succeeded)
     {
@@ -681,6 +687,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
             ID3D10Blob_Release(hs_code);
         if (ds_code)
             ID3D10Blob_Release(ds_code);
+        if (gs_code)
+            ID3D10Blob_Release(gs_code);
         return false;
     }
 
@@ -704,12 +712,20 @@ static bool d3d11_runner_draw(struct shader_runner *r,
                 ID3D10Blob_GetBufferSize(ds_code), NULL, &ds);
         ok(hr == S_OK, "Failed to create domain shader, hr %#lx.\n", hr);
     }
+    if (gs_code)
+    {
+        hr = ID3D11Device_CreateGeometryShader(device, ID3D10Blob_GetBufferPointer(gs_code),
+                ID3D10Blob_GetBufferSize(gs_code), NULL, &gs);
+        ok(hr == S_OK, "Failed to create geometry shader, hr %#lx.\n", hr);
+    }
 
     ID3D10Blob_Release(ps_code);
     if (hs_code)
         ID3D10Blob_Release(hs_code);
     if (ds_code)
         ID3D10Blob_Release(ds_code);
+    if (gs_code)
+        ID3D10Blob_Release(gs_code);
 
     if (runner->r.uniform_count)
     {
@@ -721,6 +737,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
             ID3D11DeviceContext_HSSetConstantBuffers(context, 0, 1, &cb);
         if (ds_code)
             ID3D11DeviceContext_DSSetConstantBuffers(context, 0, 1, &cb);
+        if (gs_code)
+            ID3D11DeviceContext_GSSetConstantBuffers(context, 0, 1, &cb);
     }
 
     for (i = 0; i < runner->r.resource_count; ++i)
@@ -812,6 +830,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ID3D11DeviceContext_HSSetShader(context, hs, NULL, 0);
     if (ds_code)
         ID3D11DeviceContext_DSSetShader(context, ds, NULL, 0);
+    if (gs_code)
+        ID3D11DeviceContext_GSSetShader(context, gs, NULL, 0);
     ID3D11DeviceContext_RSSetState(context, runner->rasterizer_state);
 
     ID3D11DeviceContext_DrawInstanced(context, vertex_count, instance_count, 0, 0);
@@ -822,6 +842,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ID3D11HullShader_Release(hs);
     if (ds_code)
         ID3D11DomainShader_Release(ds);
+    if (gs_code)
+        ID3D11GeometryShader_Release(gs);
     if (cb)
         ID3D11Buffer_Release(cb);
     if (ds_state)

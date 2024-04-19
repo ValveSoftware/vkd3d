@@ -1,0 +1,67 @@
+[require]
+shader model >= 4.0
+
+[input layout]
+0 r32g32b32a32 float SV_POSITION
+0 r32g32b32a32 float COLOR
+
+[vb 0]
+0.0 0.0 1.0 1.0   0.0 1.0 1.0 1.0
+
+[vertex shader]
+struct vs_data
+{
+    float4 pos : SV_POSITION;
+    float4 color : COLOR;
+};
+
+void main(in struct vs_data vs_input, out struct vs_data vs_output)
+{
+    vs_output.pos = vs_input.pos;
+    vs_output.color = vs_input.color;
+}
+
+[geometry shader todo]
+struct gs_data
+{
+    float4 pos : SV_POSITION;
+    float4 color : COLOR;
+};
+
+    [maxvertexcount(4)]
+void main(point struct gs_data vin[1], inout TriangleStream<gs_data> vout)
+{
+    float offset = 0.2 * vin[0].pos.w;
+    gs_data v;
+
+    v.color = vin[0].color;
+
+    v.pos = float4(vin[0].pos.x - offset, vin[0].pos.y - offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x - offset, vin[0].pos.y + offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x + offset, vin[0].pos.y - offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+    v.pos = float4(vin[0].pos.x + offset, vin[0].pos.y + offset, vin[0].pos.z, 1.0);
+    vout.Append(v);
+}
+
+[pixel shader]
+struct ps_data
+{
+    float4 pos : SV_POSITION;
+    float4 color : COLOR;
+};
+
+float4 main(struct ps_data ps_input) : SV_Target
+{
+    return ps_input.color;
+}
+
+[test]
+todo draw point list 1
+probe rtv 0 (320, 190) rgba (0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (255, 240) rgba (0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (320, 240) rgba (0.0, 1.0, 1.0, 1.0)
+probe rtv 0 (385, 240) rgba (0.0, 0.0, 0.0, 0.0)
+probe rtv 0 (320, 290) rgba (0.0, 0.0, 0.0, 0.0)

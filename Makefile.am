@@ -117,6 +117,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/fxgroup-syntax.shader_test \
 	tests/hlsl/gather-offset.shader_test \
 	tests/hlsl/gather.shader_test \
+	tests/hlsl/geometry.shader_test \
 	tests/hlsl/get-sample-pos.shader_test \
 	tests/hlsl/getdimensions.shader_test \
 	tests/hlsl/half.shader_test \

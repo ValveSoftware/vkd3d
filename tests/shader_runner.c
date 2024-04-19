@@ -113,6 +113,8 @@ enum parse_state
     STATE_SHADER_HULL_TODO,
     STATE_SHADER_DOMAIN,
     STATE_SHADER_DOMAIN_TODO,
+    STATE_SHADER_GEOMETRY,
+    STATE_SHADER_GEOMETRY_TODO,
     STATE_TEST,
 };
 
@@ -965,6 +967,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         else if (match_string(line, "triangle strip", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+        else if (match_string(line, "point list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
         else if (match_string(line, "1 control point patch list", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
         else if (match_string(line, "2 control point patch list", &line))
@@ -1306,6 +1310,7 @@ const char *shader_type_string(enum shader_type type)
         [SHADER_TYPE_VS] = "vs",
         [SHADER_TYPE_HS] = "hs",
         [SHADER_TYPE_DS] = "ds",
+        [SHADER_TYPE_GS] = "gs",
         [SHADER_TYPE_FX] = "fx",
     };
     assert(type < ARRAY_SIZE(shader_types));
@@ -1369,6 +1374,7 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, u
         [SHADER_TYPE_VS] = L"vs_6_0",
         [SHADER_TYPE_HS] = L"hs_6_0",
         [SHADER_TYPE_DS] = L"ds_6_0",
+        [SHADER_TYPE_GS] = L"gs_6_0",
     };
     const WCHAR *args[] =
     {
@@ -1500,6 +1506,8 @@ static enum parse_state get_parse_state_todo(enum parse_state state)
         return STATE_SHADER_HULL_TODO;
     else if (state == STATE_SHADER_DOMAIN)
         return STATE_SHADER_DOMAIN_TODO;
+    else if (state == STATE_SHADER_GEOMETRY)
+        return STATE_SHADER_GEOMETRY_TODO;
     else
         return STATE_SHADER_EFFECT_TODO;
 }
@@ -1760,6 +1768,21 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                     shader_source_size = 0;
                     break;
 
+                case STATE_SHADER_GEOMETRY:
+                case STATE_SHADER_GEOMETRY_TODO:
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_GEOMETRY_TODO)
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_GS,
+                                expect_hr);
+                    }
+                    free(runner->gs_source);
+                    runner->gs_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
                 case STATE_PREPROC_INVALID:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -1972,6 +1995,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 expect_hr = S_OK;
                 state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
+            else if (match_directive_substring(line, "[geometry shader", &line))
+            {
+                state = STATE_SHADER_GEOMETRY;
+                expect_hr = S_OK;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+            }
             else if (!strcmp(line, "[input layout]\n"))
             {
                 state = STATE_INPUT_LAYOUT;
@@ -2009,6 +2038,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 case STATE_SHADER_HULL_TODO:
                 case STATE_SHADER_DOMAIN:
                 case STATE_SHADER_DOMAIN_TODO:
+                case STATE_SHADER_GEOMETRY:
+                case STATE_SHADER_GEOMETRY_TODO:
                 {
                     size_t len = strlen(line);
 
@@ -2051,6 +2082,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     free(runner->cs_source);
     free(runner->hs_source);
     free(runner->ds_source);
+    free(runner->gs_source);
     free(runner->fx_source);
     free(runner->uniforms);
     for (i = 0; i < runner->resource_count; ++i)

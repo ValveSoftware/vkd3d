@@ -728,7 +728,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkVertexInputAttributeDescription input_attributes[32];
     VkPipelineDepthStencilStateCreateInfo ds_desc = {0};
     VkVertexInputBindingDescription input_bindings[32];
-    VkPipelineShaderStageCreateInfo stage_desc[4];
+    VkPipelineShaderStageCreateInfo stage_desc[5];
     struct vkd3d_shader_code vs_dxbc;
     VkDevice device = runner->device;
     unsigned int stage_count = 0;
@@ -750,6 +750,11 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
         ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ds",
                 VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source, NULL);
     }
+
+    if (runner->r.gs_source)
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "gs",
+                VK_SHADER_STAGE_GEOMETRY_BIT, runner->r.gs_source, NULL);
+
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
     if (!ret)
     {
