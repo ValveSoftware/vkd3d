@@ -1430,6 +1430,40 @@ static bool constant_is_zero(struct hlsl_ir_constant *const_arg)
     return true;
 }
 
+static bool constant_is_one(struct hlsl_ir_constant *const_arg)
+{
+    struct hlsl_type *data_type = const_arg->node.data_type;
+    unsigned int k;
+
+    for (k = 0; k < data_type->dimx; ++k)
+    {
+        switch (data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                if (const_arg->value.u[k].f != 1.0f)
+                    return false;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                if (const_arg->value.u[k].d != 1.0)
+                    return false;
+                break;
+
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_BOOL:
+                if (const_arg->value.u[k].u != 1)
+                    return false;
+                break;
+
+            default:
+                return false;
+        }
+    }
+    return true;
+}
+
 bool hlsl_fold_constant_identities(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *const_arg = NULL;
@@ -1472,6 +1506,11 @@ bool hlsl_fold_constant_identities(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     {
         case HLSL_OP2_ADD:
             if (constant_is_zero(const_arg))
+                res_node = mut_arg;
+            break;
+
+        case HLSL_OP2_MUL:
+            if (constant_is_one(const_arg))
                 res_node = mut_arg;
             break;
 
