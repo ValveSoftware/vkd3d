@@ -5001,6 +5001,9 @@ static enum vkd3d_result vsir_cfg_materialize_undominated_ssas_to_temps(struct v
         struct vsir_block *block = &cfg->blocks[i];
         struct vkd3d_shader_instruction *ins;
 
+        if (block->label == 0)
+            continue;
+
         for (ins = block->begin; ins <= block->end; ++ins)
         {
             for (j = 0; j < ins->dst_count; ++j)
@@ -5015,6 +5018,9 @@ static enum vkd3d_result vsir_cfg_materialize_undominated_ssas_to_temps(struct v
     {
         struct vsir_block *block = &cfg->blocks[i];
         struct vkd3d_shader_instruction *ins;
+
+        if (block->label == 0)
+            continue;
 
         for (ins = block->begin; ins <= block->end; ++ins)
         {
