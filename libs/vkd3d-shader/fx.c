@@ -1122,7 +1122,7 @@ static void write_buffers(struct fx_write_context *fx)
     }
 }
 
-static bool is_object_variable(const struct hlsl_ir_var *var)
+static bool is_supported_object_variable(const struct hlsl_ctx *ctx, const struct hlsl_ir_var *var)
 {
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
 
@@ -1133,7 +1133,13 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
+            return true;
         case HLSL_CLASS_UAV:
+            if (ctx->profile->major_version < 5)
+                return false;
+            if (type->e.resource.rasteriser_ordered)
+                return false;
+            return true;
         case HLSL_CLASS_VERTEX_SHADER:
             return true;
 
@@ -1144,14 +1150,15 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
 
 static void write_objects(struct fx_write_context *fx, bool shared)
 {
+    struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_var *var;
 
     if (shared && !fx->child_effect)
         return;
 
-    LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!is_object_variable(var))
+        if (!is_supported_object_variable(ctx, var))
             continue;
 
         if (fx->child_effect && (shared != !!(var->storage_modifiers & HLSL_STORAGE_SHARED)))
