@@ -5427,6 +5427,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     do
     {
         progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_identities, body, NULL);
         progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= hlsl_copy_propagation_execute(ctx, body);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);

@@ -1396,6 +1396,97 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     return success;
 }
 
+static bool constant_is_zero(struct hlsl_ir_constant *const_arg)
+{
+    struct hlsl_type *data_type = const_arg->node.data_type;
+    unsigned int k;
+
+    for (k = 0; k < data_type->dimx; ++k)
+    {
+        switch (data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                if (const_arg->value.u[k].f != 0.0f)
+                    return false;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                if (const_arg->value.u[k].d != 0.0)
+                    return false;
+                break;
+
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_BOOL:
+                if (const_arg->value.u[k].u != 0)
+                    return false;
+                break;
+
+            default:
+                return false;
+        }
+    }
+    return true;
+}
+
+bool hlsl_fold_constant_identities(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_constant *const_arg = NULL;
+    struct hlsl_ir_node *mut_arg = NULL;
+    struct hlsl_ir_node *res_node;
+    struct hlsl_ir_expr *expr;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+
+    if (instr->data_type->class > HLSL_CLASS_VECTOR)
+        return false;
+
+    /* Verify that the expression has two operands. */
+    for (i = 0; i < ARRAY_SIZE(expr->operands); ++i)
+    {
+        if (!!expr->operands[i].node != (i < 2))
+            return false;
+    }
+
+    if (expr->operands[0].node->type == HLSL_IR_CONSTANT)
+    {
+        const_arg = hlsl_ir_constant(expr->operands[0].node);
+        mut_arg = expr->operands[1].node;
+    }
+    else if (expr->operands[1].node->type == HLSL_IR_CONSTANT)
+    {
+        mut_arg = expr->operands[0].node;
+        const_arg = hlsl_ir_constant(expr->operands[1].node);
+    }
+    else
+    {
+        return false;
+    }
+
+    res_node = NULL;
+    switch (expr->op)
+    {
+        case HLSL_OP2_ADD:
+            if (constant_is_zero(const_arg))
+                res_node = mut_arg;
+            break;
+
+        default:
+            break;
+    }
+
+    if (res_node)
+    {
+        hlsl_replace_node(&expr->node, res_node);
+        return true;
+    }
+    return false;
+}
+
 bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_constant_value value;
