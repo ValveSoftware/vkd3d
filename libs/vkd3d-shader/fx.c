@@ -90,6 +90,7 @@ struct fx_write_context
     uint32_t dsv_count;
     uint32_t rtv_count;
     uint32_t texture_count;
+    uint32_t uav_count;
     int status;
 
     bool child_effect;
@@ -1029,6 +1030,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             fx->texture_count += elements_count;
             break;
         case HLSL_CLASS_UAV:
+            fx->uav_count += elements_count;
             break;
 
         case HLSL_CLASS_PIXEL_SHADER:
@@ -1263,7 +1265,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.shader_count);
     put_u32(&buffer, 0); /* Inline shader count. */
     put_u32(&buffer, fx.group_count); /* Group count. */
-    put_u32(&buffer, 0); /* UAV count. */
+    put_u32(&buffer, fx.uav_count);
     put_u32(&buffer, 0); /* Interface variables count. */
     put_u32(&buffer, 0); /* Interface variable element count. */
     put_u32(&buffer, 0); /* Class instance elements count. */
