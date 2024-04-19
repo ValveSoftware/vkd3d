@@ -6912,6 +6912,7 @@ state_block:
     | state_block stateblock_lhs_identifier state_block_index_opt '=' complex_initializer ';'
         {
             struct hlsl_state_block_entry *entry;
+            unsigned int i;
 
             if (!(entry = hlsl_alloc(ctx, sizeof(*entry))))
                 YYABORT;
@@ -6921,8 +6922,13 @@ state_block:
             entry->lhs_index = $3.index;
 
             entry->instrs = $5.instrs;
-            entry->args = $5.args;
+
             entry->args_count = $5.args_count;
+            if (!(entry->args = hlsl_alloc(ctx, sizeof(*entry->args) * entry->args_count)))
+                YYABORT;
+            for (i = 0; i < entry->args_count; ++i)
+                hlsl_src_from_node(&entry->args[i], $5.args[i]);
+            vkd3d_free($5.args);
 
             $$ = $1;
             state_block_add_entry($$, entry);

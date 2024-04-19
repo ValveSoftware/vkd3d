@@ -136,7 +136,11 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
 
 static void free_state_block_entry(struct hlsl_state_block_entry *entry)
 {
+    unsigned int i;
+
     vkd3d_free(entry->name);
+    for (i = 0; i < entry->args_count; ++i)
+        hlsl_src_remove(&entry->args[i]);
     vkd3d_free(entry->args);
     hlsl_block_cleanup(entry->instrs);
     vkd3d_free(entry->instrs);

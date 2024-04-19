@@ -483,7 +483,7 @@ struct hlsl_state_block_entry
     struct hlsl_block *instrs;
 
     /* For assignments, arguments of the rhs initializer. */
-    struct hlsl_ir_node **args;
+    struct hlsl_src *args;
     unsigned int args_count;
 };
 
