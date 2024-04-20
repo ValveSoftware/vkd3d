@@ -20229,6 +20229,7 @@ static void test_get_copyable_footprints(void)
     {
         DXGI_FORMAT format;
         bool is_compressed;
+        bool is_depth;
     }
     formats[] =
     {
@@ -20244,8 +20245,8 @@ static void test_get_copyable_footprints(void)
         {DXGI_FORMAT_BC6H_UF16, true},
         {DXGI_FORMAT_BC6H_SF16, true},
         {DXGI_FORMAT_BC7_UNORM, true},
-        {DXGI_FORMAT_D32_FLOAT, false},
-        {DXGI_FORMAT_D24_UNORM_S8_UINT, false},
+        {DXGI_FORMAT_D32_FLOAT, false, true},
+        {DXGI_FORMAT_D24_UNORM_S8_UINT, false, true},
     };
     static const uint64_t base_offsets[] =
     {
@@ -20327,6 +20328,9 @@ static void test_get_copyable_footprints(void)
         for (j = 0; j < ARRAY_SIZE(formats); ++j)
         {
             if (formats[j].is_compressed && !resources[i].test_with_compressed)
+                continue;
+            /* Depth formats are not supported for 3D textures in any current feature level including 12.1. */
+            if (formats[j].is_depth && resources[i].dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
                 continue;
             if (is_buffer && j > 0)
                 continue;
