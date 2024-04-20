@@ -85,7 +85,7 @@ struct fx_write_context
     uint32_t numeric_variable_count;
     uint32_t object_variable_count;
     uint32_t shared_object_count;
-    uint32_t shader_variable_count;
+    uint32_t shader_count;
     uint32_t parameter_count;
     uint32_t dsv_count;
     uint32_t rtv_count;
@@ -1036,7 +1036,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             /* FIXME: write shader blobs, once parser support works. */
             for (i = 0; i < elements_count; ++i)
                 put_u32(buffer, 0);
-            ++fx->shader_variable_count;
+            fx->shader_count += elements_count;
             break;
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
@@ -1195,7 +1195,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Sampler state count. */
     put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
-    put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
+    put_u32(&buffer, fx.shader_count);
     put_u32(&buffer, 0); /* Inline shader count. */
 
     set_u32(&buffer, size_offset, fx.unstructured.size);
@@ -1253,7 +1253,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Sampler state count. */
     put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
-    put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
+    put_u32(&buffer, fx.shader_count);
     put_u32(&buffer, 0); /* Inline shader count. */
     put_u32(&buffer, fx.group_count); /* Group count. */
     put_u32(&buffer, 0); /* UAV count. */
