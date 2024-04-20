@@ -2088,8 +2088,12 @@ static IDxcCompiler3 *dxcompiler_create(void)
 {
     DxcCreateInstanceProc create_instance;
     IDxcCompiler3 *compiler;
+    const char *skip_dxc;
     HRESULT hr;
     void *dll;
+
+    if ((skip_dxc = getenv("VKD3D_TESTS_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
+        return NULL;
 
     dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER);
     ok(dll, "Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
