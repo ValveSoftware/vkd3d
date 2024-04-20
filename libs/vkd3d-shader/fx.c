@@ -89,6 +89,7 @@ struct fx_write_context
     uint32_t parameter_count;
     uint32_t dsv_count;
     uint32_t rtv_count;
+    uint32_t texture_count;
     int status;
 
     bool child_effect;
@@ -1025,6 +1026,8 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             fx->rtv_count += elements_count;
             break;
         case HLSL_CLASS_TEXTURE:
+            fx->texture_count += elements_count;
+            break;
         case HLSL_CLASS_UAV:
             break;
 
@@ -1185,7 +1188,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
-    put_u32(&buffer, 0); /* Texture object count. */
+    put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, 0); /* Depth stencil state count. */
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
@@ -1243,7 +1246,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
-    put_u32(&buffer, 0); /* Texture object count. */
+    put_u32(&buffer, fx.texture_count);
     put_u32(&buffer, 0); /* Depth stencil state count. */
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
