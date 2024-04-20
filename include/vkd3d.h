@@ -214,12 +214,26 @@ struct vkd3d_application_info
     enum vkd3d_api_version api_version;
 };
 
-/* Extends vkd3d_instance_create_info. Available since 1.3. */
+/**
+ * A chained structure to specify the host time domain.
+ *
+ * This structure extends vkd3d_instance_create_info.
+ *
+ * \since 1.3
+ */
 struct vkd3d_host_time_domain_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_HOST_TIME_DOMAIN_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /**
+     * The number of clock ticks per second, used for GetClockCalibration(). It should normally
+     * match the expected result of QueryPerformanceFrequency(). If this chained structure is not
+     * used then 10 millions is used, which means that each tick is a tenth of microsecond, or
+     * equivalently 100 nanoseconds.
+     */
     uint64_t ticks_per_second;
 };
 
