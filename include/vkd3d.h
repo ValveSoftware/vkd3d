@@ -151,13 +151,26 @@ struct vkd3d_instance_create_info
     uint32_t instance_extension_count;
 };
 
-/* Extends vkd3d_instance_create_info. Available since 1.1. */
+/**
+ * A chained structure to specify optional instance extensions.
+ *
+ * This structure extends vkd3d_instance_create_info.
+ *
+ * \since 1.1
+ */
 struct vkd3d_optional_instance_extensions_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_OPTIONAL_INSTANCE_EXTENSIONS_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /**
+     * A list of optional Vulkan instance extensions to request. Instance creation does not fail if
+     * they are not available.
+     */
     const char * const *extensions;
+    /** The number of elements in the extensions array. */
     uint32_t extension_count;
 };
 
