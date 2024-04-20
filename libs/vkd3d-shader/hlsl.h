@@ -474,6 +474,8 @@ struct hlsl_state_block_entry
 {
     /* For assignments, the name in the lhs. */
     char *name;
+    /* Resolved format-specific property identifier. */
+    unsigned int name_id;
 
     /* Whether the lhs in the assignment is indexed and, in that case, its index. */
     bool lhs_has_index;
