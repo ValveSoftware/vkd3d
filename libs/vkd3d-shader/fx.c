@@ -88,6 +88,7 @@ struct fx_write_context
     uint32_t shader_variable_count;
     uint32_t parameter_count;
     uint32_t dsv_count;
+    uint32_t rtv_count;
     int status;
 
     bool child_effect;
@@ -1021,6 +1022,8 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
     switch (type->class)
     {
         case HLSL_CLASS_RENDER_TARGET_VIEW:
+            fx->rtv_count += elements_count;
+            break;
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
             break;
@@ -1187,7 +1190,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
     put_u32(&buffer, 0); /* Sampler state count. */
-    put_u32(&buffer, 0); /* Rendertarget view count. */
+    put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
     put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
     put_u32(&buffer, 0); /* Inline shader count. */
@@ -1245,7 +1248,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Blend state count. */
     put_u32(&buffer, 0); /* Rasterizer state count. */
     put_u32(&buffer, 0); /* Sampler state count. */
-    put_u32(&buffer, 0); /* Rendertarget view count. */
+    put_u32(&buffer, fx.rtv_count);
     put_u32(&buffer, fx.dsv_count);
     put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
     put_u32(&buffer, 0); /* Inline shader count. */
