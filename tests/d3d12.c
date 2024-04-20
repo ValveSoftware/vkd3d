@@ -37440,7 +37440,7 @@ static void test_unbounded_samplers(void)
         sampler_desc.AddressU = (i & 1) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         sampler_desc.AddressV = (i & 2) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         sampler_desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        ID3D12Device_CreateSampler(device, &sampler_desc, get_cpu_descriptor_handle(&context, sampler_heap, i));
+        ID3D12Device_CreateSampler(device, &sampler_desc, get_cpu_sampler_handle(&context, sampler_heap, i));
     }
 
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
