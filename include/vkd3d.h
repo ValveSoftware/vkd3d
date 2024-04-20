@@ -174,18 +174,43 @@ struct vkd3d_optional_instance_extensions_info
     uint32_t extension_count;
 };
 
-/* Extends vkd3d_instance_create_info. Available since 1.2. */
+/**
+ * A chained structure to specify application information.
+ *
+ * This structure extends vkd3d_instance_create_info.
+ *
+ * \since 1.2
+ */
 struct vkd3d_application_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_APPLICATION_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /**
+     * The application's name, to be passed to the Vulkan implementation. If it is NULL, a name is
+     * computed from the process executable filename. If that cannot be done, the empty string is
+     * used.
+     */
     const char *application_name;
+    /** The application's version, to be passed to the Vulkan implementation. */
     uint32_t application_version;
 
-    const char *engine_name; /* "vkd3d" if NULL */
-    uint32_t engine_version; /* vkd3d version if engine_name is NULL */
+    /**
+     * The engine name, to be passed to the Vulkan implementation. If it is NULL, "vkd3d" is used.
+     */
+    const char *engine_name;
+    /**
+     * The engine version, to be passed to the Vulkan implementation. If it is 0, the version is
+     * computed from the vkd3d library version.
+     */
+    uint32_t engine_version;
 
+    /**
+     * The vkd3d API version to use, to guarantee backward compatibility of the shared library. If
+     * this chained structure is not used then VKD3D_API_VERSION_1_0 is used.
+     */
     enum vkd3d_api_version api_version;
 };
 
