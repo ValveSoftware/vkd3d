@@ -23928,15 +23928,13 @@ static void test_graphics_uav_counters(void)
     context.pipeline_state = create_pipeline_state(context.device, context.root_signature, 0, NULL, &ps, NULL);
 
     memset(&uav_desc, 0, sizeof(uav_desc));
-    uav_desc.Format = DXGI_FORMAT_UNKNOWN;
+    uav_desc.Format = DXGI_FORMAT_R32_UINT;
     uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
     uav_desc.Buffer.NumElements = 64;
-    uav_desc.Buffer.StructureByteStride = sizeof(uint32_t);
     uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
     ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
             get_cpu_descriptor_handle(&context, cpu_heap, 0));
-    uav_desc.Buffer.CounterOffsetInBytes = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
-    ID3D12Device_CreateUnorderedAccessView(device, buffer, counter_buffer, &uav_desc,
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
             get_cpu_descriptor_handle(&context, gpu_heap, 0));
 
     ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &gpu_heap);
@@ -23946,6 +23944,12 @@ static void test_graphics_uav_counters(void)
             get_cpu_descriptor_handle(&context, cpu_heap, 0),
             buffer, clear_value, 0, NULL);
     uav_barrier(command_list, buffer);
+
+    uav_desc.Format = DXGI_FORMAT_UNKNOWN;
+    uav_desc.Buffer.StructureByteStride = sizeof(uint32_t);
+    uav_desc.Buffer.CounterOffsetInBytes = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, counter_buffer, &uav_desc,
+            get_cpu_descriptor_handle(&context, gpu_heap, 0));
 
     counter = 0;
     upload_buffer_data(counter_buffer, uav_desc.Buffer.CounterOffsetInBytes,
