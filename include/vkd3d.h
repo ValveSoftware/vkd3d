@@ -93,20 +93,45 @@ typedef HRESULT (*PFN_vkd3d_join_thread)(void *thread);
 
 struct vkd3d_instance;
 
+/**
+ * A chained structure containing instance creation parameters.
+ */
 struct vkd3d_instance_create_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_INSTANCE_CREATE_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /** An pointer to a function to signal events. */
     PFN_vkd3d_signal_event pfn_signal_event;
+    /**
+     * An optional pointer to a function to create threads. If this is NULL vkd3d will use a
+     * function of its choice, depending on the platform. It must be NULL if and only if
+     * pfn_join_thread is NULL.
+     */
     PFN_vkd3d_create_thread pfn_create_thread;
+    /**
+     * An optional pointer to a function to join threads. If this is NULL vkd3d will use a
+     * function of its choice, depending on the platform. It must be NULL if and only if
+     * pfn_create_thread is NULL.
+     */
     PFN_vkd3d_join_thread pfn_join_thread;
+    /** The size of type WCHAR. It must be 2 or 4 and should normally be set to sizeof(WCHAR). */
     size_t wchar_size;
 
-    /* If set to NULL, libvkd3d loads libvulkan. */
+    /**
+     * A pointer to the vkGetInstanceProcAddr Vulkan function, which will be used to load all the
+     * other Vulkan functions. If set to NULL, vkd3d will search and use the Vulkan loader.
+     */
     PFN_vkGetInstanceProcAddr pfn_vkGetInstanceProcAddr;
 
+    /**
+     * A list of Vulkan instance extensions to request. They are intended as required, so instance
+     * creation will fail if any of them is not available.
+     */
     const char * const *instance_extensions;
+    /** The number of elements in the instance_extensions array. */
     uint32_t instance_extension_count;
 };
 
