@@ -46,21 +46,37 @@ extern "C" {
  * \since 1.0
  */
 
+/** The type of a chained structure. */
 enum vkd3d_structure_type
 {
-    /* 1.0 */
+    /** The structure is a vkd3d_instance_create_info structure. */
     VKD3D_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    /** The structure is a vkd3d_device_create_info structure. */
     VKD3D_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    /** The structure is a vkd3d_image_resource_create_info structure. */
     VKD3D_STRUCTURE_TYPE_IMAGE_RESOURCE_CREATE_INFO,
 
-    /* 1.1 */
+    /**
+     * The structure is a vkd3d_optional_instance_extensions_info structure.
+     * \since 1.1
+     */
     VKD3D_STRUCTURE_TYPE_OPTIONAL_INSTANCE_EXTENSIONS_INFO,
 
-    /* 1.2 */
+    /**
+     * The structure is a vkd3d_optional_device_extensions_info structure.
+     * \since 1.2
+     */
     VKD3D_STRUCTURE_TYPE_OPTIONAL_DEVICE_EXTENSIONS_INFO,
+    /**
+     * The structure is a vkd3d_application_info structure.
+     * \since 1.2
+     */
     VKD3D_STRUCTURE_TYPE_APPLICATION_INFO,
 
-    /* 1.3 */
+    /**
+     * The structure is a vkd3d_host_time_domain_info structure.
+     * \since 1.3
+     */
     VKD3D_STRUCTURE_TYPE_HOST_TIME_DOMAIN_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_STRUCTURE_TYPE),
