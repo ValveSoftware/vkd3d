@@ -30793,7 +30793,7 @@ static void test_domain_shader_inputs(void)
     bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
-    so_buffer = create_default_buffer(context.device, 1024,
+    so_buffer = create_default_buffer(context.device, 2048,
             D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_STREAM_OUT);
     sobv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(so_buffer);
     sobv.SizeInBytes = 1024;
@@ -30978,7 +30978,7 @@ static void test_domain_shader_one_patch_constant_input(void)
     bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
-    so_buffer = create_default_buffer(context.device, 1024,
+    so_buffer = create_default_buffer(context.device, 2048,
             D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_STREAM_OUT);
     sobv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(so_buffer);
     sobv.SizeInBytes = 1024;
