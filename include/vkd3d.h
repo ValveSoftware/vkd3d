@@ -313,18 +313,58 @@ struct vkd3d_optional_device_extensions_info
     uint32_t extension_count;
 };
 
-/* vkd3d_image_resource_create_info flags */
+/**
+ * When specified as a flag of vkd3d_image_resource_create_info, it means that vkd3d will do the
+ * initial transition operation on the image from VK_IMAGE_LAYOUT_UNDEFINED to its appropriate
+ * Vulkan layout (depending on its D3D12 resource state). If this flag is not specified the caller
+ * is responsible for transitioning the Vulkan image to the appropriate layout.
+ */
 #define VKD3D_RESOURCE_INITIAL_STATE_TRANSITION 0x00000001
+/**
+ * When specified as a flag of vkd3d_image_resource_create_info, it means that field present_state
+ * is honored.
+ */
 #define VKD3D_RESOURCE_PRESENT_STATE_TRANSITION 0x00000002
 
+/**
+ * A chained structure containing the parameters to create a D3D12 resource backed by a Vulkan
+ * image.
+ */
 struct vkd3d_image_resource_create_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_IMAGE_RESOURCE_CREATE_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /** The Vulkan image that backs the resource. */
     VkImage vk_image;
+    /** The resource description. */
     D3D12_RESOURCE_DESC desc;
+    /**
+     * A combination of zero or more flags. The valid flags are
+     * VKD3D_RESOURCE_INITIAL_STATE_TRANSITION and VKD3D_RESOURCE_PRESENT_STATE_TRANSITION.
+     */
     unsigned int flags;
+    /**
+     * This field specifies how to handle resource state D3D12_RESOURCE_STATE_PRESENT for
+     * the resource. Notice that on D3D12 there is no difference between
+     * D3D12_RESOURCE_STATE_COMMON and D3D12_RESOURCE_STATE_PRESENT (they have the same value),
+     * while on Vulkan two different layouts are used (VK_IMAGE_LAYOUT_GENERAL and
+     * VK_IMAGE_LAYOUT_PRESENT_SRC_KHR).
+     *
+     * * When flag VKD3D_RESOURCE_PRESENT_STATE_TRANSITION is not specified, field
+     *   present_state is ignored and resource state D3D12_RESOURCE_STATE_COMMON/_PRESENT is
+     *   mapped to VK_IMAGE_LAYOUT_GENERAL; this is useful for non-swapchain resources.
+     * * Otherwise, when present_state is D3D12_RESOURCE_STATE_PRESENT/_COMMON, resource state
+     *   D3D12_RESOURCE_STATE_COMMON/_PRESENT is mapped to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+     *   this is useful for swapchain resources that are directly backed by a Vulkan swapchain
+     *   image.
+     * * Otherwise, resource state D3D12_RESOURCE_STATE_COMMON/_PRESENT is treated as resource
+     *   state present_state; this is useful for swapchain resources that backed by a Vulkan
+     *   non-swapchain image, which the client will likely consume with a copy or drawing
+     *   operation at presentation time.
+     */
     D3D12_RESOURCE_STATES present_state;
 };
 
