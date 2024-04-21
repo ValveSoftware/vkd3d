@@ -129,9 +129,11 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 }
 
 static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
+static const char * get_fx_4_type_name(const struct hlsl_type *type);
 
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
+    const struct hlsl_type *element_type;
     struct type_entry *type_entry;
     unsigned int elements_count;
     const char *name;
@@ -140,14 +142,16 @@ static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context
 
     if (type->class == HLSL_CLASS_ARRAY)
     {
-        name = hlsl_get_multiarray_element_type(type)->name;
         elements_count = hlsl_get_multiarray_size(type);
+        element_type = hlsl_get_multiarray_element_type(type);
     }
     else
     {
-        name = type->name;
         elements_count = 0;
+        element_type = type;
     }
+
+    name = get_fx_4_type_name(element_type);
 
     LIST_FOR_EACH_ENTRY(type_entry, &fx->types, struct type_entry, entry)
     {
