@@ -82,7 +82,9 @@ struct fx_write_context
     uint32_t technique_count;
     uint32_t group_count;
     uint32_t buffer_count;
+    uint32_t shared_buffer_count;
     uint32_t numeric_variable_count;
+    uint32_t shared_numeric_variable_count;
     uint32_t object_variable_count;
     uint32_t shared_object_count;
     uint32_t shader_count;
@@ -969,11 +971,11 @@ static const struct fx_write_context_ops fx_4_ops =
     .are_child_effects_supported = true,
 };
 
-static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
+static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t name_offset, type_offset, value_offset;
     uint32_t semantic_offset, flags = 0;
-    uint32_t name_offset, type_offset;
     enum fx_4_numeric_variable_flags
     {
         HAS_EXPLICIT_BIND_POINT = 0x4,
@@ -993,12 +995,24 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write
 
     semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
     put_u32(buffer, var->buffer_offset); /* Offset in the constant buffer */
-    put_u32(buffer, 0); /* FIXME: default value offset */
+    value_offset = put_u32(buffer, 0); /* Default value offset */
     put_u32(buffer, flags); /* Flags */
 
-    put_u32(buffer, 0); /* Annotations count */
-    if (has_annotations(var))
-        hlsl_fixme(ctx, &ctx->location, "Writing annotations for numeric variables is not implemented.");
+    if (shared)
+    {
+        fx->shared_numeric_variable_count++;
+    }
+    else
+    {
+        /* FIXME: write default value */
+        set_u32(buffer, value_offset, 0);
+
+        put_u32(buffer, 0); /* Annotations count */
+        if (has_annotations(var))
+            hlsl_fixme(ctx, &ctx->location, "Writing annotations for numeric variables is not implemented.");
+
+        fx->numeric_variable_count++;
+    }
 }
 
 struct rhs_named_value
@@ -1395,6 +1409,9 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_var *var;
     uint32_t count_offset;
+    bool shared;
+
+    shared = fx->child_effect && b->modifiers & HLSL_STORAGE_SHARED;
 
     if (b->reservation.reg_type)
         bind_point = b->reservation.reg_index;
@@ -1411,9 +1428,17 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
     count_offset = put_u32(buffer, 0);
     put_u32(buffer, bind_point); /* Bind point */
 
-    put_u32(buffer, 0); /* Annotations count */
-    if (b->annotations)
-        hlsl_fixme(ctx, &b->loc, "Writing annotations for buffers is not implemented.");
+    if (shared)
+    {
+        ++fx->shared_buffer_count;
+    }
+    else
+    {
+        put_u32(buffer, 0); /* Annotations count */
+        if (b->annotations)
+            hlsl_fixme(ctx, &b->loc, "Writing annotations for buffers is not implemented.");
+        ++fx->buffer_count;
+    }
 
     count = 0;
     size = 0;
@@ -1422,18 +1447,16 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
         if (var->buffer != b)
             continue;
 
-        write_fx_4_numeric_variable(var, fx);
+        write_fx_4_numeric_variable(var, shared, fx);
         size += get_fx_4_type_size(var->data_type);
         ++count;
     }
 
     set_u32(buffer, count_offset, count);
     set_u32(buffer, size_offset, align(size, 16));
-
-    fx->numeric_variable_count += count;
 }
 
-static void write_buffers(struct fx_write_context *fx)
+static void write_buffers(struct fx_write_context *fx, bool shared)
 {
     struct hlsl_buffer *buffer;
 
@@ -1443,9 +1466,10 @@ static void write_buffers(struct fx_write_context *fx)
             continue;
         if (!strcmp(buffer->name, "$Params"))
             continue;
+        if (fx->child_effect && (shared != !!(buffer->modifiers & HLSL_STORAGE_SHARED)))
+            continue;
 
         write_fx_4_buffer(buffer, fx);
-        ++fx->buffer_count;
     }
 }
 
@@ -1505,9 +1529,9 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
-    write_buffers(&fx);
+    write_buffers(&fx, false);
     write_objects(&fx, false);
-    /* TODO: shared buffers */
+    write_buffers(&fx, true);
     write_objects(&fx, true);
 
     write_techniques(ctx->globals, &fx);
@@ -1516,9 +1540,9 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.buffer_count); /* Buffer count. */
     put_u32(&buffer, fx.numeric_variable_count); /* Numeric variable count. */
     put_u32(&buffer, fx.object_variable_count); /* Object variable count. */
-    put_u32(&buffer, 0); /* Pool buffer count. */
-    put_u32(&buffer, 0); /* Pool variable count. */
-    put_u32(&buffer, fx.shared_object_count); /* Shared object count. */
+    put_u32(&buffer, fx.shared_buffer_count);
+    put_u32(&buffer, fx.shared_numeric_variable_count);
+    put_u32(&buffer, fx.shared_object_count);
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
@@ -1564,7 +1588,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
-    write_buffers(&fx);
+    write_buffers(&fx, false);
     write_objects(&fx, false);
     /* TODO: interface variables */
 
@@ -1574,9 +1598,9 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.buffer_count); /* Buffer count. */
     put_u32(&buffer, fx.numeric_variable_count); /* Numeric variable count. */
     put_u32(&buffer, fx.object_variable_count); /* Object variable count. */
-    put_u32(&buffer, 0); /* Pool buffer count. */
-    put_u32(&buffer, 0); /* Pool variable count. */
-    put_u32(&buffer, 0); /* Pool object count. */
+    put_u32(&buffer, fx.shared_buffer_count);
+    put_u32(&buffer, fx.shared_numeric_variable_count);
+    put_u32(&buffer, fx.shared_object_count);
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
