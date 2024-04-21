@@ -731,19 +731,24 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
     VkPipelineShaderStageCreateInfo stage_desc[4];
     struct vkd3d_shader_code vs_dxbc;
     VkDevice device = runner->device;
+    unsigned int stage_count = 0;
     VkPipeline pipeline;
     unsigned int i, j;
     VkResult vr;
     int ret;
 
     memset(stage_desc, 0, sizeof(stage_desc));
-    ret = create_shader_stage(runner, &stage_desc[0], "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc)
-            && create_shader_stage(runner, &stage_desc[1], "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL);
+    ret = create_shader_stage(runner, &stage_desc[stage_count++], "vs",
+            VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc);
+    ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ps",
+            VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL);
 
     if (runner->r.hs_source)
     {
-        ret &= create_shader_stage(runner, &stage_desc[1], "hs", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source, NULL);
-        ret &= create_shader_stage(runner, &stage_desc[2], "ds", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source, NULL);
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "hs",
+                VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, runner->r.hs_source, NULL);
+        ret &= create_shader_stage(runner, &stage_desc[stage_count++], "ds",
+                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, runner->r.ds_source, NULL);
     }
     todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
     if (!ret)
@@ -842,7 +847,7 @@ static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, 
 
     ms_desc.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    pipeline_desc.stageCount = ARRAY_SIZE(stage_desc);
+    pipeline_desc.stageCount = stage_count;
     pipeline_desc.pStages = stage_desc;
     pipeline_desc.pVertexInputState = &input_desc;
     pipeline_desc.pInputAssemblyState = &ia_desc;
