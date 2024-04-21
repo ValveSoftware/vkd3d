@@ -290,13 +290,26 @@ struct vkd3d_device_create_info
     LUID adapter_luid;
 };
 
-/* Extends vkd3d_device_create_info. Available since 1.2. */
+/**
+ * A chained structure to specify optional device extensions.
+ *
+ * This structure extends vkd3d_device_create_info.
+ *
+ * \since 1.2
+ */
 struct vkd3d_optional_device_extensions_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_OPTIONAL_DEVICE_EXTENSIONS_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /**
+     * A list of optional Vulkan device extensions to request. Device creation does not fail if
+     * they are not available.
+     */
     const char * const *extensions;
+    /** The number of elements in the extensions array. */
     uint32_t extension_count;
 };
 
