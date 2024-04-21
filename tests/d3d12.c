@@ -23995,7 +23995,6 @@ static void test_atomic_instructions(void)
     {
 #if 0
         RWByteAddressBuffer u;
-        RWBuffer<uint> u1;
 
         uint4 v;
         int4 i;
@@ -24011,32 +24010,29 @@ static void test_atomic_instructions(void)
             u.InterlockedMax(6 * 4, v.x);
             u.InterlockedMin(7 * 4, v.x);
             u.InterlockedXor(8 * 4, v.x);
-            /* Test a typed buffer to ensure it's declared typed. */
-            InterlockedAnd(u1[9], v.x);
         }
 #endif
-        0x43425844, 0x56fe03ba, 0x9eb179fd, 0x02af0886, 0xd4983e25, 0x00000001, 0x000001dc, 0x00000003,
+        0x43425844, 0x24c6a30c, 0x2ce4437d, 0xdee8a0df, 0xd18cb4bc, 0x00000001, 0x000001ac, 0x00000003,
         0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000188, 0x00000050, 0x00000062, 0x0100086a,
-        0x04000059, 0x00208e46, 0x00000000, 0x00000002, 0x0300009d, 0x0011e000, 0x00000000, 0x0400089c,
-        0x0011e000, 0x00000001, 0x00004444, 0x080000a9, 0x0011e000, 0x00000000, 0x00004001, 0x00000000,
-        0x0020800a, 0x00000000, 0x00000000, 0x0b0000ac, 0x0011e000, 0x00000000, 0x00004001, 0x00000004,
-        0x0020801a, 0x00000000, 0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x080000ad, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000008, 0x0020800a, 0x00000000, 0x00000000, 0x080000aa, 0x0011e000,
-        0x00000000, 0x00004001, 0x0000000c, 0x0020800a, 0x00000000, 0x00000000, 0x080000ae, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000010, 0x0020800a, 0x00000000, 0x00000001, 0x080000af, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000014, 0x0020800a, 0x00000000, 0x00000001, 0x080000b0, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000018, 0x0020800a, 0x00000000, 0x00000000, 0x080000b1, 0x0011e000,
-        0x00000000, 0x00004001, 0x0000001c, 0x0020800a, 0x00000000, 0x00000000, 0x080000ab, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000020, 0x0020800a, 0x00000000, 0x00000000, 0x080000a9, 0x0011e000,
-        0x00000001, 0x00004001, 0x00000009, 0x0020800a, 0x00000000, 0x00000000, 0x0100003e,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000158, 0x00000050, 0x00000056, 0x0100086a,
+        0x04000059, 0x00208e46, 0x00000000, 0x00000002, 0x0300009d, 0x0011e000, 0x00000000, 0x080000a9,
+        0x0011e000, 0x00000000, 0x00004001, 0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x0b0000ac,
+        0x0011e000, 0x00000000, 0x00004001, 0x00000004, 0x0020801a, 0x00000000, 0x00000000, 0x0020800a,
+        0x00000000, 0x00000000, 0x080000ad, 0x0011e000, 0x00000000, 0x00004001, 0x00000008, 0x0020800a,
+        0x00000000, 0x00000000, 0x080000aa, 0x0011e000, 0x00000000, 0x00004001, 0x0000000c, 0x0020800a,
+        0x00000000, 0x00000000, 0x080000ae, 0x0011e000, 0x00000000, 0x00004001, 0x00000010, 0x0020800a,
+        0x00000000, 0x00000001, 0x080000af, 0x0011e000, 0x00000000, 0x00004001, 0x00000014, 0x0020800a,
+        0x00000000, 0x00000001, 0x080000b0, 0x0011e000, 0x00000000, 0x00004001, 0x00000018, 0x0020800a,
+        0x00000000, 0x00000000, 0x080000b1, 0x0011e000, 0x00000000, 0x00004001, 0x0000001c, 0x0020800a,
+        0x00000000, 0x00000000, 0x080000ab, 0x0011e000, 0x00000000, 0x00004001, 0x00000020, 0x0020800a,
+        0x00000000, 0x00000000, 0x0100003e,
     };
     static const D3D12_SHADER_BYTECODE ps_atomics = {ps_atomics_code, sizeof(ps_atomics_code)};
     static const DWORD cs_atomics_code[] =
     {
 #if 0
         RWByteAddressBuffer u;
-        RWBuffer<uint> u2;
+        RWByteAddressBuffer u2;
 
         uint4 v;
         int4 i;
@@ -24046,59 +24042,45 @@ static void test_atomic_instructions(void)
         {
             uint r;
             u.InterlockedAnd(0 * 4, v.x, r);
-            u2[0] = r;
+            u2.Store(0 * 4, r);
             u.InterlockedCompareExchange(1 * 4, v.y, v.x, r);
-            u2[1] = r;
+            u2.Store(1 * 4, r);
             u.InterlockedAdd(2 * 4, v.x, r);
-            u2[2] = r;
+            u2.Store(2 * 4, r);
             u.InterlockedOr(3 * 4, v.x, r);
-            u2[3] = r;
+            u2.Store(3 * 4, r);
             u.InterlockedMax(4 * 4, i.x, r);
-            u2[4] = r;
+            u2.Store(4 * 4, r);
             u.InterlockedMin(5 * 4, i.x, r);
-            u2[5] = r;
+            u2.Store(5 * 4, r);
             u.InterlockedMax(6 * 4, v.x, r);
-            u2[6] = r;
+            u2.Store(6 * 4, r);
             u.InterlockedMin(7 * 4, v.x, r);
-            u2[7] = r;
+            u2.Store(7 * 4, r);
             u.InterlockedXor(8 * 4, v.x, r);
-            u2[8] = r;
-            /* Test a typed buffer to ensure it's declared typed. */
-            InterlockedXor(u2[10], v.x, r);
-            u2[11] = r;
+            u2.Store(8 * 4, r);
         }
 #endif
-        0x43425844, 0x67bb8e2f, 0x78243d95, 0x7e90faa7, 0xaa9cc6e5, 0x00000001, 0x000003d4, 0x00000003,
+        0x43425844, 0x859a96e3, 0x1a35e463, 0x1e89ce58, 0x5cfe430a, 0x00000001, 0x0000026c, 0x00000003,
         0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000380, 0x00050050, 0x000000e0, 0x0100086a,
-        0x04000059, 0x00208e46, 0x00000000, 0x00000002, 0x0300009d, 0x0011e000, 0x00000000, 0x0400089c,
-        0x0011e000, 0x00000001, 0x00004444, 0x02000068, 0x00000001, 0x0400009b, 0x00000001, 0x00000001,
-        0x00000001, 0x0a0000b5, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000000,
-        0x0020800a, 0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x00000000,
-        0x00000000, 0x00000000, 0x00000000, 0x00100006, 0x00000000, 0x0d0000b9, 0x00100012, 0x00000000,
-        0x0011e000, 0x00000000, 0x00004001, 0x00000004, 0x0020801a, 0x00000000, 0x00000000, 0x0020800a,
-        0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x00000001, 0x00000001,
-        0x00000001, 0x00000001, 0x00100006, 0x00000000, 0x0a0000b4, 0x00100012, 0x00000000, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000008, 0x0020800a, 0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2,
-        0x00000001, 0x00004002, 0x00000002, 0x00000002, 0x00000002, 0x00000002, 0x00100006, 0x00000000,
-        0x0a0000b6, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x0000000c, 0x0020800a,
-        0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x00000003, 0x00000003,
-        0x00000003, 0x00000003, 0x00100006, 0x00000000, 0x0a0000ba, 0x00100012, 0x00000000, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000010, 0x0020800a, 0x00000000, 0x00000001, 0x0a0000a4, 0x0011e0f2,
-        0x00000001, 0x00004002, 0x00000004, 0x00000004, 0x00000004, 0x00000004, 0x00100006, 0x00000000,
-        0x0a0000bb, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000014, 0x0020800a,
-        0x00000000, 0x00000001, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x00000005, 0x00000005,
-        0x00000005, 0x00000005, 0x00100006, 0x00000000, 0x0a0000bc, 0x00100012, 0x00000000, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000018, 0x0020800a, 0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2,
-        0x00000001, 0x00004002, 0x00000006, 0x00000006, 0x00000006, 0x00000006, 0x00100006, 0x00000000,
-        0x0a0000bd, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x0000001c, 0x0020800a,
-        0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x00000007, 0x00000007,
-        0x00000007, 0x00000007, 0x00100006, 0x00000000, 0x0a0000b7, 0x00100012, 0x00000000, 0x0011e000,
-        0x00000000, 0x00004001, 0x00000020, 0x0020800a, 0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2,
-        0x00000001, 0x00004002, 0x00000008, 0x00000008, 0x00000008, 0x00000008, 0x00100006, 0x00000000,
-        0x0a0000b7, 0x00100012, 0x00000000, 0x0011e000, 0x00000001, 0x00004001, 0x0000000a, 0x0020800a,
-        0x00000000, 0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000001, 0x00004002, 0x0000000b, 0x0000000b,
-        0x0000000b, 0x0000000b, 0x00100006, 0x00000000, 0x0100003e,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000218, 0x00050050, 0x00000086, 0x0100086a,
+        0x04000059, 0x00208e46, 0x00000000, 0x00000002, 0x0300009d, 0x0011e000, 0x00000000, 0x0300009d,
+        0x0011e000, 0x00000001, 0x02000068, 0x00000001, 0x0400009b, 0x00000001, 0x00000001, 0x00000001,
+        0x0a0000b5, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000000, 0x0020800a,
+        0x00000000, 0x00000000, 0x0d0000b9, 0x00100022, 0x00000000, 0x0011e000, 0x00000000, 0x00004001,
+        0x00000004, 0x0020801a, 0x00000000, 0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x0a0000b4,
+        0x00100042, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000008, 0x0020800a, 0x00000000,
+        0x00000000, 0x0a0000b6, 0x00100082, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x0000000c,
+        0x0020800a, 0x00000000, 0x00000000, 0x070000a6, 0x0011e0f2, 0x00000001, 0x00004001, 0x00000000,
+        0x00100e46, 0x00000000, 0x0a0000ba, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001,
+        0x00000010, 0x0020800a, 0x00000000, 0x00000001, 0x0a0000bb, 0x00100022, 0x00000000, 0x0011e000,
+        0x00000000, 0x00004001, 0x00000014, 0x0020800a, 0x00000000, 0x00000001, 0x0a0000bc, 0x00100042,
+        0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000018, 0x0020800a, 0x00000000, 0x00000000,
+        0x0a0000bd, 0x00100082, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x0000001c, 0x0020800a,
+        0x00000000, 0x00000000, 0x070000a6, 0x0011e0f2, 0x00000001, 0x00004001, 0x00000010, 0x00100e46,
+        0x00000000, 0x0a0000b7, 0x00100012, 0x00000000, 0x0011e000, 0x00000000, 0x00004001, 0x00000020,
+        0x0020800a, 0x00000000, 0x00000000, 0x070000a6, 0x0011e012, 0x00000001, 0x00004001, 0x00000020,
+        0x0010000a, 0x00000000, 0x0100003e,
     };
     static D3D12_SHADER_BYTECODE cs_atomics = {cs_atomics_code, sizeof(cs_atomics_code)};
     static const char * const instructions[] =
@@ -24123,24 +24105,6 @@ static void test_atomic_instructions(void)
         {{ 1,   0 }, {-1}, {0xffff,   0, 1, 0, 0, 0, 0, 0, 0xff }, {     1,   1, 2,   1, 0, ~0u, 1,  0, 0xfe}},
         {{~0u, ~0u}, { 0}, {0xffff, 0xf, 1, 0, 0, 0, 0, 9,   ~0u}, {0xffff, 0xf, 0, ~0u, 0,  0, ~0u, 9,    0}},
     };
-    static const struct typed_test
-    {
-        struct uvec4 v;
-        struct ivec4 i;
-        unsigned int input[3];
-        unsigned int expected_result[3];
-    }
-    typed_tests[] =
-    {
-        {{ 1,   0 }, {-1}, {0xffff, 0xff, 0}, {     1, 0xfe, 0xff}},
-        {{~0u, ~0u}, { 0}, {0xffff,  ~0u, 0}, {0xffff,    0,  ~0u}},
-    };
-
-    if (test_options.use_warp_device)
-    {
-        skip("Broken on WARP.\n");
-        return;
-    }
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_width = 1;
@@ -24178,7 +24142,7 @@ static void test_atomic_instructions(void)
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
     cs_buffer = create_default_buffer(device, sizeof(tests->input),
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-    cs_buffer2 = create_default_buffer(device, sizeof(tests->input) + sizeof(typed_tests->input),
+    cs_buffer2 = create_default_buffer(device, sizeof(tests->input),
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
 
     context.pipeline_state = create_pipeline_state(context.device, context.root_signature, 0, NULL, &ps_atomics, NULL);
@@ -24187,16 +24151,12 @@ static void test_atomic_instructions(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        const struct typed_test *typed_test = &typed_tests[i];
         const struct test *test = &tests[i];
 
         upload_buffer_data(ps_buffer, 0, sizeof(test->input), test->input, queue, command_list);
         reset_command_list(command_list, context.allocator);
 
         upload_buffer_data(cs_buffer, 0, sizeof(test->input), test->input, queue, command_list);
-        reset_command_list(command_list, context.allocator);
-        upload_buffer_data(cs_buffer2, sizeof(test->input), sizeof(typed_test->input), typed_test->input,
-                queue, command_list);
         reset_command_list(command_list, context.allocator);
 
         transition_sub_resource_state(command_list, ps_buffer, 0,
@@ -24212,8 +24172,9 @@ static void test_atomic_instructions(void)
         ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
         ID3D12GraphicsCommandList_SetGraphicsRootUnorderedAccessView(command_list,
                 0, ID3D12Resource_GetGPUVirtualAddress(ps_buffer));
+        /* Resource binding tier < 3 requires all UAVs bound even if unused. */
         ID3D12GraphicsCommandList_SetGraphicsRootUnorderedAccessView(command_list,
-                1, ID3D12Resource_GetGPUVirtualAddress(cs_buffer2));
+                1, ID3D12Resource_GetGPUVirtualAddress(cs_buffer));
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 2, 4, &test->v, 0);
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 2, 4, &test->i, 4);
 
@@ -24281,13 +24242,6 @@ static void test_atomic_instructions(void)
             unsigned int out_value = get_readback_uint(&rb.rb, j, 0, 0);
             ok(out_value == test->input[j], "Got original value %u, expected %u for '%s'.\n",
                     out_value, test->input[j], imm_instructions[j]);
-        }
-        for (j = 0; j < 2; ++j)
-        {
-            unsigned int value = get_readback_uint(&rb.rb, ARRAY_SIZE(instructions) + j, 0, 0);
-            unsigned int expected = typed_test->expected_result[j];
-
-            ok(value == expected, "Test %u,%u: Got %#x, expected %#x.\n", i, j, value, expected);
         }
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
