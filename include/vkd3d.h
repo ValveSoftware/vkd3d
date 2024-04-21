@@ -237,22 +237,56 @@ struct vkd3d_host_time_domain_info
     uint64_t ticks_per_second;
 };
 
+/**
+ * A chained structure containing device creation parameters.
+ */
 struct vkd3d_device_create_info
 {
+    /** Must be set to VKD3D_STRUCTURE_TYPE_DEVICE_CREATE_INFO. */
     enum vkd3d_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
     const void *next;
 
+    /** The minimum feature level to request. Device creation will fail with E_INVALIDARG if the
+     * Vulkan device doesn't have the features needed to fulfill the request. */
     D3D_FEATURE_LEVEL minimum_feature_level;
 
+    /**
+     * The vkd3d instance to use to create a device. Either this or instance_create_info must be
+     * set.
+     */
     struct vkd3d_instance *instance;
+    /**
+     * The parameters used to create an instance, which is then used to create a device. Either
+     * this or instance must be set.
+     */
     const struct vkd3d_instance_create_info *instance_create_info;
 
+    /**
+     * The Vulkan physical device to use. If it is NULL, the first physical device found is used,
+     * prioritizing discrete GPUs over integrated GPUs and integrated GPUs over all the others.
+     *
+     * This parameter can be overridden by setting environment variable VKD3D_VULKAN_DEVICE.
+     */
     VkPhysicalDevice vk_physical_device;
 
+    /**
+     * A list of Vulkan device extensions to request. They are intended as required, so device
+     * creation will fail if any of them is not available.
+     */
     const char * const *device_extensions;
+    /** The number of elements in the device_extensions array. */
     uint32_t device_extension_count;
 
+    /**
+     * An object to be set as the device parent. This is not used by vkd3d except for being
+     * returned by vkd3d_get_device_parent.
+     */
     IUnknown *parent;
+    /**
+     * The adapter LUID to be set for the device. This is not used by vkd3d except for being
+     * returned by GetAdapterLuid.
+     */
     LUID adapter_luid;
 };
 
