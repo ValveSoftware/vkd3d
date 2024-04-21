@@ -20070,12 +20070,6 @@ static void test_null_vbv(void)
     };
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    if (test_options.use_warp_device)
-    {
-        skip("Broken on WARP.\n");
-        return;
-    }
-
     memset(&desc, 0, sizeof(desc));
     desc.no_root_signature = true;
     if (!init_test_context(&context, &desc))
@@ -20111,14 +20105,35 @@ static void test_null_vbv(void)
     vbv[1].SizeInBytes = 0;
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
 
-    /* Calls with NULL "views" pointers should be ignored. */
-    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, NULL);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 4, 0, 0);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0x00000000, 0);
+    reset_command_list(command_list, context.allocator);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+
+    vbv[1] = vbv[0];
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
+    /* A call with a NULL "views" pointer is interpreted as a null buffer. */
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 1, 1, NULL);
 
     ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 4, 0, 0);
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    todo
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0x00000000, 0);
 
     ID3D12Resource_Release(vb);
