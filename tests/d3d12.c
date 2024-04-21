@@ -547,6 +547,21 @@ static bool is_typed_uav_format_supported(ID3D12Device *device, DXGI_FORMAT form
     return format_support.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
 }
 
+static bool are_unaligned_block_textures_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS8 options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS8, &options, sizeof(options))))
+    {
+        /* Requires Windows 11 build 10.0.22000.194. */
+        return false;
+    }
+
+    return options.UnalignedBlockTexturesSupported;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -20191,6 +20206,7 @@ static void test_get_copyable_footprints(void)
     uint64_t row_sizes[10], total_size;
     D3D12_RESOURCE_DESC resource_desc;
     unsigned int sub_resource_count;
+    bool unaligned_block_textures;
     ID3D12Device8 *device8;
     unsigned int i, j, k;
     ID3D12Device *device;
@@ -20275,6 +20291,10 @@ static void test_get_copyable_footprints(void)
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 2,
         },
         {
+            {D3D12_RESOURCE_DIMENSION_TEXTURE2D, 3, 4, 4, 1, 1, DXGI_FORMAT_R32_UINT,
+                {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 1,
+        },
+        {
             {D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, 3, 1, 1, 2, DXGI_FORMAT_BC1_UNORM,
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 2,
         },
@@ -20291,7 +20311,7 @@ static void test_get_copyable_footprints(void)
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 1,
         },
         {
-            {D3D12_RESOURCE_DIMENSION_TEXTURE3D, 3, 2, 2, 2, 2, DXGI_FORMAT_BC1_UNORM,
+            {D3D12_RESOURCE_DIMENSION_TEXTURE3D, 0, 2, 2, 2, 2, DXGI_FORMAT_BC1_UNORM,
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 1,
         },
         {
@@ -20303,12 +20323,6 @@ static void test_get_copyable_footprints(void)
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL}, 0, 3,
         },
     };
-
-    if (test_options.use_warp_device)
-    {
-        skip("Broken on WARP.\n");
-        return;
-    }
 
     if (!(device = create_device()))
     {
@@ -20460,9 +20474,15 @@ static void test_get_copyable_footprints(void)
         ID3D12Device8_Release(device8);
     }
 
+    unaligned_block_textures = are_unaligned_block_textures_supported(device);
+
     for (i = 0; i < ARRAY_SIZE(invalid_descs); ++i)
     {
+        bool expect_success;
+
         resource_desc = invalid_descs[i].resource_desc;
+        /* If supported, succeeds for block compressed formats and returns aligned width and height. */
+        expect_success = unaligned_block_textures && format_block_width(resource_desc.Format) > 1;
 
         memset(layouts, 0, sizeof(layouts));
         memset(row_counts, 0, sizeof(row_counts));
@@ -20476,18 +20496,34 @@ static void test_get_copyable_footprints(void)
         {
             const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *l = &layouts[j];
 
-            ok(l->Offset == ~(uint64_t)0, "Got offset %"PRIu64".\n", l->Offset);
-            ok(l->Footprint.Format == ~(DXGI_FORMAT)0, "Got format %#x.\n", l->Footprint.Format);
-            ok(l->Footprint.Width == ~0u, "Got width %u.\n", l->Footprint.Width);
-            ok(l->Footprint.Height == ~0u, "Got height %u.\n", l->Footprint.Height);
-            ok(l->Footprint.Depth == ~0u, "Got depth %u.\n", l->Footprint.Depth);
-            ok(l->Footprint.RowPitch == ~0u, "Got row pitch %u.\n", l->Footprint.RowPitch);
+            vkd3d_test_push_context("resource %u, subresource %u", i, j);
 
-            ok(row_counts[j] == ~0u, "Got row count %u.\n", row_counts[j]);
-            ok(row_sizes[j] == ~(uint64_t)0, "Got row size %"PRIu64".\n", row_sizes[j]);
+            if (expect_success)
+            {
+                resource_desc.Width = align(resource_desc.Width, 4);
+                resource_desc.Height = align(resource_desc.Height, 4);
+                todo
+                check_copyable_footprints(&resource_desc, 0, invalid_descs[i].sub_resource_count, 0,
+                        layouts, row_counts, row_sizes, &total_size);
+            }
+            else
+            {
+                ok(l->Offset == ~(uint64_t)0, "Got offset %"PRIu64".\n", l->Offset);
+                ok(l->Footprint.Format == ~(DXGI_FORMAT)0, "Got format %#x.\n", l->Footprint.Format);
+                ok(l->Footprint.Width == ~0u, "Got width %u.\n", l->Footprint.Width);
+                ok(l->Footprint.Height == ~0u, "Got height %u.\n", l->Footprint.Height);
+                ok(l->Footprint.Depth == ~0u, "Got depth %u.\n", l->Footprint.Depth);
+                ok(l->Footprint.RowPitch == ~0u, "Got row pitch %u.\n", l->Footprint.RowPitch);
+
+                ok(row_counts[j] == ~0u, "Got row count %u.\n", row_counts[j]);
+                ok(row_sizes[j] == ~(uint64_t)0, "Got row size %"PRIu64".\n", row_sizes[j]);
+            }
+
+            vkd3d_test_pop_context();
         }
 
-        ok(total_size == ~(uint64_t)0, "Got total size %"PRIu64".\n", total_size);
+        if (!expect_success)
+            ok(total_size == ~(uint64_t)0, "Got total size %"PRIu64".\n", total_size);
     }
 
     refcount = ID3D12Device_Release(device);
