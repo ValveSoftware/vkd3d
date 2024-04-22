@@ -931,26 +931,7 @@ static void test_check_feature_support(void)
     {
         vkd3d_test_push_context("format %#x", format);
 
-        switch (format)
-        {
-            case DXGI_FORMAT_R32G8X24_TYPELESS:
-            case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
-            case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-            case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
-            case DXGI_FORMAT_D24_UNORM_S8_UINT:
-            case DXGI_FORMAT_R24G8_TYPELESS:
-            case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
-            case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
-            case DXGI_FORMAT_NV12:
-            case DXGI_FORMAT_P010:
-            case DXGI_FORMAT_P016:
-            case DXGI_FORMAT_NV11:
-                expected_plane_count = 2;
-                break;
-            default:
-                expected_plane_count = 1;
-                break;
-        }
+        expected_plane_count = format_plane_count(format);
 
         is_todo = format == DXGI_FORMAT_R9G9B9E5_SHAREDEXP
                 || format == DXGI_FORMAT_R8G8_B8G8_UNORM
@@ -20137,32 +20118,46 @@ static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_D
         const uint64_t *row_sizes, uint64_t *total_size)
 {
     unsigned int miplevel, width, height, depth, row_count, row_size, row_pitch;
+    unsigned int i, sub_resources_per_plane, plane_count, plane_idx;
+    DXGI_FORMAT expected_format = desc->Format;
     uint64_t offset, size, total;
-    unsigned int i;
+    bool format_is_ds;
+
+    sub_resources_per_plane = desc->MipLevels
+            * (desc->Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc->DepthOrArraySize : 1);
+    plane_count = format_plane_count(desc->Format);
+    format_is_ds = plane_count > 1;
 
     offset = total = 0;
     for (i = 0; i < sub_resource_count; ++i)
     {
+        plane_idx = (sub_resource_idx + i) / sub_resources_per_plane;
+        expected_format = format_get_subresource_plane_format(desc->Format, plane_idx, plane_count);
+
         miplevel = (sub_resource_idx + i) % desc->MipLevels;
-        width = align(max(1, desc->Width >> miplevel), format_block_width(desc->Format));
-        height = align(max(1, desc->Height >> miplevel), format_block_height(desc->Format));
+        width = align(max(1, desc->Width >> miplevel), format_block_width(expected_format));
+        height = align(max(1, desc->Height >> miplevel), format_block_height(expected_format));
         depth = desc->Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc->DepthOrArraySize : 1;
         depth = max(1, depth >> miplevel);
-        row_count = height / format_block_height(desc->Format);
-        row_size = (width / format_block_width(desc->Format)) * format_size(desc->Format);
-        row_pitch = align(row_size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+        row_count = height / format_block_height(expected_format);
+        row_size = (width / format_block_width(expected_format)) * format_size(expected_format);
+        /* D3D12 requires double the alignment for dual planes. */
+        row_pitch = align(row_size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * plane_count);
 
         if (layouts)
         {
             const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *l = &layouts[i];
             const D3D12_SUBRESOURCE_FOOTPRINT *f = &l->Footprint;
 
+            todo_if(format_is_ds && l->Offset != base_offset + offset)
             ok_(line)(l->Offset == base_offset + offset,
                     "Got offset %"PRIu64", expected %"PRIu64".\n", l->Offset, base_offset + offset);
-            ok_(line)(f->Format == desc->Format, "Got format %#x, expected %#x.\n", f->Format, desc->Format);
+            todo_if(format_is_ds)
+            ok_(line)(f->Format == expected_format, "Got format %#x, expected %#x.\n", f->Format, expected_format);
             ok_(line)(f->Width == width, "Got width %u, expected %u.\n", f->Width, width);
             ok_(line)(f->Height == height, "Got height %u, expected %u.\n", f->Height, height);
             ok_(line)(f->Depth == depth, "Got depth %u, expected %u.\n", f->Depth, depth);
+            todo_if(format_is_ds)
             ok_(line)(f->RowPitch == row_pitch, "Got row pitch %u, expected %u.\n", f->RowPitch, row_pitch);
         }
 
@@ -20170,17 +20165,23 @@ static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_D
             ok_(line)(row_counts[i] == row_count, "Got row count %u, expected %u.\n", row_counts[i], row_count);
 
         if (row_sizes)
+        {
+            todo_if(format_is_ds && (plane_idx || format_size(desc->Format) > 4))
             ok_(line)(row_sizes[i] == row_size, "Got row size %"PRIu64", expected %u.\n", row_sizes[i], row_size);
+        }
 
         size = max(0, row_count - 1) * row_pitch + row_size;
-        size = max(0, depth - 1) * align(size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) + size;
+        size = max(0, depth - 1) * align(size, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT * plane_count) + size;
 
         total = offset + size;
         offset = align(total, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
     }
 
     if (total_size)
+    {
+        todo_if(format_is_ds && *total_size != total)
         ok_(line)(*total_size == total, "Got total size %"PRIu64", expected %"PRIu64".\n", *total_size, total);
+    }
 }
 
 static void test_get_copyable_footprints(void)

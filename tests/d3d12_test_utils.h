@@ -337,6 +337,7 @@ static unsigned int format_size(DXGI_FORMAT format)
             return 2;
         case DXGI_FORMAT_UNKNOWN:
         case DXGI_FORMAT_A8_UNORM:
+        case DXGI_FORMAT_R8_TYPELESS:
         case DXGI_FORMAT_R8_UINT:
         case DXGI_FORMAT_R8_UNORM:
             return 1;
@@ -414,6 +415,39 @@ static inline unsigned int format_block_height(DXGI_FORMAT format)
         default:
             return 1;
     }
+}
+
+static inline unsigned int format_plane_count(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+        case DXGI_FORMAT_R32G8X24_TYPELESS:
+        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+        case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+        case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:
+        case DXGI_FORMAT_R24G8_TYPELESS:
+        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+        case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+        case DXGI_FORMAT_NV12:
+        case DXGI_FORMAT_P010:
+        case DXGI_FORMAT_P016:
+        case DXGI_FORMAT_NV11:
+            return 2;
+        default:
+            return 1;
+    }
+}
+
+static inline DXGI_FORMAT format_get_subresource_plane_format(DXGI_FORMAT format, unsigned int plane_idx,
+        unsigned int plane_count)
+{
+    assert(plane_idx < plane_count && plane_count >= 1 && plane_count <= 2);
+
+    if (plane_count < 2)
+        return format;
+
+    return plane_idx ? DXGI_FORMAT_R8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
 }
 
 struct d3d12_resource_readback
