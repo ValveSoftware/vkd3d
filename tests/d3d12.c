@@ -20248,6 +20248,7 @@ static void test_get_copyable_footprints(void)
         {DXGI_FORMAT_BC7_UNORM, true},
         {DXGI_FORMAT_D32_FLOAT, false, true},
         {DXGI_FORMAT_D24_UNORM_S8_UINT, false, true},
+        {DXGI_FORMAT_D32_FLOAT_S8X24_UINT, false, true},
     };
     static const uint64_t base_offsets[] =
     {
@@ -20349,7 +20350,7 @@ static void test_get_copyable_footprints(void)
             sub_resource_count = resource_desc.MipLevels;
             if (resources[i].dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D)
                 sub_resource_count *= resource_desc.DepthOrArraySize;
-            if (resource_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT)
+            if (format_plane_count(resource_desc.Format) > 1)
             {
                 /* FIXME: we require D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL here for DS formats but windows doesn't. */
                 if (!vkd3d_test_platform_is_windows())
