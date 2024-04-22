@@ -1,0 +1,51 @@
+[pixel shader todo fail(sm>=6)]
+String s = "text";
+string s2 = "text2";
+sTring s3 = "text3";
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader todo]
+typedef float4 sTring;
+sTring var = float4(1, 2, 3, 4);
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader todo fail(sm>=6)]
+// Uninitialized strings are allowed for non-fx profiles
+String s;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+typedef float4 string;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6) todo]
+typedef float4 String;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6) todo]
+float4 String;
+
+float4 main() : sv_target
+{
+    return 0;
+}

@@ -199,6 +199,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/static-initializer.shader_test \
 	tests/hlsl/step.shader_test \
 	tests/hlsl/storage-qualifiers.shader_test \
+	tests/hlsl/strings.shader_test \
 	tests/hlsl/struct-array.shader_test \
 	tests/hlsl/struct-assignment.shader_test \
 	tests/hlsl/struct-semantics.shader_test \
