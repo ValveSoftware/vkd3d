@@ -330,7 +330,7 @@ static void d3d9_runner_clear(struct shader_runner *r, struct resource *resource
 }
 
 static bool d3d9_runner_draw(struct shader_runner *r,
-        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
     static const D3DVERTEXELEMENT9 decl_element_end = D3DDECL_END();
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
@@ -342,6 +342,9 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     IDirect3DPixelShader9 *ps;
     unsigned int i, j;
     HRESULT hr;
+
+    if (instance_count > 1)
+        fatal_error("Unhandled instance count %u.\n", instance_count);
 
     if (!(vs_code = compile_shader(runner, runner->r.vs_source, "vs")))
         return false;

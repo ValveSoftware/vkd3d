@@ -974,7 +974,7 @@ static void gl_runner_clear(struct shader_runner *r, struct resource *res, const
 }
 
 static bool gl_runner_draw(struct shader_runner *r,
-        D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count)
+        D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count, unsigned int instance_count)
 {
     struct vkd3d_shader_signature vs_input_signature;
     unsigned int attribute_idx, rt_count, i, j;
@@ -1159,7 +1159,7 @@ static bool gl_runner_draw(struct shader_runner *r,
             glDisableVertexAttribArray(attribute_idx);
     }
 
-    glDrawArrays(get_topology_gl(topology), 0, vertex_count);
+    glDrawArraysInstanced(get_topology_gl(topology), 0, vertex_count, instance_count);
 
     for (i = 0; i < runner->r.sampler_count; ++i)
     {

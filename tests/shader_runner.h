@@ -196,7 +196,8 @@ struct shader_runner_ops
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     void (*clear)(struct shader_runner *runner, struct resource *resource, const struct vec4 *clear_value);
-    bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
+    bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count,
+            unsigned int instance_count);
     bool (*dispatch)(struct shader_runner *runner, unsigned int x, unsigned int y, unsigned int z);
     struct resource_readback *(*get_resource_readback)(struct shader_runner *runner, struct resource *resource);
     void (*release_readback)(struct shader_runner *runner, struct resource_readback *rb);

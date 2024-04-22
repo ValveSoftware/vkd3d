@@ -634,7 +634,7 @@ static void d3d11_runner_clear(struct shader_runner *r, struct resource *res, co
 }
 
 static bool d3d11_runner_draw(struct shader_runner *r,
-        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count, unsigned int instance_count)
 {
     ID3D11UnorderedAccessView *uavs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
     ID3D11RenderTargetView *rtvs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
@@ -812,7 +812,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         ID3D11DeviceContext_DSSetShader(context, ds, NULL, 0);
     ID3D11DeviceContext_RSSetState(context, runner->rasterizer_state);
 
-    ID3D11DeviceContext_Draw(context, vertex_count, 0);
+    ID3D11DeviceContext_DrawInstanced(context, vertex_count, instance_count, 0, 0);
 
     ID3D11PixelShader_Release(ps);
     ID3D11VertexShader_Release(vs);

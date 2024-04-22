@@ -930,13 +930,13 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
 
-        runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
+        runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3, 1);
     }
     else if (match_string(line, "draw", &line))
     {
+        unsigned int vertex_count, instance_count;
         D3D_PRIMITIVE_TOPOLOGY topology;
         struct resource_params params;
-        unsigned int vertex_count;
 
         if (!runner->hs_source != !runner->ds_source)
             fatal_error("Have a domain or hull shader but not both.\n");
@@ -975,8 +975,11 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         vertex_count = strtoul(line, &rest, 10);
         if (line == rest)
             fatal_error("Malformed vertex count '%s'.\n", line);
+        instance_count = strtoul(line = rest, &rest, 10);
+        if (line == rest)
+            instance_count = 1;
 
-        runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count);
+        runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count, instance_count);
     }
     else if (match_string(line, "probe", &line))
     {

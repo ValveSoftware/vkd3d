@@ -1,0 +1,49 @@
+[require]
+shader model >= 4.0
+
+[vertex shader]
+struct vs_in
+{
+    uint instance_id : SV_InstanceId;
+    uint vertex_id : SV_VertexId;
+};
+
+struct vs_out
+{
+    float4 position : SV_Position;
+    float4 color : Color;
+};
+
+void main(vs_in i, out vs_out o)
+{
+    float2 vertices[] =
+    {
+        {0.0, 0.0}, { 0.0,  2.0}, {-2.0,  0.0},
+        {0.0, 0.0}, { 2.0,  0.0}, { 0.0,  2.0},
+        {0.0, 0.0}, { 0.0, -2.0}, { 2.0,  0.0},
+        {0.0, 0.0}, {-2.0,  0.0}, { 0.0, -2.0},
+    };
+    uint pos = i.vertex_id % 3;
+    o.position = float4(vertices[pos + i.instance_id * 3], 0.0, 1.0);
+    float color = 0.25 + i.instance_id * 0.25;
+    o.color = float4(0.0, color, 0.0, color);
+}
+
+[pixel shader]
+struct vs_out
+{
+    float4 position : SV_Position;
+    float4 color : Color;
+};
+
+float4 main(vs_out i) : SV_Target
+{
+    return i.color;
+}
+
+[test]
+todo(sm>=6 | glsl) draw triangle list 3 4
+probe rtv 0 (160, 120) rgba (0.0, 0.25, 0.0, 0.25)
+probe rtv 0 (480, 120) rgba (0.0, 0.5, 0.0, 0.5)
+probe rtv 0 (480, 360) rgba (0.0, 0.75, 0.0, 0.75)
+probe rtv 0 (160, 360) rgba (0.0, 1.0, 0.0, 1.0)

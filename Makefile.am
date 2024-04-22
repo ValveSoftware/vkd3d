@@ -132,6 +132,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/initializer-static-array.shader_test \
 	tests/hlsl/initializer-struct.shader_test \
 	tests/hlsl/intrinsic-override.shader_test \
+	tests/hlsl/instance-id.shader_test \
 	tests/hlsl/invalid.shader_test \
 	tests/hlsl/inverse-trig.shader_test \
 	tests/hlsl/is-front-face.shader_test \
