@@ -458,6 +458,7 @@ enum dx_intrinsic_opcode
     DX_WAVE_ACTIVE_OP               = 119,
     DX_WAVE_ACTIVE_BIT              = 120,
     DX_WAVE_PREFIX_OP               = 121,
+    DX_QUAD_READ_LANE_AT            = 122,
     DX_QUAD_OP                      = 123,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
@@ -4627,6 +4628,8 @@ static enum vkd3d_shader_opcode map_dx_binary_op(enum dx_intrinsic_opcode op, co
             return VKD3DSIH_IMAX;
         case DX_IMIN:
             return VKD3DSIH_IMIN;
+        case DX_QUAD_READ_LANE_AT:
+            return VKD3DSIH_QUAD_READ_LANE_AT;
         case DX_UMAX:
             return VKD3DSIH_UMAX;
         case DX_UMIN:
@@ -6279,6 +6282,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_OUTPUT_CONTROL_POINT_ID       ] = {"i", "",     sm6_parser_emit_dx_output_control_point_id},
     [DX_PRIMITIVE_ID                  ] = {"i", "",     sm6_parser_emit_dx_primitive_id},
     [DX_QUAD_OP                       ] = {"n", "Rc",   sm6_parser_emit_dx_quad_op},
+    [DX_QUAD_READ_LANE_AT             ] = {"n", "Ri",   sm6_parser_emit_dx_binary},
     [DX_RAW_BUFFER_LOAD               ] = {"o", "Hii8i", sm6_parser_emit_dx_raw_buffer_load},
     [DX_RAW_BUFFER_STORE              ] = {"v", "Hiioooocc", sm6_parser_emit_dx_raw_buffer_store},
     [DX_ROUND_NE                      ] = {"g", "R",    sm6_parser_emit_dx_unary},

@@ -257,6 +257,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_QUAD_READ_ACROSS_D              ] = "quad_read_across_d",
     [VKD3DSIH_QUAD_READ_ACROSS_X              ] = "quad_read_across_x",
     [VKD3DSIH_QUAD_READ_ACROSS_Y              ] = "quad_read_across_y",
+    [VKD3DSIH_QUAD_READ_LANE_AT               ] = "quad_read_lane_at",
     [VKD3DSIH_RCP                             ] = "rcp",
     [VKD3DSIH_REP                             ] = "rep",
     [VKD3DSIH_RESINFO                         ] = "resinfo",
