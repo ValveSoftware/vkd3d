@@ -656,6 +656,16 @@ static unsigned int initializer_size(const struct parse_initializer *initializer
     return count;
 }
 
+static void cleanup_parse_attribute_list(struct parse_attribute_list *attr_list)
+{
+    unsigned int i = 0;
+
+    assert(attr_list);
+    for (i = 0; i < attr_list->count; ++i)
+        hlsl_free_attribute((struct hlsl_attribute *) attr_list->attrs[i]);
+    vkd3d_free(attr_list->attrs);
+}
+
 static void free_parse_initializer(struct parse_initializer *initializer)
 {
     destroy_block(initializer->instrs);
@@ -6033,11 +6043,7 @@ attribute_list:
             $$ = $1;
             if (!(new_array = vkd3d_realloc($$.attrs, ($$.count + 1) * sizeof(*$$.attrs))))
             {
-                unsigned int i;
-
-                for (i = 0; i < $$.count; ++i)
-                    hlsl_free_attribute((void *)$$.attrs[i]);
-                vkd3d_free($$.attrs);
+                cleanup_parse_attribute_list(&$$);
                 YYABORT;
             }
             $$.attrs = new_array;
@@ -6243,11 +6249,7 @@ func_prototype:
             }
             else
             {
-                unsigned int i;
-
-                for (i = 0; i < $1.count; ++i)
-                    hlsl_free_attribute((void *)$1.attrs[i]);
-                vkd3d_free($1.attrs);
+                cleanup_parse_attribute_list(&$1);
             }
             $$ = $2;
         }
@@ -7358,6 +7360,7 @@ selection_statement:
             {
                 destroy_block($6.then_block);
                 destroy_block($6.else_block);
+                cleanup_parse_attribute_list(&$1);
                 YYABORT;
             }
 
@@ -7365,10 +7368,12 @@ selection_statement:
             {
                 destroy_block($6.then_block);
                 destroy_block($6.else_block);
+                cleanup_parse_attribute_list(&$1);
                 YYABORT;
             }
             destroy_block($6.then_block);
             destroy_block($6.else_block);
+            cleanup_parse_attribute_list(&$1);
 
             $$ = $4;
             hlsl_block_add_instr($$, instr);
@@ -7391,21 +7396,25 @@ loop_statement:
         {
             $$ = create_loop(ctx, LOOP_WHILE, &$1, NULL, $5, NULL, $7, &@3);
             hlsl_pop_scope(ctx);
+            cleanup_parse_attribute_list(&$1);
         }
     | attribute_list_optional loop_scope_start KW_DO statement KW_WHILE '(' expr ')' ';'
         {
             $$ = create_loop(ctx, LOOP_DO_WHILE, &$1, NULL, $7, NULL, $4, &@3);
             hlsl_pop_scope(ctx);
+            cleanup_parse_attribute_list(&$1);
         }
     | attribute_list_optional loop_scope_start KW_FOR '(' expr_statement expr_statement expr_optional ')' statement
         {
             $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@3);
             hlsl_pop_scope(ctx);
+            cleanup_parse_attribute_list(&$1);
         }
     | attribute_list_optional loop_scope_start KW_FOR '(' declaration expr_statement expr_optional ')' statement
         {
             $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@3);
             hlsl_pop_scope(ctx);
+            cleanup_parse_attribute_list(&$1);
         }
 
 switch_statement:
@@ -7418,6 +7427,7 @@ switch_statement:
             {
                 destroy_switch_cases($8);
                 destroy_block($5);
+                cleanup_parse_attribute_list(&$1);
                 YYABORT;
             }
 
@@ -7428,6 +7438,7 @@ switch_statement:
             if (!s)
             {
                 destroy_block($5);
+                cleanup_parse_attribute_list(&$1);
                 YYABORT;
             }
 
@@ -7435,6 +7446,7 @@ switch_statement:
             hlsl_block_add_instr($$, s);
 
             hlsl_pop_scope(ctx);
+            cleanup_parse_attribute_list(&$1);
         }
 
 switch_case:
