@@ -5971,7 +5971,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 unsigned int value_idx = 2 * i;
                 unsigned int label_idx = 2 * i + 1;
 
-                if (!register_is_constant(&instruction->src[value_idx].reg) && !register_is_ssa(&instruction->src[value_idx].reg))
+                if (!register_is_constant_or_undef(&instruction->src[value_idx].reg)
+                        && !register_is_ssa(&instruction->src[value_idx].reg))
                     validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
                             "Invalid value register for incoming %zu of type %#x in PHI instruction, "
                             "expected SSA, IMMCONST or IMMCONST64.", i, instruction->src[value_idx].reg.type);
