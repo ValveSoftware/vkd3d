@@ -433,6 +433,7 @@ enum dx_intrinsic_opcode
     DX_WAVE_ALL_TRUE                = 114,
     DX_WAVE_ACTIVE_ALL_EQUAL        = 115,
     DX_WAVE_ACTIVE_BALLOT           = 116,
+    DX_WAVE_ACTIVE_BIT              = 120,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -532,6 +533,13 @@ enum dxil_sync_flags
     SYNC_GLOBAL_UAV          = 0x2,
     SYNC_THREAD_GROUP_UAV    = 0x4,
     SYNC_GROUP_SHARED_MEMORY = 0x8,
+};
+
+enum dxil_wave_bit_op_kind
+{
+    WAVE_BIT_OP_AND = 0,
+    WAVE_BIT_OP_OR  = 1,
+    WAVE_BIT_OP_XOR = 2,
 };
 
 struct sm6_pointer_info
@@ -5925,6 +5933,46 @@ static void sm6_parser_emit_dx_wave_active_ballot(struct sm6_parser *sm6, enum d
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
 
+static enum vkd3d_shader_opcode sm6_dx_map_wave_bit_op(enum dxil_wave_bit_op_kind op,
+        struct sm6_parser *sm6)
+{
+    switch (op)
+    {
+        case WAVE_BIT_OP_AND:
+            return VKD3DSIH_WAVE_ACTIVE_BIT_AND;
+        case WAVE_BIT_OP_OR:
+            return VKD3DSIH_WAVE_ACTIVE_BIT_OR;
+        case WAVE_BIT_OP_XOR:
+            return VKD3DSIH_WAVE_ACTIVE_BIT_XOR;
+        default:
+            FIXME("Unhandled wave bit op %u.\n", op);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
+                    "Wave bit operation %u is unhandled.\n", op);
+            return VKD3DSIH_INVALID;
+    }
+}
+
+static void sm6_parser_emit_dx_wave_active_bit(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+    enum dxil_wave_bit_op_kind wave_op;
+    enum vkd3d_shader_opcode opcode;
+
+    wave_op = sm6_value_get_constant_uint(operands[1]);
+
+    if ((opcode = sm6_dx_map_wave_bit_op(wave_op, sm6)) == VKD3DSIH_INVALID)
+        return;
+    vsir_instruction_init(ins, &sm6->p.location, opcode);
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_param_init_from_value(src_param, operands[0]);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_wave_builtin(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -6068,6 +6116,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_UMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_WAVE_ACTIVE_ALL_EQUAL         ] = {"1", "n",    sm6_parser_emit_dx_unary},
     [DX_WAVE_ACTIVE_BALLOT            ] = {"V", "1",    sm6_parser_emit_dx_wave_active_ballot},
+    [DX_WAVE_ACTIVE_BIT               ] = {"m", "Rc",   sm6_parser_emit_dx_wave_active_bit},
     [DX_WAVE_ALL_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_ANY_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
