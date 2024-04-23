@@ -9826,6 +9826,22 @@ static SpvOp map_wave_alu_op(enum vkd3d_shader_opcode handler_idx, bool is_float
             return SpvOpGroupNonUniformBitwiseOr;
         case VKD3DSIH_WAVE_ACTIVE_BIT_XOR:
             return SpvOpGroupNonUniformBitwiseXor;
+        case VKD3DSIH_WAVE_OP_ADD:
+            return is_float ? SpvOpGroupNonUniformFAdd : SpvOpGroupNonUniformIAdd;
+        case VKD3DSIH_WAVE_OP_IMAX:
+            return SpvOpGroupNonUniformSMax;
+        case VKD3DSIH_WAVE_OP_IMIN:
+            return SpvOpGroupNonUniformSMin;
+        case VKD3DSIH_WAVE_OP_MAX:
+            return SpvOpGroupNonUniformFMax;
+        case VKD3DSIH_WAVE_OP_MIN:
+            return SpvOpGroupNonUniformFMin;
+        case VKD3DSIH_WAVE_OP_MUL:
+            return is_float ? SpvOpGroupNonUniformFMul : SpvOpGroupNonUniformIMul;
+        case VKD3DSIH_WAVE_OP_UMAX:
+            return SpvOpGroupNonUniformUMax;
+        case VKD3DSIH_WAVE_OP_UMIN:
+            return SpvOpGroupNonUniformUMin;
         default:
             vkd3d_unreachable();
     }
@@ -9849,7 +9865,7 @@ static void spirv_compiler_emit_wave_alu_op(struct spirv_compiler *compiler,
     vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniformArithmetic);
     val_id = vkd3d_spirv_build_op_tr3(builder, &builder->function_stream, op, type_id,
             vkd3d_spirv_get_op_scope_subgroup(builder),
-            SpvGroupOperationReduce,
+            (instruction->flags & VKD3DSI_WAVE_PREFIX) ? SpvGroupOperationExclusiveScan : SpvGroupOperationReduce,
             val_id);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
@@ -10210,6 +10226,14 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_WAVE_ACTIVE_BIT_AND:
         case VKD3DSIH_WAVE_ACTIVE_BIT_OR:
         case VKD3DSIH_WAVE_ACTIVE_BIT_XOR:
+        case VKD3DSIH_WAVE_OP_ADD:
+        case VKD3DSIH_WAVE_OP_IMAX:
+        case VKD3DSIH_WAVE_OP_IMIN:
+        case VKD3DSIH_WAVE_OP_MAX:
+        case VKD3DSIH_WAVE_OP_MIN:
+        case VKD3DSIH_WAVE_OP_MUL:
+        case VKD3DSIH_WAVE_OP_UMAX:
+        case VKD3DSIH_WAVE_OP_UMIN:
             spirv_compiler_emit_wave_alu_op(compiler, instruction);
             break;
         case VKD3DSIH_DCL:

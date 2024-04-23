@@ -101,7 +101,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-todo dispatch 4 1 1
+dispatch 4 1 1
 probe uav 1 (0) rui (8)
 probe uav 1 (1) rui (8)
 probe uav 1 (2) rui (8)
@@ -214,7 +214,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-todo dispatch 4 1 1
+dispatch 4 1 1
 probe uav 1 (0) rui (41)
 probe uav 1 (1) rui (41)
 probe uav 1 (2) rui (41)
@@ -298,7 +298,7 @@ void main(uint id : SV_GroupIndex)
 
 [test]
 uniform 0 uint4 1 5 0 0
-todo dispatch 4 1 1
+dispatch 4 1 1
 probe uav 1 (0) rui (29)
 probe uav 1 (1) rui (29)
 probe uav 1 (2) rui (29)
