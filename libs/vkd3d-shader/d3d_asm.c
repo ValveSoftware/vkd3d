@@ -335,6 +335,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_WAVE_ALL_BIT_COUNT              ] = "wave_all_bit_count",
     [VKD3DSIH_WAVE_ALL_TRUE                   ] = "wave_all_true",
     [VKD3DSIH_WAVE_ANY_TRUE                   ] = "wave_any_true",
+    [VKD3DSIH_WAVE_IS_FIRST_LANE              ] = "wave_is_first_lane",
     [VKD3DSIH_WAVE_OP_ADD                     ] = "wave_op_add",
     [VKD3DSIH_WAVE_OP_IMAX                    ] = "wave_op_imax",
     [VKD3DSIH_WAVE_OP_IMIN                    ] = "wave_op_imin",

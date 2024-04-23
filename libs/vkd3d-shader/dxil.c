@@ -446,6 +446,7 @@ enum dx_intrinsic_opcode
     DX_STORE_PATCH_CONSTANT         = 106,
     DX_OUTPUT_CONTROL_POINT_ID      = 107,
     DX_PRIMITIVE_ID                 = 108,
+    DX_WAVE_IS_FIRST_LANE           = 110,
     DX_WAVE_GET_LANE_INDEX          = 111,
     DX_WAVE_GET_LANE_COUNT          = 112,
     DX_WAVE_ANY_TRUE                = 113,
@@ -4490,6 +4491,25 @@ static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const s
     return sm6_parser_emit_reg_composite_construct(sm6, operand_regs, component_count, state, reg);
 }
 
+static enum vkd3d_shader_opcode sm6_dx_map_void_op(enum dx_intrinsic_opcode op)
+{
+    switch (op)
+    {
+        case DX_WAVE_IS_FIRST_LANE:
+            return VKD3DSIH_WAVE_IS_FIRST_LANE;
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void sm6_parser_emit_dx_void(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, sm6_dx_map_void_op(op));
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
 {
     switch (op)
@@ -6241,6 +6261,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_WAVE_ANY_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
     [DX_WAVE_GET_LANE_INDEX           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
+    [DX_WAVE_IS_FIRST_LANE            ] = {"1", "",     sm6_parser_emit_dx_void},
     [DX_WAVE_PREFIX_OP                ] = {"n", "Rcc",  sm6_parser_emit_dx_wave_op},
 };
 
