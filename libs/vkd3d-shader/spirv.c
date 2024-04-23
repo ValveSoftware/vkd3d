@@ -1760,6 +1760,14 @@ static uint32_t vkd3d_spirv_build_op_group_nonuniform_quad_swap(struct vkd3d_spi
             vkd3d_spirv_get_op_scope_subgroup(builder), val_id, op_id);
 }
 
+static uint32_t vkd3d_spirv_build_op_group_nonuniform_quad_broadcast(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t val_id, uint32_t index_id)
+{
+    vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniformQuad);
+    return vkd3d_spirv_build_op_tr3(builder, &builder->function_stream, SpvOpGroupNonUniformQuadBroadcast, result_type,
+            vkd3d_spirv_get_op_scope_subgroup(builder), val_id, index_id);
+}
+
 static uint32_t vkd3d_spirv_build_op_group_nonuniform_ballot(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t val_id)
 {
@@ -9847,6 +9855,31 @@ static void spirv_compiler_emit_quad_read_across(struct spirv_compiler *compiler
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
+static void spirv_compiler_emit_quad_read_lane_at(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t type_id, val_id, lane_id;
+
+    if (!register_is_constant_or_undef(&src[1].reg))
+    {
+        FIXME("Unsupported non-constant quad read lane index.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Non-constant quad read lane indices are not supported.");
+        return;
+    }
+
+    type_id = vkd3d_spirv_get_type_id_for_data_type(builder, dst->reg.data_type,
+            vsir_write_mask_component_count(dst->write_mask));
+    val_id = spirv_compiler_emit_load_src(compiler, &src[0], dst->write_mask);
+    lane_id = spirv_compiler_emit_load_src(compiler, &src[1], VKD3DSP_WRITEMASK_0);
+    val_id = vkd3d_spirv_build_op_group_nonuniform_quad_broadcast(builder, type_id, val_id, lane_id);
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
 static SpvOp map_wave_bool_op(enum vkd3d_shader_opcode opcode)
 {
     switch (opcode)
@@ -10381,6 +10414,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_QUAD_READ_ACROSS_X:
         case VKD3DSIH_QUAD_READ_ACROSS_Y:
             spirv_compiler_emit_quad_read_across(compiler, instruction);
+            break;
+        case VKD3DSIH_QUAD_READ_LANE_AT:
+            spirv_compiler_emit_quad_read_lane_at(compiler, instruction);
             break;
         case VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL:
         case VKD3DSIH_WAVE_ALL_TRUE:
