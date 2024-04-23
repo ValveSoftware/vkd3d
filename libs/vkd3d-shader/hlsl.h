@@ -1400,7 +1400,6 @@ unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 
 void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx);
-void hlsl_prepend_global_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block);
 
 const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type);
 unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type);

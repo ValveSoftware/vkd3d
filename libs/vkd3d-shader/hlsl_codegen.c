@@ -5314,17 +5314,6 @@ static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *bod
     }
 }
 
-void hlsl_prepend_global_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *body)
-{
-    struct hlsl_ir_var *var;
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
-    {
-        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, body, var);
-    }
-}
-
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -5353,7 +5342,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
 
-    hlsl_prepend_global_uniform_copy(ctx, body);
+    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
+            prepend_uniform_copy(ctx, body, var);
+    }
 
     for (i = 0; i < entry_func->parameters.count; ++i)
     {
