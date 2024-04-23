@@ -432,6 +432,7 @@ enum dx_intrinsic_opcode
     DX_WAVE_ANY_TRUE                = 113,
     DX_WAVE_ALL_TRUE                = 114,
     DX_WAVE_ACTIVE_ALL_EQUAL        = 115,
+    DX_WAVE_ACTIVE_BALLOT           = 116,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -5910,6 +5911,20 @@ static void sm6_parser_emit_dx_texture_store(struct sm6_parser *sm6, enum dx_int
     dst_param_init_with_mask(dst_param, write_mask);
 }
 
+static void sm6_parser_emit_dx_wave_active_ballot(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_WAVE_ACTIVE_BALLOT);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_param_init_from_value(src_param, operands[0]);
+
+    instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
+}
+
 static void sm6_parser_emit_dx_wave_builtin(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5954,6 +5969,7 @@ struct sm6_dx_opcode_info
     H -> handle
     D -> Dimensions
     S -> splitdouble
+    V -> 4 x i32
     v -> void
     o -> overloaded
     R -> matches the return type
@@ -6051,6 +6067,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_UMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_WAVE_ACTIVE_ALL_EQUAL         ] = {"1", "n",    sm6_parser_emit_dx_unary},
+    [DX_WAVE_ACTIVE_BALLOT            ] = {"V", "1",    sm6_parser_emit_dx_wave_active_ballot},
     [DX_WAVE_ALL_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_ANY_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
@@ -6102,6 +6119,8 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
             return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Dimensions");
         case 'S':
             return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.splitdouble");
+        case 'V':
+            return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.fouri32");
         case 'v':
             return !type;
         case 'o':
