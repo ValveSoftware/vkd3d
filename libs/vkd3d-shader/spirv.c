@@ -9902,7 +9902,8 @@ static void spirv_compiler_emit_wave_bit_count(struct spirv_compiler *compiler,
     SpvGroupOperation group_op;
     uint32_t type_id, val_id;
 
-    group_op = SpvGroupOperationReduce;
+    group_op = (instruction->handler_idx == VKD3DSIH_WAVE_PREFIX_BIT_COUNT) ? SpvGroupOperationExclusiveScan
+            : SpvGroupOperationReduce;
 
     val_id = spirv_compiler_emit_group_nonuniform_ballot(compiler, instruction->src);
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
@@ -10288,6 +10289,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_wave_alu_op(compiler, instruction);
             break;
         case VKD3DSIH_WAVE_ALL_BIT_COUNT:
+        case VKD3DSIH_WAVE_PREFIX_BIT_COUNT:
             spirv_compiler_emit_wave_bit_count(compiler, instruction);
             break;
         case VKD3DSIH_WAVE_IS_FIRST_LANE:
