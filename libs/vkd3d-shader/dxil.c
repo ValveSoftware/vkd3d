@@ -433,7 +433,9 @@ enum dx_intrinsic_opcode
     DX_WAVE_ALL_TRUE                = 114,
     DX_WAVE_ACTIVE_ALL_EQUAL        = 115,
     DX_WAVE_ACTIVE_BALLOT           = 116,
+    DX_WAVE_ACTIVE_OP               = 119,
     DX_WAVE_ACTIVE_BIT              = 120,
+    DX_WAVE_PREFIX_OP               = 121,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -540,6 +542,14 @@ enum dxil_wave_bit_op_kind
     WAVE_BIT_OP_AND = 0,
     WAVE_BIT_OP_OR  = 1,
     WAVE_BIT_OP_XOR = 2,
+};
+
+enum dxil_wave_op_kind
+{
+    WAVE_OP_ADD = 0,
+    WAVE_OP_MUL = 1,
+    WAVE_OP_MIN = 2,
+    WAVE_OP_MAX = 3,
 };
 
 struct sm6_pointer_info
@@ -5973,6 +5983,57 @@ static void sm6_parser_emit_dx_wave_active_bit(struct sm6_parser *sm6, enum dx_i
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static enum vkd3d_shader_opcode sm6_dx_map_wave_op(enum dxil_wave_op_kind op, bool is_signed, bool is_float,
+        struct sm6_parser *sm6)
+{
+    switch (op)
+    {
+        case WAVE_OP_ADD:
+            return VKD3DSIH_WAVE_OP_ADD;
+        case WAVE_OP_MUL:
+            return VKD3DSIH_WAVE_OP_MUL;
+        case WAVE_OP_MIN:
+            if (is_float)
+                return VKD3DSIH_WAVE_OP_MIN;
+            return is_signed ? VKD3DSIH_WAVE_OP_IMIN : VKD3DSIH_WAVE_OP_UMIN;
+        case WAVE_OP_MAX:
+            if (is_float)
+                return VKD3DSIH_WAVE_OP_MAX;
+            return is_signed ? VKD3DSIH_WAVE_OP_IMAX : VKD3DSIH_WAVE_OP_UMAX;
+        default:
+            FIXME("Unhandled wave op %u.\n", op);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
+                    "Wave operation %u is unhandled.\n", op);
+            return VKD3DSIH_INVALID;
+    }
+}
+
+static void sm6_parser_emit_dx_wave_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+    enum vkd3d_shader_opcode opcode;
+    enum dxil_wave_op_kind wave_op;
+    bool is_signed;
+
+    wave_op = sm6_value_get_constant_uint(operands[1]);
+    is_signed = !sm6_value_get_constant_uint(operands[2]);
+    opcode = sm6_dx_map_wave_op(wave_op, is_signed, sm6_type_is_floating_point(operands[0]->type), sm6);
+
+    if (opcode == VKD3DSIH_INVALID)
+        return;
+
+    vsir_instruction_init(ins, &sm6->p.location, opcode);
+    ins->flags = (op == DX_WAVE_PREFIX_OP) ? VKD3DSI_WAVE_PREFIX : 0;
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_param_init_from_value(src_param, operands[0]);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_wave_builtin(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -6117,10 +6178,12 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_WAVE_ACTIVE_ALL_EQUAL         ] = {"1", "n",    sm6_parser_emit_dx_unary},
     [DX_WAVE_ACTIVE_BALLOT            ] = {"V", "1",    sm6_parser_emit_dx_wave_active_ballot},
     [DX_WAVE_ACTIVE_BIT               ] = {"m", "Rc",   sm6_parser_emit_dx_wave_active_bit},
+    [DX_WAVE_ACTIVE_OP                ] = {"n", "Rcc",  sm6_parser_emit_dx_wave_op},
     [DX_WAVE_ALL_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_ANY_TRUE                 ] = {"1", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
     [DX_WAVE_GET_LANE_INDEX           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
+    [DX_WAVE_PREFIX_OP                ] = {"n", "Rcc",  sm6_parser_emit_dx_wave_op},
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,

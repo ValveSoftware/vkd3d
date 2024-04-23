@@ -334,6 +334,14 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_WAVE_ACTIVE_BIT_XOR             ] = "wave_active_bit_xor",
     [VKD3DSIH_WAVE_ALL_TRUE                   ] = "wave_all_true",
     [VKD3DSIH_WAVE_ANY_TRUE                   ] = "wave_any_true",
+    [VKD3DSIH_WAVE_OP_ADD                     ] = "wave_op_add",
+    [VKD3DSIH_WAVE_OP_IMAX                    ] = "wave_op_imax",
+    [VKD3DSIH_WAVE_OP_IMIN                    ] = "wave_op_imin",
+    [VKD3DSIH_WAVE_OP_MAX                     ] = "wave_op_max",
+    [VKD3DSIH_WAVE_OP_MIN                     ] = "wave_op_min",
+    [VKD3DSIH_WAVE_OP_MUL                     ] = "wave_op_mul",
+    [VKD3DSIH_WAVE_OP_UMAX                    ] = "wave_op_umax",
+    [VKD3DSIH_WAVE_OP_UMIN                    ] = "wave_op_umin",
     [VKD3DSIH_XOR                             ] = "xor",
 };
 
@@ -1842,6 +1850,17 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
         case VKD3DSIH_TEX:
             if (vkd3d_shader_ver_ge(&compiler->shader_version, 2, 0) && (ins->flags & VKD3DSI_TEXLD_PROJECT))
                 vkd3d_string_buffer_printf(buffer, "p");
+            break;
+
+        case VKD3DSIH_WAVE_OP_ADD:
+        case VKD3DSIH_WAVE_OP_IMAX:
+        case VKD3DSIH_WAVE_OP_IMIN:
+        case VKD3DSIH_WAVE_OP_MAX:
+        case VKD3DSIH_WAVE_OP_MIN:
+        case VKD3DSIH_WAVE_OP_MUL:
+        case VKD3DSIH_WAVE_OP_UMAX:
+        case VKD3DSIH_WAVE_OP_UMIN:
+            vkd3d_string_buffer_printf(&compiler->buffer, (ins->flags & VKD3DSI_WAVE_PREFIX) ? "_prefix" : "_active");
             break;
 
         case VKD3DSIH_ISHL:
