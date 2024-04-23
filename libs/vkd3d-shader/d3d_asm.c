@@ -344,6 +344,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_WAVE_OP_MUL                     ] = "wave_op_mul",
     [VKD3DSIH_WAVE_OP_UMAX                    ] = "wave_op_umax",
     [VKD3DSIH_WAVE_OP_UMIN                    ] = "wave_op_umin",
+    [VKD3DSIH_WAVE_PREFIX_BIT_COUNT           ] = "wave_prefix_bit_count",
     [VKD3DSIH_XOR                             ] = "xor",
 };
 

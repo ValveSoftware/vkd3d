@@ -459,6 +459,7 @@ enum dx_intrinsic_opcode
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_WAVE_ALL_BIT_COUNT           = 135,
+    DX_WAVE_PREFIX_BIT_COUNT        = 136,
     DX_RAW_BUFFER_LOAD              = 139,
     DX_RAW_BUFFER_STORE             = 140,
 };
@@ -4582,6 +4583,8 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_WAVE_ALL_TRUE;
         case DX_WAVE_ANY_TRUE:
             return VKD3DSIH_WAVE_ANY_TRUE;
+        case DX_WAVE_PREFIX_BIT_COUNT:
+            return VKD3DSIH_WAVE_PREFIX_BIT_COUNT;
         default:
             vkd3d_unreachable();
     }
@@ -6262,6 +6265,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_WAVE_GET_LANE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
     [DX_WAVE_GET_LANE_INDEX           ] = {"i", "",     sm6_parser_emit_dx_wave_builtin},
     [DX_WAVE_IS_FIRST_LANE            ] = {"1", "",     sm6_parser_emit_dx_void},
+    [DX_WAVE_PREFIX_BIT_COUNT         ] = {"i", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_PREFIX_OP                ] = {"n", "Rcc",  sm6_parser_emit_dx_wave_op},
 };
 
