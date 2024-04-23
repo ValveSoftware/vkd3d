@@ -3617,8 +3617,9 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[0]);
     }
 
+    /* Alignment is supported only in the Kernel execution model and is an optimisation only. */
     if (reg->alignment)
-        WARN("Ignoring alignment %u.\n", reg->alignment);
+        TRACE("Ignoring alignment %u.\n", reg->alignment);
 
     if (index_count)
     {
@@ -5904,8 +5905,9 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
 
+    /* Alignment is supported only in the Kernel execution model and is an optimisation only. */
     if (temp->alignment)
-        WARN("Ignoring alignment %u.\n", temp->alignment);
+        TRACE("Ignoring alignment %u.\n", temp->alignment);
 
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
