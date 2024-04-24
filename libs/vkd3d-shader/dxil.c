@@ -3755,21 +3755,21 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
     for (i = 0; i < sm6->p.program->instructions.count; ++i)
     {
         ins = &sm6->p.program->instructions.elements[i];
-        if (ins->handler_idx == VKD3DSIH_DCL_INDEXABLE_TEMP && ins->declaration.indexable_temp.initialiser)
+        if (ins->opcode == VKD3DSIH_DCL_INDEXABLE_TEMP && ins->declaration.indexable_temp.initialiser)
         {
             ins->declaration.indexable_temp.initialiser = resolve_forward_initialiser(
                     (uintptr_t)ins->declaration.indexable_temp.initialiser, sm6);
         }
-        else if (ins->handler_idx == VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER)
+        else if (ins->opcode == VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER)
         {
             ins->declaration.icb = resolve_forward_initialiser((uintptr_t)ins->declaration.icb, sm6);
         }
-        else if (ins->handler_idx == VKD3DSIH_DCL_TGSM_RAW)
+        else if (ins->opcode == VKD3DSIH_DCL_TGSM_RAW)
         {
             ins->declaration.tgsm_raw.zero_init = resolve_forward_zero_initialiser(ins->flags, sm6);
             ins->flags = 0;
         }
-        else if (ins->handler_idx == VKD3DSIH_DCL_TGSM_STRUCTURED)
+        else if (ins->opcode == VKD3DSIH_DCL_TGSM_STRUCTURED)
         {
             ins->declaration.tgsm_structured.zero_init = resolve_forward_zero_initialiser(ins->flags, sm6);
             ins->flags = 0;
@@ -4402,7 +4402,7 @@ static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record 
         code_block->terminator.false_block = sm6_function_get_block(function, record->operands[1], sm6);
     }
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 }
 
 static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, const struct vkd3d_shader_register **operand_regs,
@@ -4962,7 +4962,7 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     reg->non_uniform = !!sm6_value_get_constant_uint(operands[3]);
 
     /* NOP is used to flag no instruction emitted. */
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 }
 
 static void sm6_parser_emit_dx_stream(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -6381,7 +6381,7 @@ static void sm6_parser_emit_unhandled(struct sm6_parser *sm6, struct vkd3d_shade
 {
     const struct sm6_type *type;
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 
     if (!dst->type)
         return;
@@ -6628,7 +6628,7 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
     {
         *dst = *value;
         dst->type = type;
-        ins->handler_idx = VKD3DSIH_NOP;
+        ins->opcode = VKD3DSIH_NOP;
         return;
     }
 
@@ -6739,7 +6739,7 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
      * do not otherwise occur, so deleting these avoids the need for backend support. */
     if (sm6_type_is_bool(type_a) && code == ICMP_NE && sm6_value_is_constant_zero(b))
     {
-        ins->handler_idx = VKD3DSIH_NOP;
+        ins->opcode = VKD3DSIH_NOP;
         *dst = *a;
         return;
     }
@@ -7039,7 +7039,7 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
     reg->idx_count = 2;
     dst->structure_stride = src->structure_stride;
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 }
 
 static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_record *record,
@@ -7189,7 +7189,7 @@ static void sm6_parser_emit_phi(struct sm6_parser *sm6, const struct dxil_record
         incoming[j].block = sm6_function_get_block(function, record->operands[i + 1], sm6);
     }
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 
     qsort(incoming, phi->incoming_count, sizeof(*incoming), phi_incoming_compare);
 
@@ -7224,7 +7224,7 @@ static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record
 
     code_block->terminator.type = TERMINATOR_RET;
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 }
 
 static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_record *record,
@@ -7384,7 +7384,7 @@ static void sm6_parser_emit_switch(struct sm6_parser *sm6, const struct dxil_rec
         terminator->cases[i / 2u].value = sm6_value_get_constant_uint64(src);
     }
 
-    ins->handler_idx = VKD3DSIH_NOP;
+    ins->opcode = VKD3DSIH_NOP;
 }
 
 static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_record *record,
@@ -7843,7 +7843,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         }
 
         ins = &code_block->instructions[code_block->instruction_count];
-        ins->handler_idx = VKD3DSIH_INVALID;
+        ins->opcode = VKD3DSIH_INVALID;
 
         dst = sm6_parser_get_current_value(sm6);
         fwd_type = dst->type;
@@ -7922,7 +7922,6 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
 
         if (sm6->p.failed)
             return VKD3D_ERROR;
-        assert(ins->handler_idx != VKD3DSIH_INVALID);
 
         if (record->attachment)
             metadata_attachment_record_apply(record->attachment, record->code, ins, dst, sm6);
@@ -7933,9 +7932,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             code_block = (block_idx < function->block_count) ? function->blocks[block_idx] : NULL;
         }
         if (code_block)
-            code_block->instruction_count += ins->handler_idx != VKD3DSIH_NOP;
-        else
-            assert(ins->handler_idx == VKD3DSIH_NOP);
+            code_block->instruction_count += ins->opcode != VKD3DSIH_NOP;
 
         if (dst->type && fwd_type && dst->type != fwd_type)
         {
@@ -8735,7 +8732,7 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
 
     if (!m)
     {
-        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
+        ins->opcode = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
         ins->declaration.raw_resource.resource.reg.write_mask = 0;
         return &ins->declaration.raw_resource.resource;
     }
@@ -8760,7 +8757,7 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
                     "A typed resource has no data type.");
         }
 
-        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_TYPED : VKD3DSIH_DCL;
+        ins->opcode = is_uav ? VKD3DSIH_DCL_UAV_TYPED : VKD3DSIH_DCL;
         for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
             ins->declaration.semantic.resource_data_type[i] = resource_values.data_type;
         ins->declaration.semantic.resource_type = resource_type;
@@ -8770,14 +8767,14 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
     }
     else if (kind == RESOURCE_KIND_RAWBUFFER)
     {
-        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
+        ins->opcode = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
         ins->declaration.raw_resource.resource.reg.write_mask = 0;
 
         return &ins->declaration.raw_resource.resource;
     }
     else if (kind == RESOURCE_KIND_STRUCTUREDBUFFER)
     {
-        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_STRUCTURED : VKD3DSIH_DCL_RESOURCE_STRUCTURED;
+        ins->opcode = is_uav ? VKD3DSIH_DCL_UAV_STRUCTURED : VKD3DSIH_DCL_RESOURCE_STRUCTURED;
         ins->declaration.structured_resource.byte_stride = resource_values.byte_stride;
         ins->declaration.structured_resource.resource.reg.write_mask = 0;
 
@@ -8858,7 +8855,7 @@ static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
     d->kind = kind;
     d->reg_type = VKD3DSPR_RESOURCE;
     d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_RESOURCE;
-    d->resource_data_type = (ins->handler_idx == VKD3DSIH_DCL)
+    d->resource_data_type = (ins->opcode == VKD3DSIH_DCL)
             ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
     init_resource_declaration(resource, VKD3DSPR_RESOURCE, d->reg_data_type, d->id, &d->range);
@@ -8932,7 +8929,7 @@ static enum vkd3d_result sm6_parser_resources_load_uav(struct sm6_parser *sm6,
     d->kind = values[0];
     d->reg_type = VKD3DSPR_UAV;
     d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UAV;
-    d->resource_data_type = (ins->handler_idx == VKD3DSIH_DCL_UAV_TYPED)
+    d->resource_data_type = (ins->opcode == VKD3DSIH_DCL_UAV_TYPED)
             ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
     init_resource_declaration(resource, VKD3DSPR_UAV, d->reg_data_type, d->id, &d->range);

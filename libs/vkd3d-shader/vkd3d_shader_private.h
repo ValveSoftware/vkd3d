@@ -1189,7 +1189,7 @@ struct vkd3d_shader_location
 struct vkd3d_shader_instruction
 {
     struct vkd3d_shader_location location;
-    enum vkd3d_shader_opcode handler_idx;
+    enum vkd3d_shader_opcode opcode;
     uint32_t flags;
     unsigned int dst_count;
     unsigned int src_count;
@@ -1238,8 +1238,8 @@ static inline bool vkd3d_shader_ver_le(const struct vkd3d_shader_version *v, uns
     return v->major < major || (v->major == major && v->minor <= minor);
 }
 
-void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_opcode handler_idx);
+void vsir_instruction_init(struct vkd3d_shader_instruction *ins,
+        const struct vkd3d_shader_location *location, enum vkd3d_shader_opcode opcode);
 
 static inline bool vkd3d_shader_instruction_has_texel_offset(const struct vkd3d_shader_instruction *ins)
 {

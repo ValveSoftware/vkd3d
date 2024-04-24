@@ -1199,7 +1199,7 @@ static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const
     {
         bool untyped = false;
 
-        switch (compiler->current->handler_idx)
+        switch (compiler->current->opcode)
         {
             case VKD3DSIH_MOV:
             case VKD3DSIH_MOVC:
@@ -1755,7 +1755,7 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
 
-    switch (ins->handler_idx)
+    switch (ins->opcode)
     {
         case VKD3DSIH_BREAKP:
         case VKD3DSIH_CONTINUEP:
@@ -1937,9 +1937,9 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     if (ins->coissue)
         vkd3d_string_buffer_printf(buffer, "+");
 
-    shader_print_opcode(compiler, ins->handler_idx);
+    shader_print_opcode(compiler, ins->opcode);
 
-    switch (ins->handler_idx)
+    switch (ins->opcode)
     {
         case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_UAV_TYPED:
@@ -2430,7 +2430,7 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
     {
         struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
-        switch (ins->handler_idx)
+        switch (ins->opcode)
         {
             case VKD3DSIH_ELSE:
             case VKD3DSIH_ENDIF:
@@ -2459,7 +2459,7 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
 
         shader_dump_instruction(&compiler, ins);
 
-        switch (ins->handler_idx)
+        switch (ins->opcode)
         {
             case VKD3DSIH_ELSE:
             case VKD3DSIH_IF:

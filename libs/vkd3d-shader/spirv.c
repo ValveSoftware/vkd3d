@@ -6831,7 +6831,7 @@ static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
     uint32_t function_id, void_id, function_type_id;
     struct vkd3d_shader_phase *phase;
 
-    assert(compiler->phase != instruction->handler_idx);
+    assert(compiler->phase != instruction->opcode);
 
     if (!is_in_default_phase(compiler))
         spirv_compiler_leave_shader_phase(compiler);
@@ -6843,16 +6843,16 @@ static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_function(builder, void_id, function_id,
             SpvFunctionControlMaskNone, function_type_id);
 
-    compiler->phase = instruction->handler_idx;
+    compiler->phase = instruction->opcode;
     spirv_compiler_emit_shader_phase_name(compiler, function_id, NULL);
 
-    phase = (instruction->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+    phase = (instruction->opcode == VKD3DSIH_HS_CONTROL_POINT_PHASE)
         ? &compiler->control_point_phase : &compiler->patch_constant_phase;
     phase->function_id = function_id;
     /* The insertion location must be set after the label is emitted. */
     phase->function_location = 0;
 
-    if (instruction->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+    if (instruction->opcode == VKD3DSIH_HS_CONTROL_POINT_PHASE)
         compiler->emit_default_control_point_phase = instruction->flags;
 }
 
@@ -7016,7 +7016,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
 {
     static const struct
     {
-        enum vkd3d_shader_opcode handler_idx;
+        enum vkd3d_shader_opcode opcode;
         SpvOp spirv_op;
     }
     alu_ops[] =
@@ -7056,7 +7056,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
 
     for (i = 0; i < ARRAY_SIZE(alu_ops); ++i)
     {
-        if (alu_ops[i].handler_idx == instruction->handler_idx)
+        if (alu_ops[i].opcode == instruction->opcode)
             return alu_ops[i].spirv_op;
     }
 
@@ -7065,7 +7065,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
 
 static SpvOp spirv_compiler_map_logical_instruction(const struct vkd3d_shader_instruction *instruction)
 {
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_AND:
             return SpvOpLogicalAnd;
@@ -7090,20 +7090,20 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
     if (dst->reg.data_type == VKD3D_DATA_HALF || dst->reg.data_type == VKD3D_DATA_FLOAT)
     {
-        val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOF);
+        val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->opcode == VKD3DSIH_ITOF);
     }
     else if (dst->reg.data_type == VKD3D_DATA_DOUBLE)
     {
         /* ITOD is not supported. Frontends which emit bool casts must use ITOF for double. */
-        val_id = spirv_compiler_emit_bool_to_double(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOF);
+        val_id = spirv_compiler_emit_bool_to_double(compiler, 1, val_id, instruction->opcode == VKD3DSIH_ITOF);
     }
     else if (dst->reg.data_type == VKD3D_DATA_UINT16 || dst->reg.data_type == VKD3D_DATA_UINT)
     {
-        val_id = spirv_compiler_emit_bool_to_int(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOI);
+        val_id = spirv_compiler_emit_bool_to_int(compiler, 1, val_id, instruction->opcode == VKD3DSIH_ITOI);
     }
     else if (dst->reg.data_type == VKD3D_DATA_UINT64)
     {
-        val_id = spirv_compiler_emit_bool_to_int64(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOI);
+        val_id = spirv_compiler_emit_bool_to_int64(compiler, 1, val_id, instruction->opcode == VKD3DSIH_ITOI);
     }
     else
     {
@@ -7126,7 +7126,7 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
     SpvOp op = SpvOpMax;
     unsigned int i;
 
-    if (src->reg.data_type == VKD3D_DATA_UINT64 && instruction->handler_idx == VKD3DSIH_COUNTBITS)
+    if (src->reg.data_type == VKD3D_DATA_UINT64 && instruction->opcode == VKD3DSIH_COUNTBITS)
     {
         /* At least some drivers support this anyway, but if validation is enabled it will fail. */
         FIXME("Unsupported 64-bit source for bit count.\n");
@@ -7142,8 +7142,8 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
             /* VSIR supports logic ops AND/OR/XOR on bool values. */
             op = spirv_compiler_map_logical_instruction(instruction);
         }
-        else if (instruction->handler_idx == VKD3DSIH_ITOF || instruction->handler_idx == VKD3DSIH_UTOF
-                || instruction->handler_idx == VKD3DSIH_ITOI || instruction->handler_idx == VKD3DSIH_UTOU)
+        else if (instruction->opcode == VKD3DSIH_ITOF || instruction->opcode == VKD3DSIH_UTOF
+                || instruction->opcode == VKD3DSIH_ITOI || instruction->opcode == VKD3DSIH_UTOU)
         {
             /* VSIR supports cast from bool to signed/unsigned integer types and floating point types,
              * where bool is treated as a 1-bit integer and a signed 'true' value converts to -1. */
@@ -7158,9 +7158,9 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
 
     if (op == SpvOpMax)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+        ERR("Unexpected instruction %#x.\n", instruction->opcode);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
-                "Encountered invalid/unhandled instruction handler %#x.", instruction->handler_idx);
+                "Encountered invalid/unhandled instruction handler %#x.", instruction->opcode);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
@@ -7179,8 +7179,8 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
      * Microsoft fxc will compile immediate constants larger than 5 bits.
      * Fixing up the constants would be more elegant, but the simplest way is
      * to let this handle constants too. */
-    if (!(instruction->flags & VKD3DSI_SHIFT_UNMASKED) && (instruction->handler_idx == VKD3DSIH_ISHL
-            || instruction->handler_idx == VKD3DSIH_ISHR || instruction->handler_idx == VKD3DSIH_USHR))
+    if (!(instruction->flags & VKD3DSI_SHIFT_UNMASKED) && (instruction->opcode == VKD3DSIH_ISHL
+            || instruction->opcode == VKD3DSIH_ISHR || instruction->opcode == VKD3DSIH_USHR))
     {
         uint32_t mask_id = spirv_compiler_get_constant_vector(compiler,
                 VKD3D_SHADER_COMPONENT_UINT, vsir_write_mask_component_count(dst->write_mask), 0x1f);
@@ -7218,7 +7218,7 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
 {
     static const struct
     {
-        enum vkd3d_shader_opcode handler_idx;
+        enum vkd3d_shader_opcode opcode;
         enum GLSLstd450 glsl_inst;
     }
     glsl_insts[] =
@@ -7258,7 +7258,7 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
 
     for (i = 0; i < ARRAY_SIZE(glsl_insts); ++i)
     {
-        if (glsl_insts[i].handler_idx == instruction->handler_idx)
+        if (glsl_insts[i].opcode == instruction->opcode)
             return glsl_insts[i].glsl_inst;
     }
 
@@ -7276,20 +7276,20 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     unsigned int i, component_count;
     enum GLSLstd450 glsl_inst;
 
-    if (src[0].reg.data_type == VKD3D_DATA_UINT64 && (instruction->handler_idx == VKD3DSIH_FIRSTBIT_HI
-            || instruction->handler_idx == VKD3DSIH_FIRSTBIT_LO || instruction->handler_idx == VKD3DSIH_FIRSTBIT_SHI))
+    if (src[0].reg.data_type == VKD3D_DATA_UINT64 && (instruction->opcode == VKD3DSIH_FIRSTBIT_HI
+            || instruction->opcode == VKD3DSIH_FIRSTBIT_LO || instruction->opcode == VKD3DSIH_FIRSTBIT_SHI))
     {
         /* At least some drivers support this anyway, but if validation is enabled it will fail. */
-        FIXME("Unsupported 64-bit source for handler %#x.\n", instruction->handler_idx);
+        FIXME("Unsupported 64-bit source for handler %#x.\n", instruction->opcode);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "64-bit source for handler %#x is not supported.", instruction->handler_idx);
+                "64-bit source for handler %#x is not supported.", instruction->opcode);
         return;
     }
 
     glsl_inst = spirv_compiler_map_ext_glsl_instruction(instruction);
     if (glsl_inst == GLSLstd450Bad)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+        ERR("Unexpected instruction %#x.\n", instruction->opcode);
         return;
     }
 
@@ -7306,8 +7306,8 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     val_id = vkd3d_spirv_build_op_ext_inst(builder, type_id,
             instr_set_id, glsl_inst, src_id, instruction->src_count);
 
-    if (instruction->handler_idx == VKD3DSIH_FIRSTBIT_HI
-            || instruction->handler_idx == VKD3DSIH_FIRSTBIT_SHI)
+    if (instruction->opcode == VKD3DSIH_FIRSTBIT_HI
+            || instruction->opcode == VKD3DSIH_FIRSTBIT_SHI)
     {
         /* In D3D bits are numbered from the most significant bit. */
         component_count = vsir_write_mask_component_count(dst->write_mask);
@@ -7415,7 +7415,7 @@ static void spirv_compiler_emit_movc(struct spirv_compiler *compiler,
 
     if (src[0].reg.data_type != VKD3D_DATA_BOOL)
     {
-        if (instruction->handler_idx == VKD3DSIH_CMP)
+        if (instruction->opcode == VKD3DSIH_CMP)
             condition_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, SpvOpFOrdGreaterThanEqual,
                     vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count), condition_id,
                     spirv_compiler_get_constant_float_vector(compiler, 0.0f, component_count));
@@ -7469,9 +7469,9 @@ static void spirv_compiler_emit_dot(struct spirv_compiler *compiler,
     component_count = vsir_write_mask_component_count(dst->write_mask);
     component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
 
-    if (instruction->handler_idx == VKD3DSIH_DP4)
+    if (instruction->opcode == VKD3DSIH_DP4)
         write_mask = VKD3DSP_WRITEMASK_ALL;
-    else if (instruction->handler_idx == VKD3DSIH_DP3)
+    else if (instruction->opcode == VKD3DSIH_DP3)
         write_mask = VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1 | VKD3DSP_WRITEMASK_2;
     else
         write_mask = VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1;
@@ -7606,8 +7606,8 @@ static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
     unsigned int component_count = 0;
     SpvOp div_op, mod_op;
 
-    div_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSDiv : SpvOpUDiv;
-    mod_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSRem : SpvOpUMod;
+    div_op = instruction->opcode == VKD3DSIH_IDIV ? SpvOpSDiv : SpvOpUDiv;
+    mod_op = instruction->opcode == VKD3DSIH_IDIV ? SpvOpSRem : SpvOpUMod;
 
     if (dst[0].reg.type != VKD3DSPR_NULL)
     {
@@ -7778,13 +7778,13 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
     mask_id = spirv_compiler_get_constant_uint(compiler, size - 1);
     size_id = spirv_compiler_get_constant_uint(compiler, size);
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_BFI:  op = SpvOpBitFieldInsert; break;
         case VKD3DSIH_IBFE: op = SpvOpBitFieldSExtract; break;
         case VKD3DSIH_UBFE: op = SpvOpBitFieldUExtract; break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+            ERR("Unexpected instruction %#x.\n", instruction->opcode);
             return;
     }
 
@@ -7895,7 +7895,7 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
     unsigned int component_count;
     SpvOp op;
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_DEQO:
         case VKD3DSIH_EQO: op = SpvOpFOrdEqual; break;
@@ -7916,7 +7916,7 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
         case VKD3DSIH_UGE: op = SpvOpUGreaterThanEqual; break;
         case VKD3DSIH_ULT: op = SpvOpULessThan; break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+            ERR("Unexpected instruction %#x.\n", instruction->opcode);
             return;
     }
 
@@ -7949,7 +7949,7 @@ static void spirv_compiler_emit_orderedness_instruction(struct spirv_compiler *c
     src0_id = vkd3d_spirv_build_op_is_nan(builder, type_id, src0_id);
     src1_id = vkd3d_spirv_build_op_is_nan(builder, type_id, src1_id);
     val_id = vkd3d_spirv_build_op_logical_or(builder, type_id, src0_id, src1_id);
-    if (instruction->handler_idx == VKD3DSIH_ORD)
+    if (instruction->opcode == VKD3DSIH_ORD)
         val_id = vkd3d_spirv_build_op_logical_not(builder, type_id, val_id);
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
@@ -7964,7 +7964,7 @@ static void spirv_compiler_emit_float_comparison_instruction(struct spirv_compil
     unsigned int component_count;
     SpvOp op;
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_SLT: op = SpvOpFOrdLessThan; break;
         case VKD3DSIH_SGE: op = SpvOpFOrdGreaterThanEqual; break;
@@ -8262,7 +8262,7 @@ static void spirv_compiler_emit_deriv_instruction(struct spirv_compiler *compile
 
     static const struct instruction_info
     {
-        enum vkd3d_shader_opcode handler_idx;
+        enum vkd3d_shader_opcode opcode;
         SpvOp op;
         bool needs_derivative_control;
     }
@@ -8279,7 +8279,7 @@ static void spirv_compiler_emit_deriv_instruction(struct spirv_compiler *compile
     info = NULL;
     for (i = 0; i < ARRAY_SIZE(deriv_instructions); ++i)
     {
-        if (deriv_instructions[i].handler_idx == instruction->handler_idx)
+        if (deriv_instructions[i].opcode == instruction->opcode)
         {
             info = &deriv_instructions[i];
             break;
@@ -8287,7 +8287,7 @@ static void spirv_compiler_emit_deriv_instruction(struct spirv_compiler *compile
     }
     if (!info)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+        ERR("Unexpected instruction %#x.\n", instruction->opcode);
         return;
     }
 
@@ -8497,7 +8497,7 @@ static void spirv_compiler_emit_ld(struct spirv_compiler *compiler,
     uint32_t coordinate_mask;
     bool multisample;
 
-    multisample = instruction->handler_idx == VKD3DSIH_LD2DMS;
+    multisample = instruction->opcode == VKD3DSIH_LD2DMS;
 
     spirv_compiler_prepare_image(compiler, &image, &src[1].reg, NULL, VKD3D_IMAGE_FLAG_NONE);
 
@@ -8576,7 +8576,7 @@ static void spirv_compiler_emit_sample(struct spirv_compiler *compiler,
     spirv_compiler_prepare_image(compiler, &image,
             &resource->reg, &sampler->reg, VKD3D_IMAGE_FLAG_SAMPLED);
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_SAMPLE:
             op = SpvOpImageSampleImplicitLod;
@@ -8603,7 +8603,7 @@ static void spirv_compiler_emit_sample(struct spirv_compiler *compiler,
                     &src[3], VKD3DSP_WRITEMASK_0);
             break;
         default:
-            ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+            ERR("Unexpected instruction %#x.\n", instruction->opcode);
             return;
     }
 
@@ -8637,7 +8637,7 @@ static void spirv_compiler_emit_sample_c(struct spirv_compiler *compiler,
     uint32_t image_operands[2];
     SpvOp op;
 
-    if (instruction->handler_idx == VKD3DSIH_SAMPLE_C_LZ)
+    if (instruction->opcode == VKD3DSIH_SAMPLE_C_LZ)
     {
         op = SpvOpImageSampleDrefExplicitLod;
         operands_mask |= SpvImageOperandsLodMask;
@@ -8687,12 +8687,12 @@ static void spirv_compiler_emit_gather4(struct spirv_compiler *compiler,
     uint32_t coordinate_mask;
     bool extended_offset;
 
-    if (instruction->handler_idx == VKD3DSIH_GATHER4_C
-            || instruction->handler_idx == VKD3DSIH_GATHER4_PO_C)
+    if (instruction->opcode == VKD3DSIH_GATHER4_C
+            || instruction->opcode == VKD3DSIH_GATHER4_PO_C)
         image_flags |= VKD3D_IMAGE_FLAG_DEPTH;
 
-    extended_offset = instruction->handler_idx == VKD3DSIH_GATHER4_PO
-            || instruction->handler_idx == VKD3DSIH_GATHER4_PO_C;
+    extended_offset = instruction->opcode == VKD3DSIH_GATHER4_PO
+            || instruction->opcode == VKD3DSIH_GATHER4_PO_C;
 
     addr = &src[0];
     offset = extended_offset ? &src[1] : NULL;
@@ -8963,7 +8963,6 @@ static void spirv_compiler_emit_store_uav_raw_structured(struct spirv_compiler *
     {
         type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
         spirv_compiler_prepare_image(compiler, &image, &dst->reg, NULL, VKD3D_IMAGE_FLAG_NONE);
-        assert((instruction->handler_idx == VKD3DSIH_STORE_STRUCTURED) != !image.structure_stride);
         base_coordinate_id = spirv_compiler_emit_raw_structured_addressing(compiler,
                 type_id, image.structure_stride, &src[0], VKD3DSP_WRITEMASK_0, &src[1], VKD3DSP_WRITEMASK_0);
 
@@ -9007,7 +9006,6 @@ static void spirv_compiler_emit_store_tgsm(struct spirv_compiler *compiler,
 
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
     ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, reg_info.storage_class, type_id);
-    assert((instruction->handler_idx == VKD3DSIH_STORE_STRUCTURED) != !reg_info.structure_stride);
     base_coordinate_id = spirv_compiler_emit_raw_structured_addressing(compiler,
             type_id, reg_info.structure_stride, &src[0], VKD3DSP_WRITEMASK_0, &src[1], VKD3DSP_WRITEMASK_0);
 
@@ -9145,7 +9143,7 @@ static void spirv_compiler_emit_uav_counter_instruction(struct spirv_compiler *c
     uint32_t operands[3];
     SpvOp op;
 
-    op = instruction->handler_idx == VKD3DSIH_IMM_ATOMIC_ALLOC
+    op = instruction->opcode == VKD3DSIH_IMM_ATOMIC_ALLOC
             ? SpvOpAtomicIIncrement : SpvOpAtomicIDecrement;
 
     resource_symbol = spirv_compiler_find_resource(compiler, &src->reg);
@@ -9211,7 +9209,7 @@ static SpvOp spirv_compiler_map_atomic_instruction(const struct vkd3d_shader_ins
 {
     static const struct
     {
-        enum vkd3d_shader_opcode handler_idx;
+        enum vkd3d_shader_opcode opcode;
         SpvOp spirv_op;
     }
     atomic_ops[] =
@@ -9240,16 +9238,16 @@ static SpvOp spirv_compiler_map_atomic_instruction(const struct vkd3d_shader_ins
 
     for (i = 0; i < ARRAY_SIZE(atomic_ops); ++i)
     {
-        if (atomic_ops[i].handler_idx == instruction->handler_idx)
+        if (atomic_ops[i].opcode == instruction->opcode)
             return atomic_ops[i].spirv_op;
     }
 
     return SpvOpMax;
 }
 
-static bool is_imm_atomic_instruction(enum vkd3d_shader_opcode handler_idx)
+static bool is_imm_atomic_instruction(enum vkd3d_shader_opcode opcode)
 {
-    return VKD3DSIH_IMM_ATOMIC_ALLOC <= handler_idx && handler_idx <= VKD3DSIH_IMM_ATOMIC_XOR;
+    return VKD3DSIH_IMM_ATOMIC_ALLOC <= opcode && opcode <= VKD3DSIH_IMM_ATOMIC_XOR;
 }
 
 static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compiler,
@@ -9274,12 +9272,12 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     bool raw;
     SpvOp op;
 
-    resource = is_imm_atomic_instruction(instruction->handler_idx) ? &dst[1] : &dst[0];
+    resource = is_imm_atomic_instruction(instruction->opcode) ? &dst[1] : &dst[0];
 
     op = spirv_compiler_map_atomic_instruction(instruction);
     if (op == SpvOpMax)
     {
-        ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+        ERR("Unexpected instruction %#x.\n", instruction->opcode);
         return;
     }
 
@@ -9360,7 +9358,7 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     {
         WARN("Ignoring 'volatile' attribute.\n");
         spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_IGNORING_FLAG,
-                "Ignoring the 'volatile' attribute flag for atomic instruction %#x.", instruction->handler_idx);
+                "Ignoring the 'volatile' attribute flag for atomic instruction %#x.", instruction->opcode);
     }
 
     memory_semantic = (instruction->flags & VKD3DARF_SEQ_CST)
@@ -9379,7 +9377,7 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     result_id = vkd3d_spirv_build_op_trv(builder, &builder->function_stream,
             op, type_id, operands, i);
 
-    if (is_imm_atomic_instruction(instruction->handler_idx))
+    if (is_imm_atomic_instruction(instruction->opcode))
         spirv_compiler_emit_store_dst(compiler, dst, result_id);
 }
 
@@ -9684,13 +9682,13 @@ static void spirv_compiler_emit_eval_attrib(struct spirv_compiler *compiler,
 
     src_ids[src_count++] = register_info.id;
 
-    if (instruction->handler_idx == VKD3DSIH_EVAL_CENTROID)
+    if (instruction->opcode == VKD3DSIH_EVAL_CENTROID)
     {
         op = GLSLstd450InterpolateAtCentroid;
     }
     else
     {
-        assert(instruction->handler_idx == VKD3DSIH_EVAL_SAMPLE_INDEX);
+        assert(instruction->opcode == VKD3DSIH_EVAL_SAMPLE_INDEX);
         op = GLSLstd450InterpolateAtSample;
         src_ids[src_count++] = spirv_compiler_emit_load_src(compiler, &src[1], VKD3DSP_WRITEMASK_0);
     }
@@ -9772,7 +9770,7 @@ static void spirv_compiler_emit_emit_stream(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     unsigned int stream_idx;
 
-    if (instruction->handler_idx == VKD3DSIH_EMIT_STREAM)
+    if (instruction->opcode == VKD3DSIH_EMIT_STREAM)
         stream_idx = instruction->src[0].reg.idx[0].offset;
     else
         stream_idx = 0;
@@ -9793,7 +9791,7 @@ static void spirv_compiler_emit_cut_stream(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     unsigned int stream_idx;
 
-    if (instruction->handler_idx == VKD3DSIH_CUT_STREAM)
+    if (instruction->opcode == VKD3DSIH_CUT_STREAM)
         stream_idx = instruction->src[0].reg.idx[0].offset;
     else
         stream_idx = 0;
@@ -9807,9 +9805,9 @@ static void spirv_compiler_emit_cut_stream(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_end_primitive(builder);
 }
 
-static SpvOp map_wave_bool_op(enum vkd3d_shader_opcode handler_idx)
+static SpvOp map_wave_bool_op(enum vkd3d_shader_opcode opcode)
 {
-    switch (handler_idx)
+    switch (opcode)
     {
         case VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL:
             return SpvOpGroupNonUniformAllEqual;
@@ -9833,7 +9831,7 @@ static void spirv_compiler_emit_wave_bool_op(struct spirv_compiler *compiler,
 
     vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniformVote);
 
-    op = map_wave_bool_op(instruction->handler_idx);
+    op = map_wave_bool_op(instruction->opcode);
     type_id = vkd3d_spirv_get_op_type_bool(builder);
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
     val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, op,
@@ -9865,9 +9863,9 @@ static void spirv_compiler_emit_wave_active_ballot(struct spirv_compiler *compil
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static SpvOp map_wave_alu_op(enum vkd3d_shader_opcode handler_idx, bool is_float)
+static SpvOp map_wave_alu_op(enum vkd3d_shader_opcode opcode, bool is_float)
 {
-    switch (handler_idx)
+    switch (opcode)
     {
         case VKD3DSIH_WAVE_ACTIVE_BIT_AND:
             return SpvOpGroupNonUniformBitwiseAnd;
@@ -9905,7 +9903,7 @@ static void spirv_compiler_emit_wave_alu_op(struct spirv_compiler *compiler,
     uint32_t type_id, val_id;
     SpvOp op;
 
-    op = map_wave_alu_op(instruction->handler_idx, data_type_is_floating_point(src->reg.data_type));
+    op = map_wave_alu_op(instruction->opcode, data_type_is_floating_point(src->reg.data_type));
 
     type_id = vkd3d_spirv_get_type_id_for_data_type(builder, dst->reg.data_type,
             vsir_write_mask_component_count(dst->write_mask));
@@ -9928,7 +9926,7 @@ static void spirv_compiler_emit_wave_bit_count(struct spirv_compiler *compiler,
     SpvGroupOperation group_op;
     uint32_t type_id, val_id;
 
-    group_op = (instruction->handler_idx == VKD3DSIH_WAVE_PREFIX_BIT_COUNT) ? SpvGroupOperationExclusiveScan
+    group_op = (instruction->opcode == VKD3DSIH_WAVE_PREFIX_BIT_COUNT) ? SpvGroupOperationExclusiveScan
             : SpvGroupOperationReduce;
 
     val_id = spirv_compiler_emit_group_nonuniform_ballot(compiler, instruction->src);
@@ -10014,7 +10012,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
 
     compiler->location = instruction->location;
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_DCL_GLOBAL_FLAGS:
             spirv_compiler_emit_dcl_global_flags(compiler, instruction);
@@ -10390,9 +10388,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             /* nothing to do */
             break;
         default:
-            FIXME("Unhandled instruction %#x.\n", instruction->handler_idx);
+            FIXME("Unhandled instruction %#x.\n", instruction->opcode);
             spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
-                    "Encountered invalid/unhandled instruction handler %#x.", instruction->handler_idx);
+                    "Encountered invalid/unhandled instruction handler %#x.", instruction->opcode);
             break;
     }
 

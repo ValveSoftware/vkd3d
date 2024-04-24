@@ -48,9 +48,9 @@ static void shader_glsl_print_indent(struct vkd3d_string_buffer *buffer, unsigne
 static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
     shader_glsl_print_indent(&gen->buffer, gen->indent);
-    vkd3d_string_buffer_printf(&gen->buffer, "/* <unhandled instruction %#x> */\n", ins->handler_idx);
+    vkd3d_string_buffer_printf(&gen->buffer, "/* <unhandled instruction %#x> */\n", ins->opcode);
     vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-            "Internal compiler error: Unhandled instruction %#x.", ins->handler_idx);
+            "Internal compiler error: Unhandled instruction %#x.", ins->opcode);
 }
 
 static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
@@ -74,7 +74,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
 {
     generator->location = instruction->location;
 
-    switch (instruction->handler_idx)
+    switch (instruction->opcode)
     {
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_OUTPUT:

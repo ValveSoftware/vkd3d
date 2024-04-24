@@ -780,7 +780,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     if (type != VKD3D_SM4_SHADER_DATA_IMMEDIATE_CONSTANT_BUFFER)
     {
         FIXME("Ignoring shader data type %#x.\n", type);
-        ins->handler_idx = VKD3DSIH_NOP;
+        ins->opcode = VKD3DSIH_NOP;
         return;
     }
 
@@ -789,7 +789,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     if (icb_size % 4)
     {
         FIXME("Unexpected immediate constant buffer size %u.\n", icb_size);
-        ins->handler_idx = VKD3DSIH_INVALID;
+        ins->opcode = VKD3DSIH_INVALID;
         return;
     }
 
@@ -797,7 +797,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     {
         ERR("Failed to allocate immediate constant buffer, size %u.\n", icb_size);
         vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
-        ins->handler_idx = VKD3DSIH_INVALID;
+        ins->opcode = VKD3DSIH_INVALID;
         return;
     }
     icb->register_idx = 0;
@@ -2395,16 +2395,16 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     if (!(opcode_info = get_info_from_sm4_opcode(&sm4->lookup, opcode)))
     {
         FIXME("Unrecognized opcode %#x, opcode_token 0x%08x.\n", opcode, opcode_token);
-        ins->handler_idx = VKD3DSIH_INVALID;
+        ins->opcode = VKD3DSIH_INVALID;
         *ptr += len;
         return;
     }
 
     vsir_instruction_init(ins, &sm4->p.location, opcode_info->handler_idx);
-    if (ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE || ins->handler_idx == VKD3DSIH_HS_FORK_PHASE
-            || ins->handler_idx == VKD3DSIH_HS_JOIN_PHASE)
-        sm4->phase = ins->handler_idx;
-    sm4->has_control_point_phase |= ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE;
+    if (ins->opcode == VKD3DSIH_HS_CONTROL_POINT_PHASE || ins->opcode == VKD3DSIH_HS_FORK_PHASE
+            || ins->opcode == VKD3DSIH_HS_JOIN_PHASE)
+        sm4->phase = ins->opcode;
+    sm4->has_control_point_phase |= ins->opcode == VKD3DSIH_HS_CONTROL_POINT_PHASE;
     ins->flags = 0;
     ins->coissue = false;
     ins->raw = false;
@@ -2417,7 +2417,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     {
         ERR("Failed to allocate src parameters.\n");
         vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
-        ins->handler_idx = VKD3DSIH_INVALID;
+        ins->opcode = VKD3DSIH_INVALID;
         return;
     }
     ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
@@ -2459,7 +2459,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
         {
             ERR("Failed to allocate dst parameters.\n");
             vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
-            ins->handler_idx = VKD3DSIH_INVALID;
+            ins->opcode = VKD3DSIH_INVALID;
             return;
         }
         for (i = 0; i < ins->dst_count; ++i)
@@ -2467,7 +2467,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
             if (!(shader_sm4_read_dst_param(sm4, &p, *ptr, map_data_type(opcode_info->dst_info[i]),
                     &dst_params[i])))
             {
-                ins->handler_idx = VKD3DSIH_INVALID;
+                ins->opcode = VKD3DSIH_INVALID;
                 return;
             }
             dst_params[i].modifiers |= instruction_dst_modifier;
@@ -2478,7 +2478,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
             if (!(shader_sm4_read_src_param(sm4, &p, *ptr, map_data_type(opcode_info->src_info[i]),
                     &src_params[i])))
             {
-                ins->handler_idx = VKD3DSIH_INVALID;
+                ins->opcode = VKD3DSIH_INVALID;
                 return;
             }
         }
@@ -2488,7 +2488,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
 
 fail:
     *ptr = sm4->end;
-    ins->handler_idx = VKD3DSIH_INVALID;
+    ins->opcode = VKD3DSIH_INVALID;
     return;
 }
 
@@ -2693,7 +2693,7 @@ int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t con
         ins = &instructions->elements[instructions->count];
         shader_sm4_read_instruction(&sm4, ins);
 
-        if (ins->handler_idx == VKD3DSIH_INVALID)
+        if (ins->opcode == VKD3DSIH_INVALID)
         {
             WARN("Encountered unrecognized or invalid instruction.\n");
             vsir_program_cleanup(program);

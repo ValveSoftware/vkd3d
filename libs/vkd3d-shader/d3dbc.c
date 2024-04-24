@@ -1060,7 +1060,7 @@ static void shader_sm1_read_comment(struct vkd3d_shader_sm1_parser *sm1)
 
 static void shader_sm1_validate_instruction(struct vkd3d_shader_sm1_parser *sm1, struct vkd3d_shader_instruction *ins)
 {
-    if ((ins->handler_idx == VKD3DSIH_BREAKP || ins->handler_idx == VKD3DSIH_IF) && ins->flags)
+    if ((ins->opcode == VKD3DSIH_BREAKP || ins->opcode == VKD3DSIH_IF) && ins->flags)
     {
         vkd3d_shader_parser_warning(&sm1->p, VKD3D_SHADER_WARNING_D3DBC_IGNORED_INSTRUCTION_FLAGS,
                 "Ignoring unexpected instruction flags %#x.", ins->flags);
@@ -1142,23 +1142,23 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         goto fail;
     }
 
-    if (ins->handler_idx == VKD3DSIH_DCL)
+    if (ins->opcode == VKD3DSIH_DCL)
     {
         shader_sm1_read_semantic(sm1, &p, &ins->declaration.semantic);
     }
-    else if (ins->handler_idx == VKD3DSIH_DEF)
+    else if (ins->opcode == VKD3DSIH_DEF)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VKD3D_DATA_FLOAT);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
-    else if (ins->handler_idx == VKD3DSIH_DEFB)
+    else if (ins->opcode == VKD3DSIH_DEFB)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_SCALAR, VKD3D_DATA_UINT);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
-    else if (ins->handler_idx == VKD3DSIH_DEFI)
+    else if (ins->opcode == VKD3DSIH_DEFI)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VKD3D_DATA_INT);
@@ -1195,7 +1195,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     return;
 
 fail:
-    ins->handler_idx = VKD3DSIH_INVALID;
+    ins->opcode = VKD3DSIH_INVALID;
     *ptr = sm1->end;
 }
 
@@ -1326,7 +1326,7 @@ int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t c
         ins = &instructions->elements[instructions->count];
         shader_sm1_read_instruction(&sm1, ins);
 
-        if (ins->handler_idx == VKD3DSIH_INVALID)
+        if (ins->opcode == VKD3DSIH_INVALID)
         {
             WARN("Encountered unrecognized or invalid instruction.\n");
             vsir_program_cleanup(program);
