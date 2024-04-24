@@ -753,6 +753,16 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
     runner->caps.rov = options.ROVsSupported;
 }
 
+static bool device_supports_shader_model_6_0(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_SHADER_MODEL sm = {D3D_SHADER_MODEL_6_0};
+    HRESULT hr;
+
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &sm, sizeof(sm));
+    ok(hr == S_OK, "Failed to check feature shader model support, hr %#x.\n", hr);
+    return sm.HighestShaderModel >= D3D_SHADER_MODEL_6_0;
+}
+
 void run_shader_tests_d3d12(void *dxc_compiler)
 {
     static const struct test_context_desc desc =
@@ -792,7 +802,11 @@ void run_shader_tests_d3d12(void *dxc_compiler)
     {
         runner.caps.minimum_shader_model = SHADER_MODEL_6_0;
         runner.caps.maximum_shader_model = SHADER_MODEL_6_0;
-        run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
+
+        if (device_supports_shader_model_6_0(device))
+            run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
+        else
+            trace("Device does not support shader model 6.0.\n");
     }
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
