@@ -5748,11 +5748,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->declaration.max_tessellation_factor);
             return;
 
-        /* The DXIL parser can generate these outside phases, but this is not an issue. */
-        case VKD3DSIH_DCL_INPUT:
-        case VKD3DSIH_DCL_OUTPUT:
-            return;
-
         case VKD3DSIH_DCL_INPUT_PRIMITIVE:
             if (instruction->declaration.primitive_type.type == VKD3D_PT_UNDEFINED
                     || instruction->declaration.primitive_type.type >= VKD3D_PT_COUNT)
@@ -5810,7 +5805,9 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
     }
 
-    if (version->type == VKD3D_SHADER_TYPE_HULL && ctx->phase == VKD3DSIH_INVALID)
+    /* Only DCL instructions may occur outside hull shader phases. */
+    if (!vsir_instruction_is_dcl(instruction) && version->type == VKD3D_SHADER_TYPE_HULL
+            && ctx->phase == VKD3DSIH_INVALID)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
                 "Instruction %#x appear before any phase instruction in a hull shader.",
                 instruction->handler_idx);
