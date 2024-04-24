@@ -13,11 +13,11 @@ float4 main(out uint sample_mask : SV_Coverage) : SV_Target
 }
 
 [test]
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.5, 0.5, 0.5, 0.5)
 sample mask 0x0b
 clear rtv 0 0.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.25, 0.25, 0.25, 0.25)
 
 

@@ -3821,6 +3821,8 @@ static enum vkd3d_shader_register_type register_type_from_dxil_semantic_kind(
 {
     switch (sysval_semantic)
     {
+        case VKD3D_SHADER_SV_COVERAGE:
+            return VKD3DSPR_COVERAGE;
         case VKD3D_SHADER_SV_DEPTH:
             return VKD3DSPR_DEPTHOUT;
         case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
@@ -8455,6 +8457,7 @@ static const enum vkd3d_shader_sysval_semantic sysval_semantic_table[] =
     [SEMANTIC_KIND_POSITION]             = VKD3D_SHADER_SV_POSITION,
     [SEMANTIC_KIND_PRIMITIVEID]          = VKD3D_SHADER_SV_PRIMITIVE_ID,
     [SEMANTIC_KIND_ISFRONTFACE]          = VKD3D_SHADER_SV_IS_FRONT_FACE,
+    [SEMANTIC_KIND_COVERAGE]             = VKD3D_SHADER_SV_COVERAGE,
     [SEMANTIC_KIND_TARGET]               = VKD3D_SHADER_SV_TARGET,
     [SEMANTIC_KIND_DEPTH]                = VKD3D_SHADER_SV_DEPTH,
     [SEMANTIC_KIND_DEPTHLESSEQUAL]       = VKD3D_SHADER_SV_DEPTH_LESS_EQUAL,
