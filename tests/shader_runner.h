@@ -137,6 +137,7 @@ struct shader_runner_caps
     bool float64;
     bool int64;
     bool rov;
+    bool wave_ops;
 };
 
 static inline unsigned int shader_runner_caps_get_feature_flags(const struct shader_runner_caps *caps)
@@ -169,6 +170,7 @@ struct shader_runner
     bool require_float64;
     bool require_int64;
     bool require_rov;
+    bool require_wave_ops;
 
     bool last_render_failed;
 

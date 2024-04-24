@@ -751,6 +751,7 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
     runner->caps.float64 = options.DoublePrecisionFloatShaderOps;
     runner->caps.int64 = options1.Int64ShaderOps;
     runner->caps.rov = options.ROVsSupported;
+    runner->caps.wave_ops = options1.WaveOps;
 }
 
 static bool device_supports_shader_model_6_0(ID3D12Device *device)

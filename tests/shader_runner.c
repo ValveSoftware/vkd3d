@@ -339,6 +339,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         runner->require_rov = true;
     }
+    else if (match_string(line, "wave ops", &line))
+    {
+        runner->require_wave_ops = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -1545,6 +1549,8 @@ static bool check_requirements(const struct shader_runner *runner, const struct 
         return false;
     if (runner->require_rov && !caps->rov)
         return false;
+    if (runner->require_wave_ops && !caps->wave_ops)
+        return false;
 
     return true;
 }
@@ -1838,6 +1844,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
                 runner->require_float64 = false;
                 runner->require_int64 = false;
                 runner->require_rov = false;
+                runner->require_wave_ops = false;
                 runner->compile_options = 0;
                 skip_tests = false;
             }
