@@ -5098,12 +5098,12 @@ static void register_map_undominated_use(struct vkd3d_shader_register *reg, stru
 {
     unsigned int i;
 
-    if (!register_is_ssa(reg))
-        return;
-
-    i = reg->idx[0].offset;
-    if (alloc->table[i] == UINT_MAX && !vsir_block_dominates(origin_blocks[i], block))
-        alloc->table[i] = alloc->next_temp_idx++;
+    if (register_is_ssa(reg))
+    {
+        i = reg->idx[0].offset;
+        if (alloc->table[i] == UINT_MAX && !vsir_block_dominates(origin_blocks[i], block))
+            alloc->table[i] = alloc->next_temp_idx++;
+    }
 
     for (i = 0; i < reg->idx_count; ++i)
         if (reg->idx[i].rel_addr)
