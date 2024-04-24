@@ -6726,6 +6726,15 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
 
     code = record->operands[i++];
 
+    /* dxcompiler occasionally emits bool not-equal-to-false, which is a no-op. Bool comparisons
+     * do not otherwise occur, so deleting these avoids the need for backend support. */
+    if (sm6_type_is_bool(type_a) && code == ICMP_NE && sm6_value_is_constant_zero(b))
+    {
+        ins->handler_idx = VKD3DSIH_NOP;
+        *dst = *a;
+        return;
+    }
+
     if ((!is_int && !is_fp) || is_int != (code >= ICMP_EQ))
     {
         FIXME("Invalid operation %"PRIu64" on type class %u.\n", code, type_a->class);
