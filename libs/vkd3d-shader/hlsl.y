@@ -1293,7 +1293,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
     struct hlsl_ir_node *node;
     struct hlsl_block expr;
     unsigned int ret = 0;
-    bool progress;
+    struct hlsl_src src;
 
     LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -1330,13 +1330,12 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
         return 0;
     }
 
-    do
-    {
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, &expr, NULL);
-        progress |= hlsl_copy_propagation_execute(ctx, &expr);
-    } while (progress);
+    /* Wrap the node into a src to allow the reference to survive the multiple const passes. */
+    hlsl_src_from_node(&src, node_from_block(&expr));
+    hlsl_run_const_passes(ctx, &expr);
+    node = src.node;
+    hlsl_src_remove(&src);
 
-    node = node_from_block(&expr);
     if (node->type == HLSL_IR_CONSTANT)
     {
         constant = hlsl_ir_constant(node);
