@@ -3961,7 +3961,8 @@ static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_
     uint64_t code;
 
     if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
-            || !sm6_value_validate_is_pointer_to_i32(ptr, sm6))
+            || !sm6_value_validate_is_pointer_to_i32(ptr, sm6)
+            || !sm6_value_validate_is_backward_ref(ptr, sm6))
         return;
 
     if (ptr->u.reg.type != VKD3DSPR_GROUPSHAREDMEM)
