@@ -6886,7 +6886,8 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
 
     if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
             || !sm6_value_validate_is_register(ptr, sm6)
-            || !sm6_value_validate_is_pointer(ptr, sm6))
+            || !sm6_value_validate_is_pointer(ptr, sm6)
+            || !sm6_value_validate_is_backward_ref(ptr, sm6))
     {
         return;
     }
