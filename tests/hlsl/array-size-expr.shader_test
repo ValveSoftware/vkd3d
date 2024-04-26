@@ -53,7 +53,7 @@ todo(glsl) draw quad
 probe all rgba (2, 3, 6, 1)
 
 % Additional level of indirection
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 static const float array[8] = {1, 2, 3, 4, 5, 6, 7, 8};
 static const int idx = 2;
 static const float array2[array[idx]] = {1, 2, 3};
@@ -64,11 +64,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(glsl) draw quad
 probe all rgba (2, 3, 6, 1)
 
 
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 static const struct
 {
     float f;
@@ -88,5 +88,5 @@ uniform 4 float 0.0
 uniform 8 float 0.0
 uniform 12 float 0.0
 uniform 16 float 42.0
-todo draw quad
+todo(glsl) draw quad
 probe all rgba (42, 42, 42, 42)

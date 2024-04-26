@@ -5412,6 +5412,9 @@ void hlsl_run_const_passes(struct hlsl_ctx *ctx, struct hlsl_block *body)
 {
     bool progress;
 
+    lower_ir(ctx, lower_matrix_swizzles, body);
+    lower_ir(ctx, lower_index_loads, body);
+
     lower_ir(ctx, lower_broadcasts, body);
     while (hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
