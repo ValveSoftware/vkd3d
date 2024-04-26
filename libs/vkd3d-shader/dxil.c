@@ -606,6 +606,7 @@ struct sm6_value
     enum sm6_value_type value_type;
     unsigned int structure_stride;
     bool is_undefined;
+    bool is_back_ref;
     union
     {
         struct sm6_function_data function;
@@ -2658,6 +2659,18 @@ static bool sm6_value_validate_is_pointer(const struct sm6_value *value, struct 
     return true;
 }
 
+static bool sm6_value_validate_is_backward_ref(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!value->is_back_ref)
+    {
+        FIXME("Forward-referenced pointers are not supported.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Forward-referenced pointer declarations are not supported.");
+        return false;
+    }
+    return true;
+}
+
 static bool sm6_value_validate_is_numeric(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     if (!sm6_type_is_numeric(value->type))
@@ -3135,6 +3148,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         dst = sm6_parser_get_current_value(sm6);
         dst->type = type;
         dst->value_type = VALUE_TYPE_REG;
+        dst->is_back_ref = true;
         vsir_register_init(&dst->u.reg, reg_type, reg_data_type, 0);
 
         switch (record->code)
@@ -3462,6 +3476,7 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
     dst = sm6_parser_get_current_value(sm6);
     dst->type = type;
     dst->value_type = VALUE_TYPE_REG;
+    dst->is_back_ref = true;
 
     if (is_constant && !init)
     {
@@ -6687,6 +6702,7 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
         return;
     if (!sm6_value_validate_is_register(ptr, sm6)
             || !sm6_value_validate_is_pointer(ptr, sm6)
+            || !sm6_value_validate_is_backward_ref(ptr, sm6)
             || !dxil_record_validate_operand_count(record, i + 2, i + 3, sm6))
         return;
 
@@ -7478,6 +7494,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         fwd_type = dst->type;
         dst->type = NULL;
         dst->value_type = VALUE_TYPE_REG;
+        dst->is_back_ref = true;
         is_terminator = false;
 
         record = block->records[i];
