@@ -163,6 +163,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/object-field-offsets.shader_test \
 	tests/hlsl/object-parameters.shader_test \
 	tests/hlsl/object-references.shader_test \
+	tests/hlsl/pointer-cast.shader_test \
 	tests/hlsl/pow.shader_test \
 	tests/hlsl/precise-modifier.shader_test \
 	tests/hlsl/rasteriser-ordered-views.shader_test \

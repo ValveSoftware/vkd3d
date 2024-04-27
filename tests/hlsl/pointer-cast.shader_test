@@ -1,0 +1,23 @@
+[require]
+shader model >= 6.0
+
+[pixel shader]
+uint u, v, w;
+
+static float foo[3] = {0.25, 0.5, 0.75};
+
+float4 main(float4 pos : SV_Position) : SV_Target
+{
+    // Compiles to a constexpr uint pointer cast of foo for a store instruction.
+    if (v)
+        foo[1] = asfloat(w);
+    return float4(foo[u], foo[u + 1], 0.0, 1.0);
+}
+
+[test]
+uniform 0 uint4 0 1 0x3e000000 0
+todo draw quad
+probe all rgba (0.25, 0.125, 0.0, 1.0)
+uniform 0 uint4 1 0 0x3e000000 0
+todo draw quad
+probe all rgba (0.5, 0.75, 0.0, 1.0)
