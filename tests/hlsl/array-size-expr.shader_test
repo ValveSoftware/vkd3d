@@ -66,3 +66,27 @@ float4 main() : sv_target
 [test]
 todo draw quad
 probe all rgba (2, 3, 6, 1)
+
+
+[pixel shader fail(sm>=6) todo]
+static const struct
+{
+    float f;
+    float2x3 m[2];
+} a = {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 1};
+
+float arr[a.m[1]._13_22_21.zxy.z]; // Fails on SM6 because size is float.
+
+float4 main() : sv_target
+{
+    return arr[4];
+}
+
+[test]
+uniform 0 float 0.0
+uniform 4 float 0.0
+uniform 8 float 0.0
+uniform 12 float 0.0
+uniform 16 float 42.0
+todo draw quad
+probe all rgba (42, 42, 42, 42)
