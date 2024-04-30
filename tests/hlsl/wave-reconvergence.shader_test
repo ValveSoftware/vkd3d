@@ -1,0 +1,150 @@
+[require]
+shader model >= 6.0
+
+[uav 0]
+format r32 uint
+size (buffer, 4)
+
+0x0 0x1 0x2 0x13
+
+[uav 1]
+format r32 uint
+size (buffer, 4)
+
+0x100 0x200 0x400 0x800
+
+[uav 2]
+format r32 uint
+size (buffer, 20)
+
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+
+[compute shader]
+RWBuffer<uint> u0 : register(u0);
+RWBuffer<uint> u1 : register(u1);
+RWBuffer<uint> u2 : register(u2);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    const unsigned int POS_COUNT = 5;
+    unsigned int i, pos = 0;
+    /* If SPV_KHR_subgroup_uniform_control_flow is not supported,
+     * SPIR-V doesn't guarantee reconvergence after the loop. */
+    for (i = 0; i < 2; ++i)
+    {
+        u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 1;
+        if (u0[id] & (1 << i))
+        {
+            /* In many programming languages this statement could be
+             * moved after the loop. Not here, because the set of
+             * active invocations is supposed to depend on whether
+             * we're still in the loop (i.e., before reconverging the
+             * invocations that diverged during the loop) or not. */
+            u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 2;
+            break;
+        }
+        else
+        {
+            u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 3;
+        }
+    }
+    u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 4;
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 2 (0) rui (0xf01)
+probe uav 2 (1) rui (0x503)
+probe uav 2 (2) rui (0x511)
+probe uav 2 (3) rui (0x113)
+probe uav 2 (4) rui (0xf24)
+
+probe uav 2 (5) rui (0xf01)
+probe uav 2 (6) rui (0xa02)
+probe uav 2 (7) rui (0xf04)
+probe uav 2 (8) rui (0)
+probe uav 2 (9) rui (0)
+
+probe uav 2 (10) rui (0xf01)
+probe uav 2 (11) rui (0x503)
+probe uav 2 (12) rui (0x511)
+probe uav 2 (13) rui (0x412)
+probe uav 2 (14) rui (0xf14)
+
+probe uav 2 (15) rui (0xf01)
+probe uav 2 (16) rui (0xa02)
+probe uav 2 (17) rui (0xf04)
+probe uav 2 (18) rui (0)
+probe uav 2 (19) rui (0)
+
+[uav 2]
+format r32 uint
+size (buffer, 20)
+
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+0 0 0 0 0
+
+[compute shader]
+RWBuffer<uint> u0 : register(u0);
+RWBuffer<uint> u1 : register(u1);
+RWBuffer<uint> u2 : register(u2);
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
+    const unsigned int POS_COUNT = 5;
+    unsigned int i, pos = 0;
+    /* If SPV_KHR_maximal_reconvergence is not supported, SPIR-V
+     * doesn't guarantee reconvergence after the loop even if
+     * SPV_KHR_subgroup_uniform_control_flow is supported, because the
+     * flow wasn't fully convergent when entering the loop. */
+    if (!(u0[id] & 0x10))
+    {
+        for (i = 0; i < 2; ++i)
+        {
+            u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 1;
+            if (u0[id] & (1 << i))
+            {
+                u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 2;
+                break;
+            }
+            else
+            {
+                u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 3;
+            }
+        }
+        u2[POS_COUNT * id + pos++] = WaveActiveSum(u1[id]) + 16 * i + 4;
+    }
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 2 (0) rui (0x701)
+probe uav 2 (1) rui (0x503)
+probe uav 2 (2) rui (0x511)
+probe uav 2 (3) rui (0x113)
+probe uav 2 (4) rui (0x724)
+
+probe uav 2 (5) rui (0x701)
+probe uav 2 (6) rui (0x202)
+probe uav 2 (7) rui (0x704)
+probe uav 2 (8) rui (0)
+probe uav 2 (9) rui (0)
+
+probe uav 2 (10) rui (0x701)
+probe uav 2 (11) rui (0x503)
+probe uav 2 (12) rui (0x511)
+probe uav 2 (13) rui (0x412)
+probe uav 2 (14) rui (0x714)
+
+probe uav 2 (15) rui (0)
+probe uav 2 (16) rui (0)
+probe uav 2 (17) rui (0)
+probe uav 2 (18) rui (0)
+probe uav 2 (19) rui (0)
