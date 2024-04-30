@@ -994,7 +994,6 @@ static void test_check_feature_support(void)
     shader_model.HighestShaderModel = D3D_SHADER_MODEL_5_1;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
     ok(hr == S_OK, "Failed to check shader model, hr %#x.\n", hr);
-    todo
     ok(shader_model.HighestShaderModel <= D3D_SHADER_MODEL_5_1,
             "Got shader model %#x, expected <= %#x.\n", shader_model.HighestShaderModel, D3D_SHADER_MODEL_5_1);
     for (sm = D3D_HIGHEST_SHADER_MODEL; sm >= D3D_SHADER_MODEL_6_0; --sm)

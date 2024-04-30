@@ -3490,9 +3490,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
             TRACE("Request shader model %#x.\n", data->HighestShaderModel);
 
 #ifdef VKD3D_SHADER_UNSUPPORTED_DXIL
-            data->HighestShaderModel = D3D_SHADER_MODEL_6_0;
+            data->HighestShaderModel = min(data->HighestShaderModel, D3D_SHADER_MODEL_6_0);
 #else
-            data->HighestShaderModel = D3D_SHADER_MODEL_5_1;
+            data->HighestShaderModel = min(data->HighestShaderModel, D3D_SHADER_MODEL_5_1);
 #endif
 
             TRACE("Shader model %#x.\n", data->HighestShaderModel);
