@@ -1010,15 +1010,12 @@ static void test_check_feature_support(void)
             "Got shader model %#x, expected <= %#x.\n", shader_model.HighestShaderModel, sm);
     shader_model.HighestShaderModel = 0x89;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     shader_model.HighestShaderModel = 0x52;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
     shader_model.HighestShaderModel = 0;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     /* Root signature */

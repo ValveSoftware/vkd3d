@@ -3487,6 +3487,14 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
                 return E_INVALIDARG;
             }
 
+            if (data->HighestShaderModel != D3D_SHADER_MODEL_5_1
+                    && (data->HighestShaderModel < D3D_SHADER_MODEL_6_0
+                    || data->HighestShaderModel > D3D_HIGHEST_SHADER_MODEL))
+            {
+                WARN("Unknown shader model %#x.\n", data->HighestShaderModel);
+                return E_INVALIDARG;
+            }
+
             TRACE("Request shader model %#x.\n", data->HighestShaderModel);
 
 #ifdef VKD3D_SHADER_UNSUPPORTED_DXIL
