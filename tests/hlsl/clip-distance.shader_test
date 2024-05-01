@@ -1,0 +1,98 @@
+[require]
+shader model >= 4.0
+
+[input layout]
+0 r32g32 float POSITION
+1 r32 float CLIP_DISTANCE
+
+[vb 0]
+-1.0 -1.0
+-1.0  1.0
+ 1.0 -1.0
+ 1.0  1.0
+
+[vb 1]
+1.0
+1.0
+1.0
+1.0
+
+[rtv 0]
+format r32g32b32a32 float
+size (2d, 640, 480)
+
+[vertex shader todo]
+struct input
+{
+    float4 position : POSITION;
+    float distance : CLIP_DISTANCE;
+};
+
+struct vertex
+{
+    float4 position : SV_POSITION;
+    float clip : SV_ClipDistance;
+};
+
+void main(input vin, out vertex vertex)
+{
+    vertex.position = vin.position;
+    vertex.clip = vin.distance;
+}
+
+[pixel shader]
+float4 main(const in float4 position : SV_Position) : SV_Target
+{
+    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+}
+
+[test]
+clear rtv 0 1.0 1.0 1.0 1.0
+todo draw triangle strip 4
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+[vb 1]
+0.0
+0.0
+0.0
+0.0
+
+[test]
+clear rtv 0 1.0 1.0 1.0 1.0
+todo draw triangle strip 4
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+[vb 1]
+-1.0
+-1.0
+-1.0
+-1.0
+
+[test]
+clear rtv 0 1.0 1.0 1.0 1.0
+todo draw triangle strip 4
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[vb 1]
+1.0
+1.0
+-1.0
+-1.0
+
+[test]
+clear rtv 0 1.0 1.0 1.0 1.0
+todo draw triangle strip 4
+probe rtv 0 (160, 240) rgba (0.0, 1.0, 0.0, 1.0)
+probe rtv 0 (480, 240) rgba (1.0, 1.0, 1.0, 1.0)
+
+[vb 1]
+-1.0
+1.0
+-1.0
+1.0
+
+[test]
+clear rtv 0 1.0 1.0 1.0 1.0
+todo draw triangle strip 4
+probe rtv 0 (320, 120) rgba (0.0, 1.0, 0.0, 1.0)
+probe rtv 0 (320, 360) rgba (1.0, 1.0, 1.0, 1.0)
