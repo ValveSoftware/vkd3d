@@ -2052,20 +2052,15 @@ static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, 
              * state when GPU finishes execution of a command list. */
             if (is_swapchain_image)
             {
-                if (resource->present_state == D3D12_RESOURCE_STATE_PRESENT)
-                {
-                    *access_mask = VK_ACCESS_MEMORY_READ_BIT;
-                    *stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    if (image_layout)
-                        *image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-                    return true;
-                }
-                else if (resource->present_state != D3D12_RESOURCE_STATE_COMMON)
-                {
-                    vk_barrier_parameters_from_d3d12_resource_state(resource->present_state, 0,
+                if (resource->present_state != D3D12_RESOURCE_STATE_PRESENT)
+                    return vk_barrier_parameters_from_d3d12_resource_state(resource->present_state, 0,
                             resource, vk_queue_flags, vk_info, access_mask, stage_flags, image_layout);
-                    return true;
-                }
+
+                *access_mask = VK_ACCESS_MEMORY_READ_BIT;
+                *stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                if (image_layout)
+                    *image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+                return true;
             }
 
             *access_mask = VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
