@@ -193,6 +193,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/sign.shader_test \
 	tests/hlsl/single-numeric-initializer.shader_test \
 	tests/hlsl/sm1-const-folding.shader_test \
+	tests/hlsl/sm1-const-allocation.shader_test \
 	tests/hlsl/sm6-ternary.shader_test \
 	tests/hlsl/sm6-uav-rwtexture.shader_test \
 	tests/hlsl/smoothstep.shader_test \

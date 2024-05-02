@@ -1,0 +1,227 @@
+[require]
+shader model < 4.0
+
+
+[pixel shader]
+// Only the used size is reserved.
+// Note that these matrices are column-major.
+float4x2 a;
+float4x2 b;
+
+float4 main() : sv_target
+{
+    float4x2 c = a;
+    float4x2 d = c + b;
+
+    return float4(d[0].x, d[1].x, d[2].x, d[3].x);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   a            c0       1
+//   b            c1       1
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 100 200 300 400
+draw quad
+todo probe all rgba (101, 202, 303, 404)
+
+
+[pixel shader]
+// Size 2 always are allocated before size 1
+float4x2 a;
+float4x2 b;
+
+float4 main() : sv_target
+{
+    return float4(a[0].x, a[1].x, a[2].x, b[0].y);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   b            c0       2
+//   a            c2       1
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+draw quad
+todo probe all rgba (21, 22, 23, 11)
+
+
+[pixel shader]
+// Size 3 always allocated before size 2, probably means that they are allocated in decreasing used size.
+float4x3 a;
+float4x3 b;
+
+float4 main() : sv_target
+{
+    return float4(a[0].y, b[0].z, 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   b            c0       3
+//   a            c3       2
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+uniform 16 float4 41 42 43 44
+draw quad
+todo probe all rgba (41, 21, 0, 0)
+
+
+[pixel shader]
+// Test same used size, how a comes before b.
+float4x3 a;
+float4x3 b;
+
+float4 main() : sv_target
+{
+    return float4(a[0].z, b[0].z, 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   a            c0       3
+//   b            c3       3
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+uniform 16 float4 41 42 43 44
+uniform 20 float4 51 52 53 54
+draw quad
+probe all rgba (21, 51, 0, 0)
+
+
+[pixel shader]
+// Declaration order is more important than instruction order to break ties.
+float4x3 zzz;
+float4x3 aaa;
+
+float4 main() : sv_target
+{
+    return float4(aaa[0].z, zzz[0].z, 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   zzz          c0       3
+//   aaa          c3       3
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+uniform 16 float4 41 42 43 44
+uniform 20 float4 51 52 53 54
+draw quad
+probe all rgba (51, 21, 0, 0)
+
+
+[pixel shader]
+// Arrays follow the same rules
+float2 zzz[2], aaa[4];
+
+float4 main() : sv_target
+{
+    return float4(aaa[1], zzz[1]);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   zzz          c0       2
+//   aaa          c2       2
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+draw quad
+probe all rgba (31, 32, 11, 12)
+
+
+[pixel shader]
+struct apple
+{
+    float2 a;
+    float3x2 b;
+    float4 c[2];
+};
+
+struct apple zzz, hhh, aaa;
+
+float4 main() : sv_target
+{
+    return float4(zzz.c[0].x, hhh.b[1].x, aaa.a);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   zzz          c0       4
+//   hhh          c4       2
+//   aaa          c6       1
+//
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+uniform 16 float4 41 42 43 44
+uniform 20 float4 51 52 53 54
+uniform 24 float4 61 62 63 64
+draw quad
+todo probe all rgba (31, 52, 61, 62)
+
+
+[pixel shader]
+// Constant buffer variables are treated indistinctively.
+float4x4 size3;
+float4x4 unused;
+
+cbuffer buff
+{
+    float4x4 size1;
+    float4x4 size4;
+};
+
+float4 main() : sv_target
+{
+    return float4(size1[3].x, size4[0].w, size3[2].z, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   size4        c0       4
+//   size3        c4       3
+//   size1        c7       1
+
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+uniform 12 float4 31 32 33 34
+uniform 16 float4 41 42 43 44
+uniform 20 float4 51 52 53 54
+uniform 24 float4 61 62 63 64
+uniform 28 float4 71 72 73 74
+draw quad
+todo probe all rgba (74, 31, 63, 0)
