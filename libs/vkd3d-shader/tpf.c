@@ -3199,6 +3199,7 @@ struct extern_resource
     /* var is only not NULL if this resource is a whole variable, so it may be responsible for more
      * than one component. */
     const struct hlsl_ir_var *var;
+    const struct hlsl_buffer *buffer;
 
     char *name;
     struct hlsl_type *data_type;
@@ -3241,6 +3242,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
     bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;
     struct extern_resource *extern_resources = NULL;
     const struct hlsl_ir_var *var;
+    struct hlsl_buffer *buffer;
     enum hlsl_regset regset;
     size_t capacity = 0;
     char *name;
@@ -3293,6 +3295,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                     hlsl_release_string_buffer(ctx, name_buffer);
 
                     extern_resources[*count].var = NULL;
+                    extern_resources[*count].buffer = NULL;
 
                     extern_resources[*count].name = name;
                     extern_resources[*count].data_type = component_type;
@@ -3334,6 +3337,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 }
 
                 extern_resources[*count].var = var;
+                extern_resources[*count].buffer = NULL;
 
                 extern_resources[*count].name = name;
                 extern_resources[*count].data_type = var->data_type;
@@ -3348,14 +3352,48 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
         }
     }
 
+    LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        if (!buffer->reg.allocated)
+            continue;
+
+        if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                sizeof(*extern_resources))))
+        {
+            sm4_free_extern_resources(extern_resources, *count);
+            *count = 0;
+            return NULL;
+        }
+
+        if (!(name = hlsl_strdup(ctx, buffer->name)))
+        {
+            sm4_free_extern_resources(extern_resources, *count);
+            *count = 0;
+            return NULL;
+        }
+
+        extern_resources[*count].var = NULL;
+        extern_resources[*count].buffer = buffer;
+
+        extern_resources[*count].name = name;
+        extern_resources[*count].data_type = NULL;
+        extern_resources[*count].is_user_packed = !!buffer->reservation.reg_type;
+
+        extern_resources[*count].regset = HLSL_REGSET_NUMERIC;
+        extern_resources[*count].id = buffer->reg.id;
+        extern_resources[*count].bind_count = 1;
+
+        ++*count;
+    }
+
     qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
     return extern_resources;
 }
 
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
-    unsigned int cbuffer_count = 0, resource_count = 0, extern_resources_count, i, j;
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
+    unsigned int cbuffer_count = 0, extern_resources_count, i, j;
     size_t cbuffer_position, resource_position, creator_position;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
@@ -3375,19 +3413,15 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
-    resource_count += extern_resources_count;
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
-        {
             ++cbuffer_count;
-            ++resource_count;
-        }
     }
 
     put_u32(&buffer, cbuffer_count);
     cbuffer_position = put_u32(&buffer, 0);
-    put_u32(&buffer, resource_count);
+    put_u32(&buffer, extern_resources_count);
     resource_position = put_u32(&buffer, 0);
     put_u32(&buffer, vkd3d_make_u32(vkd3d_make_u16(profile->minor_version, profile->major_version),
             target_types[profile->type]));
@@ -3423,14 +3457,11 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             flags |= D3D_SIF_USERPACKED;
 
         put_u32(&buffer, 0); /* name */
-        put_u32(&buffer, sm4_resource_type(resource->data_type));
-        if (resource->regset == HLSL_REGSET_SAMPLERS)
-        {
-            put_u32(&buffer, 0);
-            put_u32(&buffer, 0);
-            put_u32(&buffer, 0);
-        }
+        if (resource->buffer)
+            put_u32(&buffer, resource->buffer->type == HLSL_BUFFER_CONSTANT ? D3D_SIT_CBUFFER : D3D_SIT_TBUFFER);
         else
+            put_u32(&buffer, sm4_resource_type(resource->data_type));
+        if (resource->regset == HLSL_REGSET_TEXTURES || resource->regset == HLSL_REGSET_UAVS)
         {
             unsigned int dimx = hlsl_type_get_component_type(ctx, resource->data_type, 0)->e.resource.format->dimx;
 
@@ -3439,32 +3470,15 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             put_u32(&buffer, ~0u); /* FIXME: multisample count */
             flags |= (dimx - 1) << VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT;
         }
+        else
+        {
+            put_u32(&buffer, 0);
+            put_u32(&buffer, 0);
+            put_u32(&buffer, 0);
+        }
         put_u32(&buffer, resource->id);
         put_u32(&buffer, resource->bind_count);
         put_u32(&buffer, flags);
-    }
-
-    LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
-    {
-        uint32_t flags = 0;
-
-        if (!cbuffer->reg.allocated)
-            continue;
-
-        if (hlsl_version_ge(ctx, 5, 1))
-            hlsl_fixme(ctx, &cbuffer->loc, "Shader model 5.1 resource reflection.");
-
-        if (cbuffer->reservation.reg_type)
-            flags |= D3D_SIF_USERPACKED;
-
-        put_u32(&buffer, 0); /* name */
-        put_u32(&buffer, cbuffer->type == HLSL_BUFFER_CONSTANT ? D3D_SIT_CBUFFER : D3D_SIT_TBUFFER);
-        put_u32(&buffer, 0); /* return type */
-        put_u32(&buffer, 0); /* dimension */
-        put_u32(&buffer, 0); /* multisample count */
-        put_u32(&buffer, cbuffer->reg.id); /* bind point */
-        put_u32(&buffer, 1); /* bind count */
-        put_u32(&buffer, flags); /* flags */
     }
 
     for (i = 0; i < extern_resources_count; ++i)
@@ -3473,15 +3487,6 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
         string_offset = put_string(&buffer, resource->name);
         set_u32(&buffer, resources_offset + i * 8 * sizeof(uint32_t), string_offset);
-    }
-
-    LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
-    {
-        if (!cbuffer->reg.allocated)
-            continue;
-
-        string_offset = put_string(&buffer, cbuffer->name);
-        set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
     }
 
     /* Buffers. */
@@ -5896,7 +5901,7 @@ static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
     for (unsigned int i = 0; i < extern_resources_count; ++i)
     {
-        if (extern_resources[i].data_type->e.resource.rasteriser_ordered)
+        if (extern_resources[i].data_type && extern_resources[i].data_type->e.resource.rasteriser_ordered)
             *flags |= VKD3D_SM4_REQUIRES_ROVS;
     }
     sm4_free_extern_resources(extern_resources, extern_resources_count);
