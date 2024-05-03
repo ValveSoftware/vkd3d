@@ -76,6 +76,14 @@ static const char * const required_device_extensions[] =
     VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
 };
 
+/* In general we don't want to enable Vulkan beta extensions, but make an
+ * exception for VK_KHR_portability_subset because we draw no real feature from
+ * it, but it's still useful to be able to develop for MoltenVK without being
+ * spammed with validation errors. */
+#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
+#endif
+
 static const struct vkd3d_optional_extension_info optional_device_extensions[] =
 {
     /* KHR extensions */
@@ -85,6 +93,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(KHR_IMAGE_FORMAT_LIST, KHR_image_format_list),
     VK_EXTENSION(KHR_MAINTENANCE2, KHR_maintenance2),
     VK_EXTENSION(KHR_MAINTENANCE3, KHR_maintenance3),
+    VK_EXTENSION(KHR_PORTABILITY_SUBSET, KHR_portability_subset),
     VK_EXTENSION(KHR_PUSH_DESCRIPTOR, KHR_push_descriptor),
     VK_EXTENSION(KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE, KHR_sampler_mirror_clamp_to_edge),
     VK_EXTENSION(KHR_TIMELINE_SEMAPHORE, KHR_timeline_semaphore),
