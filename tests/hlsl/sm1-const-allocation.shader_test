@@ -339,7 +339,7 @@ uniform 16 float 4
 uniform 20 float 5
 uniform 24 float 6
 draw quad
-todo probe all rgba (0, 6, 0, 0)
+probe all rgba (0, 6, 0, 0)
 
 
 [pixel shader]
@@ -372,7 +372,7 @@ uniform 16 float 4
 uniform 20 float 5
 uniform 24 float 6
 draw quad
-todo probe all rgba (6, 1, 0, 0)
+probe all rgba (6, 1, 0, 0)
 
 
 [pixel shader todo]

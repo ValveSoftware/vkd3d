@@ -1713,7 +1713,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
         for (r = 0; r <= HLSL_REGSET_LAST; ++r)
         {
-            if (var->semantic.name || !var->regs[r].allocated)
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
                 continue;
 
             ++uniform_count;
@@ -1751,7 +1751,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
         for (r = 0; r <= HLSL_REGSET_LAST; ++r)
         {
-            if (var->semantic.name || !var->regs[r].allocated)
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
                 continue;
 
             put_u32(buffer, 0); /* name */
@@ -1780,7 +1780,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
         {
             size_t var_offset, name_offset;
 
-            if (var->semantic.name || !var->regs[r].allocated)
+            if (var->semantic.name || !var->regs[r].allocated || !var->last_read)
                 continue;
 
             var_offset = vars_start + (uniform_count * 5 * sizeof(uint32_t));

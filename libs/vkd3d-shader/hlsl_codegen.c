@@ -4529,7 +4529,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     {
         unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
 
-        if (!var->is_uniform || !var->last_read || reg_size == 0)
+        if (!var->is_uniform || reg_size == 0)
             continue;
 
         if (var->reg_reservation.reg_type == 'c')
