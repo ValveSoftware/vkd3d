@@ -197,6 +197,8 @@ static const struct ID3D12ShaderReflectionTypeVtbl d3d12_type_vtbl =
     d3d12_type_ImplementsInterface,
 };
 
+static struct d3d12_type null_type = {{&d3d12_type_vtbl}};
+
 static struct d3d12_variable *impl_from_ID3D12ShaderReflectionVariable(ID3D12ShaderReflectionVariable *iface)
 {
     return CONTAINING_RECORD(iface, struct d3d12_variable, ID3D12ShaderReflectionVariable_iface);
