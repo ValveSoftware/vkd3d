@@ -254,3 +254,122 @@ uniform 4 float4 11 12 13 14
 uniform 8 float4 21 22 23 24
 draw quad
 todo probe all rgba (21, 22, 1, 11)
+
+
+[pixel shader]
+// If there is a register reservation, the whole variable size is reserved.
+float a[4] : register(c1);
+float b[4];
+
+float4 main() : sv_target
+{
+    return float4(a[0], b[1], 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   a            c1       1
+//   b            c5       2
+//
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 4
+uniform 20 float 5
+uniform 24 float 6
+draw quad
+probe all rgba (1, 6, 0, 0)
+
+
+[pixel shader]
+// If there is a register reservation, the whole variable size is reserved.
+float4x4 a : register(c1);
+float b[4];
+
+float4 main() : sv_target
+{
+    return float4(a[0].x, b[1], 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   a            c1       1
+//   b            c5       2
+//
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 4
+uniform 20 float 5
+uniform 24 float 6
+draw quad
+probe all rgba (1, 6, 0, 0)
+
+
+[pixel shader]
+// If there is a register reservation, the whole variable size is reserved, even if unused.
+float4x4 unused : register(c1);
+float b[4];
+
+float4 main() : sv_target
+{
+    return float4(0, b[1], 0, 0);
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   b            c5       2
+//
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 4
+uniform 20 float 5
+uniform 24 float 6
+draw quad
+todo probe all rgba (0, 6, 0, 0)
+
+
+[pixel shader]
+float unused[2] : register(c2); // will create a gap in c0.
+float size3[3]; // cannot be placed in c0.
+float size2[2]; // can be placed in c0.
+
+float4 main() : sv_target
+{
+    float4 res;
+
+    res.x = size3[2];
+    res.y = size2[1];
+    res.z = 0;
+    res.w = 0;
+    return res;
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   size2        c0       2
+//   size3        c4       3
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 4
+uniform 20 float 5
+uniform 24 float 6
+draw quad
+todo probe all rgba (6, 1, 0, 0)
