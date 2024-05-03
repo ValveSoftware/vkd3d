@@ -4553,10 +4553,46 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
     }
 }
 
+static void sort_uniform_by_numeric_bind_count(struct list *sorted, struct hlsl_ir_var *to_sort)
+{
+    struct hlsl_ir_var *var;
+
+    list_remove(&to_sort->extern_entry);
+
+    LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
+    {
+        uint32_t to_sort_size = to_sort->bind_count[HLSL_REGSET_NUMERIC];
+        uint32_t var_size = var->bind_count[HLSL_REGSET_NUMERIC];
+
+        if (to_sort_size > var_size)
+        {
+            list_add_before(&var->extern_entry, &to_sort->extern_entry);
+            return;
+        }
+    }
+
+    list_add_tail(sorted, &to_sort->extern_entry);
+}
+
+static void sort_uniforms_by_numeric_bind_count(struct hlsl_ctx *ctx)
+{
+    struct list sorted = LIST_INIT(sorted);
+    struct hlsl_ir_var *var, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_uniform)
+            sort_uniform_by_numeric_bind_count(&sorted, var);
+    }
+    list_move_tail(&ctx->extern_vars, &sorted);
+}
+
 static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator = {0};
     struct hlsl_ir_var *var;
+
+    sort_uniforms_by_numeric_bind_count(ctx);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
