@@ -225,3 +225,32 @@ uniform 24 float4 61 62 63 64
 uniform 28 float4 71 72 73 74
 draw quad
 todo probe all rgba (74, 31, 63, 0)
+
+
+[pixel shader]
+typedef float2x2 matrix_t;
+typedef row_major matrix_t row_matrix_t;
+typedef column_major matrix_t col_matrix_t;
+uniform row_matrix_t m1;
+uniform col_matrix_t m2;
+float4 main() : COLOR
+{
+    float4 ret;
+    ret.xy = m1[0];
+    ret.zw = m2[0];
+    return ret;
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   m2           c0       2
+//   m1           c2       1
+//
+
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 11 12 13 14
+uniform 8 float4 21 22 23 24
+draw quad
+todo probe all rgba (21, 22, 1, 11)
