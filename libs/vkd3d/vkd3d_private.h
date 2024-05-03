@@ -146,6 +146,7 @@ struct vkd3d_vulkan_info
 
     bool rasterization_stream;
     bool transform_feedback_queries;
+    bool geometry_shaders;
 
     bool uav_read_without_format;
 

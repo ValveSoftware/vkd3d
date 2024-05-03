@@ -2025,7 +2025,8 @@ static void d3d12_command_list_invalidate_root_parameters(struct d3d12_command_l
 
 static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, unsigned int stencil_state,
         const struct d3d12_resource *resource, VkQueueFlags vk_queue_flags, const struct vkd3d_vulkan_info *vk_info,
-        VkAccessFlags *access_mask, VkPipelineStageFlags *stage_flags, VkImageLayout *image_layout)
+        VkAccessFlags *access_mask, VkPipelineStageFlags *stage_flags, VkImageLayout *image_layout,
+        struct d3d12_device *device)
 {
     bool is_swapchain_image = resource && (resource->flags & VKD3D_RESOURCE_PRESENT_STATE_TRANSITION);
     VkPipelineStageFlags queue_shader_stages = 0;
@@ -2035,8 +2036,9 @@ static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, 
         queue_shader_stages |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT
                 | VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT
                 | VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT
-                | VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT
                 | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        if (device->vk_info.geometry_shaders)
+            queue_shader_stages |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
     }
     if (vk_queue_flags & VK_QUEUE_COMPUTE_BIT)
         queue_shader_stages |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -2054,7 +2056,7 @@ static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, 
             {
                 if (resource->present_state != D3D12_RESOURCE_STATE_PRESENT)
                     return vk_barrier_parameters_from_d3d12_resource_state(resource->present_state, 0,
-                            resource, vk_queue_flags, vk_info, access_mask, stage_flags, image_layout);
+                            resource, vk_queue_flags, vk_info, access_mask, stage_flags, image_layout, device);
 
                 *access_mask = VK_ACCESS_MEMORY_READ_BIT;
                 *stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2251,7 +2253,8 @@ static void d3d12_command_list_transition_resource_to_initial_state(struct d3d12
             VK_IMAGE_LAYOUT_PREINITIALIZED : VK_IMAGE_LAYOUT_UNDEFINED;
 
     if (!vk_barrier_parameters_from_d3d12_resource_state(resource->initial_state, 0,
-            resource, list->vk_queue_flags, vk_info, &barrier.dstAccessMask, &dst_stage_mask, &barrier.newLayout))
+            resource, list->vk_queue_flags, vk_info, &barrier.dstAccessMask,
+            &dst_stage_mask, &barrier.newLayout, list->device))
     {
         FIXME("Unhandled state %#x.\n", resource->initial_state);
         return;
@@ -4277,13 +4280,15 @@ static void STDMETHODCALLTYPE d3d12_command_list_ResourceBarrier(ID3D12GraphicsC
                 }
 
                 if (!vk_barrier_parameters_from_d3d12_resource_state(state_before, stencil_state_before,
-                        resource, list->vk_queue_flags, vk_info, &src_access_mask, &src_stage_mask, &layout_before))
+                        resource, list->vk_queue_flags, vk_info, &src_access_mask,
+                        &src_stage_mask, &layout_before, list->device))
                 {
                     FIXME("Unhandled state %#x.\n", state_before);
                     continue;
                 }
                 if (!vk_barrier_parameters_from_d3d12_resource_state(state_after, stencil_state_after,
-                        resource, list->vk_queue_flags, vk_info, &dst_access_mask, &dst_stage_mask, &layout_after))
+                        resource, list->vk_queue_flags, vk_info, &dst_access_mask,
+                        &dst_stage_mask, &layout_after, list->device))
                 {
                     FIXME("Unhandled state %#x.\n", state_after);
                     continue;
@@ -4303,7 +4308,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ResourceBarrier(ID3D12GraphicsC
 
                 resource = unsafe_impl_from_ID3D12Resource(uav->pResource);
                 vk_barrier_parameters_from_d3d12_resource_state(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0,
-                        resource, list->vk_queue_flags, vk_info, &access_mask, &stage_mask, &image_layout);
+                        resource, list->vk_queue_flags, vk_info, &access_mask,
+                        &stage_mask, &image_layout, list->device);
                 src_access_mask = dst_access_mask = access_mask;
                 src_stage_mask = dst_stage_mask = stage_mask;
                 layout_before = layout_after = image_layout;

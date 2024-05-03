@@ -1643,6 +1643,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     vulkan_info->device_limits = physical_device_info->properties2.properties.limits;
     vulkan_info->sparse_properties = physical_device_info->properties2.properties.sparseProperties;
+    vulkan_info->geometry_shaders = physical_device_info->features2.features.geometryShader;
     vulkan_info->sparse_binding = features->sparseBinding;
     vulkan_info->sparse_residency_3d = features->sparseResidencyImage3D;
     vulkan_info->rasterization_stream = physical_device_info->xfb_properties.transformFeedbackRasterizationStreamSelect;
