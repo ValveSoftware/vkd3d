@@ -1333,7 +1333,7 @@ static void check_type_desc_(int line, const D3D12_SHADER_TYPE_DESC *type, const
     ok_(line)(type->Columns == expect->Columns, "Got %u columns.\n", type->Columns);
     ok_(line)(type->Elements == expect->Elements, "Got %u elements.\n", type->Elements);
     ok_(line)(type->Members == expect->Members, "Got %u members.\n", type->Members);
-    ok_(line)(type->Offset == expect->Offset, "Got %u members.\n", type->Members);
+    ok_(line)(type->Offset == expect->Offset, "Got offset %u.\n", type->Offset);
     ok_(line)(!strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
 }
 #define check_type_desc(a, b) check_type_desc_(__LINE__, a, b)
@@ -1407,7 +1407,7 @@ static void test_reflection(void)
     static const D3D12_SHADER_TYPE_DESC r_field_types[] =
     {
         {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
-        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"},
+        {D3D_SVC_VECTOR, D3D_SVT_FLOAT, 1, 4, 0, 0, 16, "float4"},
     };
 
     static const struct shader_variable globals_vars =
@@ -1519,7 +1519,7 @@ static void test_reflection(void)
     static const D3D12_SHADER_TYPE_DESC ps_h_field_types[] =
     {
         {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
-        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 4, "float"},
     };
 
     static const D3D12_SHADER_TYPE_DESC ps_i_field_types[] =
@@ -1588,10 +1588,10 @@ static void test_reflection(void)
             for (unsigned int j = 0; j < buffer_desc.Variables; ++j)
             {
                 const struct shader_variable *expect = &expect_buffer->vars[j];
+                D3D12_SHADER_TYPE_DESC type_desc, field_desc;
                 ID3D12ShaderReflectionType *type, *field;
                 ID3D12ShaderReflectionVariable *var;
                 D3D12_SHADER_VARIABLE_DESC var_desc;
-                D3D12_SHADER_TYPE_DESC type_desc;
 
                 vkd3d_test_push_context("Variable %u", j);
 
@@ -1623,9 +1623,9 @@ static void test_reflection(void)
                     vkd3d_test_push_context("Field %u", k);
 
                     field = ID3D12ShaderReflectionType_GetMemberTypeByIndex(type, k);
-                    hr = ID3D12ShaderReflectionType_GetDesc(field, &type_desc);
+                    hr = ID3D12ShaderReflectionType_GetDesc(field, &field_desc);
                     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
-                    check_type_desc(&type_desc, &expect->field_types[k]);
+                    check_type_desc(&field_desc, &expect->field_types[k]);
 
                     vkd3d_test_pop_context();
                 }

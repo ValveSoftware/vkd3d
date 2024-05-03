@@ -3090,7 +3090,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
             put_u32(buffer, field->name_bytecode_offset);
             put_u32(buffer, field->type->bytecode_offset);
-            put_u32(buffer, field->reg_offset[HLSL_REGSET_NUMERIC]);
+            put_u32(buffer, field->reg_offset[HLSL_REGSET_NUMERIC] * sizeof(float));
         }
         type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(D3D_SVC_STRUCT, D3D_SVT_VOID));
         put_u32(buffer, vkd3d_make_u32(1, hlsl_type_component_count(array_type)));
