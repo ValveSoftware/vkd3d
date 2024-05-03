@@ -1758,7 +1758,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
             if (r == HLSL_REGSET_NUMERIC)
             {
                 put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[r].id));
-                put_u32(buffer, var->data_type->reg_size[r] / 4);
+                put_u32(buffer, var->bind_count[r]);
             }
             else
             {
