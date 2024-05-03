@@ -3197,6 +3197,9 @@ static int sm4_compare_extern_resources(const void *a, const void *b)
     if ((r = vkd3d_u32_compare(aa->regset, bb->regset)))
         return r;
 
+    if ((r = vkd3d_u32_compare(aa->space, bb->space)))
+        return r;
+
     return vkd3d_u32_compare(aa->index, bb->index);
 }
 
@@ -3322,7 +3325,10 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
                 extern_resources[*count].name = name;
                 extern_resources[*count].data_type = var->data_type;
-                extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
+                /* For some reason 5.1 resources aren't marked as
+                 * user-packed, but cbuffers still are. */
+                extern_resources[*count].is_user_packed = hlsl_version_lt(ctx, 5, 1)
+                        && !!var->reg_reservation.reg_type;
 
                 extern_resources[*count].regset = r;
                 extern_resources[*count].id = var->regs[r].id;
@@ -3377,6 +3383,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
+    uint32_t binding_desc_size = (hlsl_version_ge(ctx, 5, 1) ? 10 : 8) * sizeof(uint32_t);
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
     unsigned int cbuffer_count = 0, extern_resources_count, i, j;
     size_t cbuffer_position, resource_position, creator_position;
@@ -3418,7 +3425,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         put_u32(&buffer, hlsl_version_ge(ctx, 5, 1) ? TAG_RD11_REVERSE : TAG_RD11);
         put_u32(&buffer, 15 * sizeof(uint32_t)); /* size of RDEF header including this header */
         put_u32(&buffer, 6 * sizeof(uint32_t)); /* size of buffer desc */
-        put_u32(&buffer, (hlsl_version_ge(ctx, 5, 1) ? 10 : 8) * sizeof(uint32_t)); /* size of binding desc */
+        put_u32(&buffer, binding_desc_size); /* size of binding desc */
         put_u32(&buffer, 10 * sizeof(uint32_t)); /* size of variable desc */
         put_u32(&buffer, 9 * sizeof(uint32_t)); /* size of type desc */
         put_u32(&buffer, 3 * sizeof(uint32_t)); /* size of member desc */
@@ -3434,10 +3441,6 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     {
         const struct extern_resource *resource = &extern_resources[i];
         uint32_t flags = 0;
-
-        if (hlsl_version_ge(ctx, 5, 1))
-            hlsl_fixme(ctx, resource->buffer ? &resource->buffer->loc : &resource->var->loc,
-                    "Shader model 5.1 resource reflection.");
 
         if (resource->is_user_packed)
             flags |= D3D_SIF_USERPACKED;
@@ -3465,6 +3468,12 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         put_u32(&buffer, resource->index);
         put_u32(&buffer, resource->bind_count);
         put_u32(&buffer, flags);
+
+        if (hlsl_version_ge(ctx, 5, 1))
+        {
+            put_u32(&buffer, resource->space);
+            put_u32(&buffer, resource->id);
+        }
     }
 
     for (i = 0; i < extern_resources_count; ++i)
@@ -3472,7 +3481,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         const struct extern_resource *resource = &extern_resources[i];
 
         string_offset = put_string(&buffer, resource->name);
-        set_u32(&buffer, resources_offset + i * 8 * sizeof(uint32_t), string_offset);
+        set_u32(&buffer, resources_offset + i * binding_desc_size, string_offset);
     }
 
     /* Buffers. */

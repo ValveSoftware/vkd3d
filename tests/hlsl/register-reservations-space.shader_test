@@ -17,7 +17,7 @@ size (2d, 1, 1)
 size (2d, 1, 1)
 2.0 2.0 2.0 99.0
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex1 : register(t1, space0);
 
 float4 main() : sv_target
@@ -26,11 +26,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (1, 1, 1, 99)
 
 
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 Texture2D tex1 : register(t1, sPaCe0);
 
 float4 main() : sv_target
@@ -39,7 +39,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (1, 1, 1, 99)
 
 
