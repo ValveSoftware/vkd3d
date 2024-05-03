@@ -61,6 +61,8 @@ struct d3d12_reflection
     D3D12_SHADER_DESC desc;
 
     struct d3d12_buffer *buffers;
+
+    D3D12_SHADER_INPUT_BIND_DESC *bindings;
 };
 
 static struct d3d12_buffer null_buffer;
@@ -397,6 +399,10 @@ static ULONG STDMETHODCALLTYPE d3d12_reflection_Release(ID3D12ShaderReflection *
         }
         vkd3d_free(reflection->buffers);
 
+        for (UINT i = 0; i < reflection->desc.BoundResources; ++i)
+            vkd3d_free((void *)reflection->bindings[i].Name);
+        vkd3d_free(reflection->bindings);
+
         vkd3d_shader_free_scan_signature_info(&reflection->signature_info);
         free(reflection);
     }
@@ -444,9 +450,18 @@ static struct ID3D12ShaderReflectionConstantBuffer * STDMETHODCALLTYPE d3d12_ref
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetResourceBindingDesc(
         ID3D12ShaderReflection *iface, UINT index, D3D12_SHADER_INPUT_BIND_DESC *desc)
 {
-    FIXME("iface %p, index %u, desc %p stub!\n", iface, index, desc);
+    struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, index %u, desc %p.\n", iface, index, desc);
+
+    if (index >= reflection->desc.BoundResources)
+    {
+        WARN("Invalid index %u.\n", index);
+        return E_INVALIDARG;
+    }
+
+    *desc = reflection->bindings[index];
+    return S_OK;
 }
 
 static HRESULT get_signature_parameter(const struct vkd3d_shader_signature *signature,
@@ -730,6 +745,20 @@ struct rdef_field
     uint32_t offset;
 };
 
+struct rdef_binding
+{
+    uint32_t name_offset;
+    uint32_t type;
+    uint32_t resource_format;
+    uint32_t dimension;
+    uint32_t multisample_count;
+    uint32_t index;
+    uint32_t count;
+    uint32_t flags;
+    uint32_t space;
+    uint32_t id;
+};
+
 static HRESULT d3d12_type_init(struct d3d12_type *type, uint32_t type_offset, uint32_t type_size,
         const struct vkd3d_shader_code *section, uint32_t field_offset)
 {
@@ -856,6 +885,7 @@ static HRESULT d3d12_buffer_init(struct d3d12_buffer *buffer, const struct rdef_
 static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3d_shader_code *section)
 {
     uint32_t variable_size = offsetof(struct rdef_variable, resource_binding);
+    uint32_t binding_size = offsetof(struct rdef_binding, space);
     uint32_t type_size = offsetof(struct rdef_type, unknown);
     const struct rdef_header *header;
     const struct rdef_rd11 *rd11;
@@ -897,6 +927,14 @@ static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3
         }
         variable_size = rd11->variable_size;
 
+        if (rd11->binding_size != sizeof(struct rdef_binding)
+                && rd11->binding_size != offsetof(struct rdef_binding, space))
+        {
+            FIXME("Unexpected binding size %#x.\n", rd11->binding_size);
+            return E_INVALIDARG;
+        }
+        binding_size = rd11->binding_size;
+
         if (rd11->type_size != sizeof(struct rdef_type))
         {
             FIXME("Unexpected type size %#x.\n", rd11->type_size);
@@ -928,6 +966,48 @@ static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3
         {
             if ((hr = d3d12_buffer_init(&reflection->buffers[i], &rdef_buffers[i], section, variable_size, type_size)))
                 return hr;
+        }
+    }
+
+    reflection->desc.BoundResources = header->binding_count;
+
+    if (header->binding_count)
+    {
+        if (!(reflection->bindings = vkd3d_calloc(header->binding_count, sizeof(*reflection->bindings))))
+            return E_OUTOFMEMORY;
+
+        for (uint32_t i = 0; i < header->binding_count; ++i)
+        {
+            const struct rdef_binding *rdef_binding;
+            D3D12_SHADER_INPUT_BIND_DESC *binding;
+            char *name;
+
+            if (!(rdef_binding = get_data_ptr(section, header->bindings_offset + (i * binding_size), 1, binding_size)))
+                return E_INVALIDARG;
+
+            if (FAILED(hr = get_string(section, rdef_binding->name_offset, &name)))
+                return hr;
+
+            binding = &reflection->bindings[i];
+
+            binding->Name = name;
+            binding->Type = rdef_binding->type;
+            binding->BindPoint = rdef_binding->index;
+            binding->BindCount = rdef_binding->count;
+            binding->uFlags = rdef_binding->flags;
+            binding->ReturnType = rdef_binding->resource_format;
+            binding->Dimension = rdef_binding->dimension;
+            binding->NumSamples = rdef_binding->multisample_count;
+            if (binding_size == sizeof(*rdef_binding))
+            {
+                binding->Space = rdef_binding->space;
+                binding->uID = rdef_binding->id;
+            }
+            else
+            {
+                binding->Space = 0;
+                binding->uID = rdef_binding->index;
+            }
         }
     }
 

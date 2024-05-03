@@ -1573,7 +1573,7 @@ static void test_reflection(void)
         hr = ID3D12ShaderReflection_GetDesc(reflection, &shader_desc);
         ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
         ok(shader_desc.ConstantBuffers == tests[t].buffer_count, "Got %u buffers.\n", shader_desc.ConstantBuffers);
-        todo ok(shader_desc.BoundResources == tests[t].binding_count, "Got %u resources.\n", shader_desc.BoundResources);
+        ok(shader_desc.BoundResources == tests[t].binding_count, "Got %u resources.\n", shader_desc.BoundResources);
 
         for (unsigned int i = 0; i < shader_desc.ConstantBuffers; ++i)
         {
@@ -1669,8 +1669,7 @@ static void test_reflection(void)
             ok(binding_desc.Type == expect->Type, "Got type %#x.\n", binding_desc.Type);
             ok(binding_desc.BindPoint == expect->BindPoint, "Got bind point %u.\n", binding_desc.BindPoint);
             ok(binding_desc.BindCount == expect->BindCount, "Got bind count %u.\n", binding_desc.BindCount);
-            todo_if ((expect->uFlags & D3D_SIF_USERPACKED) && expect->Type != D3D_SIT_CBUFFER)
-                ok(binding_desc.uFlags == expect->uFlags, "Got flags %#x.\n", binding_desc.uFlags);
+            ok(binding_desc.uFlags == expect->uFlags, "Got flags %#x.\n", binding_desc.uFlags);
             ok(binding_desc.ReturnType == expect->ReturnType, "Got return type %#x.\n", binding_desc.ReturnType);
             ok(binding_desc.Dimension == expect->Dimension, "Got dimension %#x.\n", binding_desc.Dimension);
             ok(binding_desc.NumSamples == expect->NumSamples, "Got multisample count %u.\n", binding_desc.NumSamples);
@@ -1679,7 +1678,7 @@ static void test_reflection(void)
         }
 
         hr = ID3D12ShaderReflection_GetResourceBindingDesc(reflection, shader_desc.BoundResources, &binding_desc);
-        todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+        ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
         ID3D10Blob_Release(code);
         refcount = ID3D12ShaderReflection_Release(reflection);
