@@ -2985,7 +2985,13 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].RegisterSpace = 0;
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 16;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    /* This and similar tests later currently fail with E_FAIL when
+     * VK_EXT_descriptor_indexing is not available. This check happens before
+     * detecting the overlap that would trigger E_INVALIDARG. We still check
+     * that we're seeing a failure. */
+    todo_if(binding_tier <= D3D12_RESOURCE_BINDING_TIER_2)
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(FAILED(hr), "Got unexpected hr %#x.\n", hr);
 
     /* A bounded range overlapping an unbounded one, mapped to the same
      * register space, but a different type. */
@@ -3004,7 +3010,9 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptor_ranges[1].NumDescriptors = UINT_MAX;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo_if(binding_tier <= D3D12_RESOURCE_BINDING_TIER_2)
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(FAILED(hr), "Got unexpected hr %#x.\n", hr);
 
     /* And unbounded range overlapping a bounded one, mapped to the same
      * register space and type. */
@@ -3012,7 +3020,9 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].BaseShaderRegister = 0;
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 15;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo_if(binding_tier <= D3D12_RESOURCE_BINDING_TIER_2)
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(FAILED(hr), "Got unexpected hr %#x.\n", hr);
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
