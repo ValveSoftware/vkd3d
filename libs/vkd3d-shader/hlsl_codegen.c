@@ -4593,15 +4593,14 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+        unsigned int alloc_size = 4 * var->bind_count[HLSL_REGSET_NUMERIC];
 
-        if (!var->is_uniform || !var->last_read || reg_size == 0)
+        if (!var->is_uniform || alloc_size == 0)
             continue;
 
         if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
         {
-            var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, &allocator,
-                    1, UINT_MAX, var->data_type);
+            var->regs[HLSL_REGSET_NUMERIC] = allocate_range(ctx, &allocator, 1, UINT_MAX, alloc_size);
             TRACE("Allocated %s to %s.\n", var->name,
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
