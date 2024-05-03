@@ -102,7 +102,7 @@ static ID3D12ShaderReflectionType * STDMETHODCALLTYPE d3d12_type_GetMemberTypeBy
 
     TRACE("iface %p, index %u.\n", iface, index);
 
-    if (index > type->desc.Members)
+    if (index >= type->desc.Members)
     {
         WARN("Invalid index %u.\n", index);
         return &null_type.ID3D12ShaderReflectionType_iface;
@@ -301,7 +301,7 @@ static ID3D12ShaderReflectionVariable * STDMETHODCALLTYPE d3d12_buffer_GetVariab
 
     TRACE("iface %p, index %u.\n", iface, index);
 
-    if (index > buffer->desc.Variables)
+    if (index >= buffer->desc.Variables)
     {
         WARN("Invalid index %u.\n", index);
         return &null_variable.ID3D12ShaderReflectionVariable_iface;
@@ -422,7 +422,7 @@ static struct ID3D12ShaderReflectionConstantBuffer * STDMETHODCALLTYPE d3d12_ref
 
     TRACE("iface %p, index %u.\n", iface, index);
 
-    if (index > reflection->desc.ConstantBuffers)
+    if (index >= reflection->desc.ConstantBuffers)
     {
         WARN("Invalid index %u.\n", index);
         return &null_buffer.ID3D12ShaderReflectionConstantBuffer_iface;
