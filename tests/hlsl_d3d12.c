@@ -1555,7 +1555,14 @@ static void test_reflection(void)
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
     {
         ID3D10Blob *code = compile_shader_flags(tests[t].source,
-                tests[t].profile, D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY);
+                tests[t].profile, strstr(tests[t].profile, "5_1") ? 0 : D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY);
+        ID3D12ShaderReflectionConstantBuffer *cbuffer;
+        D3D12_SHADER_TYPE_DESC type_desc, field_desc;
+        D3D12_SHADER_INPUT_BIND_DESC binding_desc;
+        ID3D12ShaderReflectionType *type, *field;
+        D3D12_SHADER_BUFFER_DESC buffer_desc;
+        ID3D12ShaderReflectionVariable *var;
+        D3D12_SHADER_VARIABLE_DESC var_desc;
         ID3D12ShaderReflection *reflection;
         D3D12_SHADER_DESC shader_desc;
 
@@ -1571,8 +1578,6 @@ static void test_reflection(void)
         for (unsigned int i = 0; i < shader_desc.ConstantBuffers; ++i)
         {
             const struct shader_buffer *expect_buffer = &tests[t].buffers[i];
-            ID3D12ShaderReflectionConstantBuffer *cbuffer;
-            D3D12_SHADER_BUFFER_DESC buffer_desc;
 
             vkd3d_test_push_context("Buffer %u", i);
 
@@ -1588,10 +1593,6 @@ static void test_reflection(void)
             for (unsigned int j = 0; j < buffer_desc.Variables; ++j)
             {
                 const struct shader_variable *expect = &expect_buffer->vars[j];
-                D3D12_SHADER_TYPE_DESC type_desc, field_desc;
-                ID3D12ShaderReflectionType *type, *field;
-                ID3D12ShaderReflectionVariable *var;
-                D3D12_SHADER_VARIABLE_DESC var_desc;
 
                 vkd3d_test_push_context("Variable %u", j);
 
@@ -1630,34 +1631,55 @@ static void test_reflection(void)
                     vkd3d_test_pop_context();
                 }
 
+                field = ID3D12ShaderReflectionType_GetMemberTypeByIndex(type, type_desc.Members);
+                hr = ID3D12ShaderReflectionType_GetDesc(field, &field_desc);
+                ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
                 vkd3d_test_pop_context();
             }
 
+            var = ID3D12ShaderReflectionConstantBuffer_GetVariableByIndex(cbuffer, buffer_desc.Variables);
+            hr = ID3D12ShaderReflectionVariable_GetDesc(var, &var_desc);
+            ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+            type = ID3D12ShaderReflectionVariable_GetType(var);
+            hr = ID3D12ShaderReflectionType_GetDesc(type, &type_desc);
+            ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+            field = ID3D12ShaderReflectionType_GetMemberTypeByIndex(type, 0);
+            hr = ID3D12ShaderReflectionType_GetDesc(field, &type_desc);
+            ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+
             vkd3d_test_pop_context();
         }
+
+        cbuffer = ID3D12ShaderReflection_GetConstantBufferByIndex(reflection, shader_desc.ConstantBuffers);
+        hr = ID3D12ShaderReflectionConstantBuffer_GetDesc(cbuffer, &buffer_desc);
+        ok(hr == E_FAIL, "Got hr %#x.\n", hr);
 
         for (unsigned int i = 0; i < shader_desc.BoundResources; ++i)
         {
             const D3D12_SHADER_INPUT_BIND_DESC *expect = &tests[t].bindings[i];
-            D3D12_SHADER_INPUT_BIND_DESC desc;
 
             vkd3d_test_push_context("Binding %u", i);
 
-            hr = ID3D12ShaderReflection_GetResourceBindingDesc(reflection, i, &desc);
+            hr = ID3D12ShaderReflection_GetResourceBindingDesc(reflection, i, &binding_desc);
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
-            ok(!strcmp(desc.Name, expect->Name), "Got name \"%s\".\n", desc.Name);
-            ok(desc.Type == expect->Type, "Got type %#x.\n", desc.Type);
-            ok(desc.BindPoint == expect->BindPoint, "Got bind point %u.\n", desc.BindPoint);
-            ok(desc.BindCount == expect->BindCount, "Got bind count %u.\n", desc.BindCount);
+            ok(!strcmp(binding_desc.Name, expect->Name), "Got name \"%s\".\n", binding_desc.Name);
+            ok(binding_desc.Type == expect->Type, "Got type %#x.\n", binding_desc.Type);
+            ok(binding_desc.BindPoint == expect->BindPoint, "Got bind point %u.\n", binding_desc.BindPoint);
+            ok(binding_desc.BindCount == expect->BindCount, "Got bind count %u.\n", binding_desc.BindCount);
             todo_if ((expect->uFlags & D3D_SIF_USERPACKED) && expect->Type != D3D_SIT_CBUFFER)
-                ok(desc.uFlags == expect->uFlags, "Got flags %#x.\n", desc.uFlags);
-            ok(desc.ReturnType == expect->ReturnType, "Got return type %#x.\n", desc.ReturnType);
-            ok(desc.Dimension == expect->Dimension, "Got dimension %#x.\n", desc.Dimension);
-            ok(desc.NumSamples == expect->NumSamples, "Got multisample count %u.\n", desc.NumSamples);
+                ok(binding_desc.uFlags == expect->uFlags, "Got flags %#x.\n", binding_desc.uFlags);
+            ok(binding_desc.ReturnType == expect->ReturnType, "Got return type %#x.\n", binding_desc.ReturnType);
+            ok(binding_desc.Dimension == expect->Dimension, "Got dimension %#x.\n", binding_desc.Dimension);
+            ok(binding_desc.NumSamples == expect->NumSamples, "Got multisample count %u.\n", binding_desc.NumSamples);
 
             vkd3d_test_pop_context();
         }
+
+        hr = ID3D12ShaderReflection_GetResourceBindingDesc(reflection, shader_desc.BoundResources, &binding_desc);
+        todo ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
         ID3D10Blob_Release(code);
         refcount = ID3D12ShaderReflection_Release(reflection);
@@ -1845,6 +1867,9 @@ static void test_signature_reflection(void)
             vkd3d_test_pop_context();
         }
 
+        hr = reflection->lpVtbl->GetInputParameterDesc(reflection, shader_desc.InputParameters, &desc);
+        ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+
         for (unsigned int j = 0; j < shader_desc.OutputParameters; ++j)
         {
             vkd3d_test_push_context("Output %u", j);
@@ -1853,6 +1878,9 @@ static void test_signature_reflection(void)
             check_signature_element(&desc, &tests[i].outputs[j]);
             vkd3d_test_pop_context();
         }
+
+        hr = reflection->lpVtbl->GetOutputParameterDesc(reflection, shader_desc.OutputParameters, &desc);
+        ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
         ID3D10Blob_Release(code);
         refcount = reflection->lpVtbl->Release(reflection);
