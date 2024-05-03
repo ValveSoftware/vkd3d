@@ -1458,10 +1458,10 @@ static void test_reflection(void)
 
     static const D3D12_SHADER_INPUT_BIND_DESC vs_bindings[] =
     {
-        {"$Globals", D3D_SIT_CBUFFER, 0, 1},
-        {"$Params", D3D_SIT_CBUFFER, 1, 1},
-        {"b1", D3D_SIT_CBUFFER, 2, 1},
-        {"b5", D3D_SIT_CBUFFER, 5, 1, D3D_SIF_USERPACKED},
+        {"$Globals", D3D_SIT_CBUFFER, 0, 1, .uID = 0},
+        {"$Params",  D3D_SIT_CBUFFER, 1, 1, .uID = 1},
+        {"b1",       D3D_SIT_CBUFFER, 2, 1, .uID = 2},
+        {"b5",       D3D_SIT_CBUFFER, 5, 1, D3D_SIF_USERPACKED, .uID = 5},
     };
 
     static const char ps_source[] =
@@ -1512,19 +1512,19 @@ static void test_reflection(void)
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
     {
-        {"c", D3D_SIT_SAMPLER, 0, 1},
-        {"d", D3D_SIT_SAMPLER, 1, 1},
-        {"e", D3D_SIT_SAMPLER, 2, 1},
-        {"f", D3D_SIT_SAMPLER, 3, 1},
-        {"g", D3D_SIT_SAMPLER, 4, 1},
-        {"k.c.a", D3D_SIT_SAMPLER, 5, 1},
-        {"b", D3D_SIT_SAMPLER, 7, 1, D3D_SIF_USERPACKED},
-        {"f", D3D_SIT_TEXTURE, 0, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
-        {"e", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
-        {"g", D3D_SIT_TEXTURE, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
-        {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
-        {"k.b", D3D_SIT_TEXTURE, 5, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE1DARRAY, ~0u},
-        {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u},
+        {"c", D3D_SIT_SAMPLER, 0, 1, .uID = 0},
+        {"d", D3D_SIT_SAMPLER, 1, 1, .uID = 1},
+        {"e", D3D_SIT_SAMPLER, 2, 1, .uID = 2},
+        {"f", D3D_SIT_SAMPLER, 3, 1, .uID = 3},
+        {"g", D3D_SIT_SAMPLER, 4, 1, .uID = 4},
+        {"k.c.a", D3D_SIT_SAMPLER, 5, 1, .uID = 5},
+        {"b", D3D_SIT_SAMPLER, 7, 1, D3D_SIF_USERPACKED, .uID = 7},
+        {"f", D3D_SIT_TEXTURE, 0, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 0},
+        {"e", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 1},
+        {"g", D3D_SIT_TEXTURE, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 2},
+        {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 0, 3},
+        {"k.b", D3D_SIT_TEXTURE, 5, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE1DARRAY, ~0u, 0, 5},
+        {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u, 0, 7},
         {"$Globals", D3D_SIT_CBUFFER, 0, 1},
     };
 
@@ -1549,6 +1549,47 @@ static void test_reflection(void)
         {{"$Globals", D3D_CT_CBUFFER, ARRAY_SIZE(ps_globals_vars), 32}, ps_globals_vars},
     };
 
+    static const char ps51_source[] =
+        "cbuffer x : register(b0, space1) { float4 a; };\n"
+        "cbuffer y : register(b0, space1) { float4 b; };\n"
+        "cbuffer z : register(b0, space0) { float4 c; };\n"
+        "float4 d;\n"
+        "Texture2D e : register(t1, space1);\n"
+        "Texture2D f : register(t1, space2);\n"
+        "RWBuffer<float> g : register(u1, space1);\n"
+        "SamplerState h : register(s1, space2147483647);\n"
+        "SamplerState i : register(s2147483647, space1);\n"
+        "float4 main(void) : SV_TARGET\n"
+        "{\n"
+        "    g[0] = 0;\n"
+        "    return a + c + d + e.Sample(h, 0) + f.Sample(i, 0);\n"
+        "}";
+
+    static const struct shader_variable ps51_x_vars =
+        {{"a",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_variable ps51_z_vars =
+        {{"c",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_variable ps51_globals_vars =
+        {{"d",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_buffer ps51_buffers[] =
+    {
+        {{"$Globals", D3D_CT_CBUFFER, 1, 16}, &ps51_globals_vars},
+        {{"x", D3D_CT_CBUFFER, 1, 16}, &ps51_x_vars},
+        {{"z", D3D_CT_CBUFFER, 1, 16}, &ps51_z_vars},
+    };
+
+    static const D3D12_SHADER_INPUT_BIND_DESC ps51_bindings[] =
+    {
+        {"i", D3D_SIT_SAMPLER, 2147483647, 1, .Space = 1, .uID = 0},
+        {"h", D3D_SIT_SAMPLER, 1, 1, .Space = 2147483647, .uID = 1},
+        {"e", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 1, 0},
+        {"f", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u, 2, 1},
+        {"g", D3D_SIT_UAV_RWTYPED, 1, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_BUFFER, ~0u, 1, 0},
+        {"z", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 0, .uID = 0},
+        {"$Globals", D3D_SIT_CBUFFER, 1, 1, .uID = 1},
+        {"x", D3D_SIT_CBUFFER, 0, 1, D3D_SIF_USERPACKED, .Space = 1, .uID = 2},
+    };
+
     static const struct
     {
         const char *source;
@@ -1562,6 +1603,7 @@ static void test_reflection(void)
     {
         {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers)},
         {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers)},
+        {ps51_source, "ps_5_1", ps51_bindings, ARRAY_SIZE(ps51_bindings), ps51_buffers, ARRAY_SIZE(ps51_buffers)},
     };
 
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
@@ -1685,6 +1727,9 @@ static void test_reflection(void)
             ok(binding_desc.ReturnType == expect->ReturnType, "Got return type %#x.\n", binding_desc.ReturnType);
             ok(binding_desc.Dimension == expect->Dimension, "Got dimension %#x.\n", binding_desc.Dimension);
             ok(binding_desc.NumSamples == expect->NumSamples, "Got multisample count %u.\n", binding_desc.NumSamples);
+            ok(binding_desc.Space == expect->Space, "Got space %u.\n", binding_desc.Space);
+            todo_if (binding_desc.uID != expect->uID)
+                ok(binding_desc.uID == expect->uID, "Got ID %u.\n", binding_desc.uID);
 
             vkd3d_test_pop_context();
         }
