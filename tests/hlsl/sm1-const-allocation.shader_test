@@ -373,3 +373,40 @@ uniform 20 float 5
 uniform 24 float 6
 draw quad
 todo probe all rgba (6, 1, 0, 0)
+
+
+[pixel shader todo]
+// Relative addressing extends the allocation size only up to the array's size.
+float idx;
+
+struct
+{
+    float dyn[5];
+    float unused;
+} a;
+
+
+float4 main() : sv_target
+{
+    return a.dyn[idx];
+}
+// Registers:
+//
+//   Name         Reg   Size
+//   ------------ ----- ----
+//   a            c0       5
+//   idx          c5       1
+//
+
+[test]
+uniform 0 float 0
+uniform 4 float 1
+uniform 8 float 2
+uniform 12 float 3
+uniform 16 float 4
+uniform 20 float 3
+todo draw quad
+probe all rgba (3, 3, 3, 3)
+uniform 20 float 1
+todo draw quad
+probe all rgba (1, 1, 1, 1)
