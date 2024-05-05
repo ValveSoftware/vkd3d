@@ -1596,6 +1596,12 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     static const VkSubgroupFeatureFlags required_stages = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    if (FAILED(hr = vkd3d_check_device_extensions(device, create_info, &vk_extensions, &vk_extension_count,
+            device_extension_count, user_extension_supported)))
+        return hr;
+
+    vkd3d_physical_device_info_init(physical_device_info, device);
+
     vkd3d_trace_physical_device(physical_device, physical_device_info, vk_procs);
     vkd3d_trace_physical_device_features(physical_device_info);
     vkd3d_trace_physical_device_limits(physical_device_info);
@@ -1685,10 +1691,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     device->feature_options5.SRVOnlyTiledResourceTier3 = FALSE;
     device->feature_options5.RenderPassesTier = D3D12_RENDER_PASS_TIER_0;
     device->feature_options5.RaytracingTier = D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
-
-    if (FAILED(hr = vkd3d_check_device_extensions(device, create_info, &vk_extensions, &vk_extension_count,
-            device_extension_count, user_extension_supported)))
-        return hr;
 
     fragment_shader_interlock = &physical_device_info->fragment_shader_interlock_features;
     if (!fragment_shader_interlock->fragmentShaderSampleInterlock
@@ -2111,8 +2113,6 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
             device_queue_info.family_index[VKD3D_QUEUE_FAMILY_TRANSFER]);
 
     VK_CALL(vkGetPhysicalDeviceMemoryProperties(physical_device, &device->memory_properties));
-
-    vkd3d_physical_device_info_init(&physical_device_info, device);
 
     if (FAILED(hr = vkd3d_init_device_caps(device, create_info, &physical_device_info,
             &extension_count, &user_extension_supported)))
