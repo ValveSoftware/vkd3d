@@ -424,8 +424,6 @@ static HRESULT vkd3d_init_instance_caps(struct vkd3d_instance *instance,
         ERR("Failed to enumerate instance extensions, vr %d.\n", vr);
         return hresult_from_vk_result(vr);
     }
-    if (!count)
-        return S_OK;
 
     if (!(vk_extensions = vkd3d_calloc(count, sizeof(*vk_extensions))))
         return E_OUTOFMEMORY;
@@ -1534,8 +1532,6 @@ static HRESULT vkd3d_check_device_extensions(struct d3d12_device *device,
         ERR("Failed to enumerate device extensions, vr %d.\n", vr);
         return hresult_from_vk_result(vr);
     }
-    if (!*vk_extension_count)
-        return S_OK;
 
     if (!(*vk_extensions = vkd3d_calloc(*vk_extension_count, sizeof(**vk_extensions))))
         return E_OUTOFMEMORY;
