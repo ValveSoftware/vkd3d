@@ -272,13 +272,15 @@ static bool has_extension(const VkExtensionProperties *extensions,
 
     for (i = 0; i < count; ++i)
     {
-        if (is_extension_disabled(extension_name))
-        {
-            WARN("Extension %s is disabled.\n", debugstr_a(extension_name));
-            continue;
-        }
         if (!strcmp(extensions[i].extensionName, extension_name))
+        {
+            if (is_extension_disabled(extension_name))
+            {
+                WARN("Extension %s is disabled.\n", debugstr_a(extension_name));
+                return false;
+            }
             return true;
+        }
     }
     return false;
 }
