@@ -1517,6 +1517,63 @@ static bool d3d12_device_supports_typed_uav_load_additional_formats(const struct
     return true;
 }
 
+static HRESULT vkd3d_check_device_extensions(struct d3d12_device *device,
+        const struct vkd3d_device_create_info *create_info, VkExtensionProperties **vk_extensions,
+        uint32_t *vk_extension_count, uint32_t *device_extension_count, bool **user_extension_supported)
+{
+    const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
+    const struct vkd3d_optional_device_extensions_info *optional_extensions;
+    VkPhysicalDevice physical_device = device->vk_physical_device;
+    struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
+    VkResult vr;
+
+    *device_extension_count = 0;
+
+    if ((vr = VK_CALL(vkEnumerateDeviceExtensionProperties(physical_device, NULL, vk_extension_count, NULL))) < 0)
+    {
+        ERR("Failed to enumerate device extensions, vr %d.\n", vr);
+        return hresult_from_vk_result(vr);
+    }
+    if (!*vk_extension_count)
+        return S_OK;
+
+    if (!(*vk_extensions = vkd3d_calloc(*vk_extension_count, sizeof(**vk_extensions))))
+        return E_OUTOFMEMORY;
+
+    TRACE("Enumerating %u device extensions.\n", *vk_extension_count);
+    if ((vr = VK_CALL(vkEnumerateDeviceExtensionProperties(physical_device, NULL, vk_extension_count, *vk_extensions))) < 0)
+    {
+        ERR("Failed to enumerate device extensions, vr %d.\n", vr);
+        vkd3d_free(*vk_extensions);
+        return hresult_from_vk_result(vr);
+    }
+
+    optional_extensions = vkd3d_find_struct(create_info->next, OPTIONAL_DEVICE_EXTENSIONS_INFO);
+    if (optional_extensions && optional_extensions->extension_count)
+    {
+        if (!(*user_extension_supported = vkd3d_calloc(optional_extensions->extension_count, sizeof(bool))))
+        {
+            vkd3d_free(*vk_extensions);
+            return E_OUTOFMEMORY;
+        }
+    }
+    else
+    {
+        *user_extension_supported = NULL;
+    }
+
+    *device_extension_count = vkd3d_check_extensions(*vk_extensions, *vk_extension_count,
+            required_device_extensions, ARRAY_SIZE(required_device_extensions),
+            optional_device_extensions, ARRAY_SIZE(optional_device_extensions),
+            create_info->device_extensions, create_info->device_extension_count,
+            optional_extensions ? optional_extensions->extensions : NULL,
+            optional_extensions ? optional_extensions->extension_count : 0,
+            *user_extension_supported, vulkan_info, "device",
+            device->vkd3d_instance->config_flags & VKD3D_CONFIG_FLAG_VULKAN_DEBUG);
+
+    return S_OK;
+}
+
 static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         const struct vkd3d_device_create_info *create_info,
         struct vkd3d_physical_device_info *physical_device_info,
@@ -1525,14 +1582,13 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     const VkPhysicalDeviceSubgroupProperties *subgroup_properties = &physical_device_info->subgroup_properties;
     const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
     VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *fragment_shader_interlock;
-    const struct vkd3d_optional_device_extensions_info *optional_extensions;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing;
     VkPhysicalDevice physical_device = device->vk_physical_device;
     struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
     VkExtensionProperties *vk_extensions;
     VkPhysicalDeviceFeatures *features;
-    uint32_t count;
-    VkResult vr;
+    uint32_t vk_extension_count;
+    HRESULT hr;
 
     /* SHUFFLE is required to implement WaveReadLaneAt with dynamically uniform index before SPIR-V 1.5 / Vulkan 1.2. */
     static const VkSubgroupFeatureFlags required_subgroup_features = VK_SUBGROUP_FEATURE_ARITHMETIC_BIT
@@ -1543,8 +1599,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
             | VK_SUBGROUP_FEATURE_VOTE_BIT;
 
     static const VkSubgroupFeatureFlags required_stages = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    *device_extension_count = 0;
 
     vkd3d_trace_physical_device(physical_device, physical_device_info, vk_procs);
     vkd3d_trace_physical_device_features(physical_device_info);
@@ -1636,47 +1690,9 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     device->feature_options5.RenderPassesTier = D3D12_RENDER_PASS_TIER_0;
     device->feature_options5.RaytracingTier = D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 
-    if ((vr = VK_CALL(vkEnumerateDeviceExtensionProperties(physical_device, NULL, &count, NULL))) < 0)
-    {
-        ERR("Failed to enumerate device extensions, vr %d.\n", vr);
-        return hresult_from_vk_result(vr);
-    }
-    if (!count)
-        return S_OK;
-
-    if (!(vk_extensions = vkd3d_calloc(count, sizeof(*vk_extensions))))
-        return E_OUTOFMEMORY;
-
-    TRACE("Enumerating %u device extensions.\n", count);
-    if ((vr = VK_CALL(vkEnumerateDeviceExtensionProperties(physical_device, NULL, &count, vk_extensions))) < 0)
-    {
-        ERR("Failed to enumerate device extensions, vr %d.\n", vr);
-        vkd3d_free(vk_extensions);
-        return hresult_from_vk_result(vr);
-    }
-
-    optional_extensions = vkd3d_find_struct(create_info->next, OPTIONAL_DEVICE_EXTENSIONS_INFO);
-    if (optional_extensions && optional_extensions->extension_count)
-    {
-        if (!(*user_extension_supported = vkd3d_calloc(optional_extensions->extension_count, sizeof(bool))))
-        {
-            vkd3d_free(vk_extensions);
-            return E_OUTOFMEMORY;
-        }
-    }
-    else
-    {
-        *user_extension_supported = NULL;
-    }
-
-    *device_extension_count = vkd3d_check_extensions(vk_extensions, count,
-            required_device_extensions, ARRAY_SIZE(required_device_extensions),
-            optional_device_extensions, ARRAY_SIZE(optional_device_extensions),
-            create_info->device_extensions, create_info->device_extension_count,
-            optional_extensions ? optional_extensions->extensions : NULL,
-            optional_extensions ? optional_extensions->extension_count : 0,
-            *user_extension_supported, vulkan_info, "device",
-            device->vkd3d_instance->config_flags & VKD3D_CONFIG_FLAG_VULKAN_DEBUG);
+    if (FAILED(hr = vkd3d_check_device_extensions(device, create_info, &vk_extensions, &vk_extension_count,
+            device_extension_count, user_extension_supported)))
+        return hr;
 
     fragment_shader_interlock = &physical_device_info->fragment_shader_interlock_features;
     if (!fragment_shader_interlock->fragmentShaderSampleInterlock
@@ -1703,7 +1719,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     vulkan_info->texel_buffer_alignment_properties = physical_device_info->texel_buffer_alignment_properties;
 
-    if (get_spec_version(vk_extensions, count, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) >= 3)
+    if (get_spec_version(vk_extensions, vk_extension_count, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) >= 3)
     {
         const VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT *divisor_features;
         divisor_features = &physical_device_info->vertex_divisor_features;
