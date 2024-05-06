@@ -168,6 +168,9 @@ static struct list *make_empty_list(struct hlsl_ctx *ctx)
 
 static void destroy_block(struct hlsl_block *block)
 {
+    if (!block)
+        return;
+
     hlsl_block_cleanup(block);
     vkd3d_free(block);
 }
