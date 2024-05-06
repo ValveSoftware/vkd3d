@@ -2004,7 +2004,7 @@ void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator,
 {
     void *params;
 
-    if (count > allocator->count - allocator->index)
+    if (!allocator->current || count > allocator->count - allocator->index)
     {
         struct vkd3d_shader_param_node *next;
 
