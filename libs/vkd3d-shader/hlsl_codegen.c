@@ -4252,6 +4252,8 @@ static void register_deref_usage(struct hlsl_ctx *ctx, struct hlsl_deref *deref)
 {
     struct hlsl_ir_var *var = deref->var;
     enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
+    uint32_t required_bind_count;
+    struct hlsl_type *type;
     unsigned int index;
 
     if (!hlsl_regset_index_from_deref(ctx, deref, regset, &index))
@@ -4262,12 +4264,39 @@ static void register_deref_usage(struct hlsl_ctx *ctx, struct hlsl_deref *deref)
         var->objects_usage[regset][index].used = true;
         var->bind_count[regset] = max(var->bind_count[regset], index + 1);
     }
+    else if (regset == HLSL_REGSET_NUMERIC)
+    {
+        type = hlsl_deref_get_type(ctx, deref);
+
+        hlsl_regset_index_from_deref(ctx, deref, regset, &index);
+        required_bind_count = align(index + type->reg_size[regset], 4) / 4;
+        var->bind_count[regset] = max(var->bind_count[regset], required_bind_count);
+    }
+    else
+    {
+        vkd3d_unreachable();
+    }
 }
 
-static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool track_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
     {
+        case HLSL_IR_LOAD:
+        {
+            struct hlsl_ir_load *load = hlsl_ir_load(instr);
+
+            if (!load->src.var->is_uniform)
+                return false;
+
+            /* These will are handled by validate_static_object_references(). */
+            if (hlsl_deref_get_regset(ctx, &load->src) != HLSL_REGSET_NUMERIC)
+                return false;
+
+            register_deref_usage(ctx, &load->src);
+            break;
+        }
+
         case HLSL_IR_RESOURCE_LOAD:
             register_deref_usage(ctx, &hlsl_ir_resource_load(instr)->resource);
             if (hlsl_ir_resource_load(instr)->sampler.var)
@@ -5106,13 +5135,14 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
     return true;
 }
 
+/* Retrieves true if the index is constant, and false otherwise. In the latter case, the maximum
+ * possible index is retrieved, assuming there is not out-of-bounds access. */
 bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         enum hlsl_regset regset, unsigned int *index)
 {
     struct hlsl_type *type = deref->var->data_type;
+    bool index_is_constant = true;
     unsigned int i;
-
-    assert(regset <= HLSL_REGSET_LAST_OBJECT);
 
     *index = 0;
 
@@ -5122,37 +5152,62 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
         unsigned int idx = 0;
 
         assert(path_node);
-        if (path_node->type != HLSL_IR_CONSTANT)
-            return false;
-
-        /* We should always have generated a cast to UINT. */
-        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
-                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
-
-        idx = hlsl_ir_constant(path_node)->value.u[0].u;
-
-        switch (type->class)
+        if (path_node->type == HLSL_IR_CONSTANT)
         {
-            case HLSL_CLASS_ARRAY:
-                if (idx >= type->e.array.elements_count)
-                    return false;
+            /* We should always have generated a cast to UINT. */
+            assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+                    && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
-                *index += idx * type->e.array.type->reg_size[regset];
-                break;
+            idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
-            case HLSL_CLASS_STRUCT:
-                *index += type->e.record.fields[idx].reg_offset[regset];
-                break;
+            switch (type->class)
+            {
+                case HLSL_CLASS_ARRAY:
+                    if (idx >= type->e.array.elements_count)
+                        return false;
 
-            default:
-                vkd3d_unreachable();
+                    *index += idx * type->e.array.type->reg_size[regset];
+                    break;
+
+                case HLSL_CLASS_STRUCT:
+                    *index += type->e.record.fields[idx].reg_offset[regset];
+                    break;
+
+                case HLSL_CLASS_MATRIX:
+                    *index += 4 * idx;
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
+        }
+        else
+        {
+            index_is_constant = false;
+
+            switch (type->class)
+            {
+                case HLSL_CLASS_ARRAY:
+                    idx = type->e.array.elements_count - 1;
+                    *index += idx * type->e.array.type->reg_size[regset];
+                    break;
+
+                case HLSL_CLASS_MATRIX:
+                    idx = hlsl_type_major_size(type) - 1;
+                    *index += idx * 4;
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
         }
 
         type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
     }
 
-    assert(type->reg_size[regset] == 1);
-    return true;
+    assert(!(regset <= HLSL_REGSET_LAST_OBJECT) || (type->reg_size[regset] == 1));
+    assert(!(regset == HLSL_REGSET_NUMERIC) || type->reg_size[regset] <= 4);
+    return index_is_constant;
 }
 
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
@@ -5449,7 +5504,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         compute_liveness(ctx, entry_func);
     while (hlsl_transform_ir(ctx, dce, body, NULL));
 
-    hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
+    hlsl_transform_ir(ctx, track_components_usage, body, NULL);
     sort_synthetic_separated_samplers_first(ctx);
 
     if (profile->major_version < 4)
