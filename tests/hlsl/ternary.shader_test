@@ -318,7 +318,7 @@ probe all rgba (2.0, 3.0, 3.0, 2.0)
 
 % Objects can be used, but their types have to be identical.
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 Texture2D t;
 
 float4 main() : sv_target

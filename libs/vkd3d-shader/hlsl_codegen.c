@@ -4248,34 +4248,38 @@ static bool track_object_components_sampler_dim(struct hlsl_ctx *ctx, struct hls
     return false;
 }
 
-static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static void register_deref_usage(struct hlsl_ctx *ctx, struct hlsl_deref *deref)
 {
-    struct hlsl_ir_resource_load *load;
-    struct hlsl_ir_var *var;
-    enum hlsl_regset regset;
+    struct hlsl_ir_var *var = deref->var;
+    enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
     unsigned int index;
 
-    if (instr->type != HLSL_IR_RESOURCE_LOAD)
-        return false;
+    if (!hlsl_regset_index_from_deref(ctx, deref, regset, &index))
+        return;
 
-    load = hlsl_ir_resource_load(instr);
-    var = load->resource.var;
-
-    regset = hlsl_deref_get_regset(ctx, &load->resource);
-
-    if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
-        return false;
-
-    var->objects_usage[regset][index].used = true;
-    var->bind_count[regset] = max(var->bind_count[regset], index + 1);
-    if (load->sampler.var)
+    if (regset <= HLSL_REGSET_LAST_OBJECT)
     {
-        var = load->sampler.var;
-        if (!hlsl_regset_index_from_deref(ctx, &load->sampler, HLSL_REGSET_SAMPLERS, &index))
-            return false;
+        var->objects_usage[regset][index].used = true;
+        var->bind_count[regset] = max(var->bind_count[regset], index + 1);
+    }
+}
 
-        var->objects_usage[HLSL_REGSET_SAMPLERS][index].used = true;
-        var->bind_count[HLSL_REGSET_SAMPLERS] = max(var->bind_count[HLSL_REGSET_SAMPLERS], index + 1);
+static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    switch (instr->type)
+    {
+        case HLSL_IR_RESOURCE_LOAD:
+            register_deref_usage(ctx, &hlsl_ir_resource_load(instr)->resource);
+            if (hlsl_ir_resource_load(instr)->sampler.var)
+                register_deref_usage(ctx, &hlsl_ir_resource_load(instr)->sampler);
+            break;
+
+        case HLSL_IR_RESOURCE_STORE:
+            register_deref_usage(ctx, &hlsl_ir_resource_store(instr)->resource);
+            break;
+
+        default:
+            break;
     }
 
     return false;
@@ -5440,6 +5444,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
     if (profile->major_version >= 4)
         hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
+
+    do
+        compute_liveness(ctx, entry_func);
+    while (hlsl_transform_ir(ctx, dce, body, NULL));
+
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
     sort_synthetic_separated_samplers_first(ctx);
 
