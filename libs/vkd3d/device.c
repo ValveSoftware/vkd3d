@@ -3919,6 +3919,25 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS14:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS14 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+            }
+
+            data->AdvancedTextureOpsSupported = FALSE;
+            data->WriteableMSAATexturesSupported = FALSE;
+            data->IndependentFrontAndBackStencilRefMaskSupported = FALSE;
+
+            TRACE("Advanced texture ops %#x.\n", data->AdvancedTextureOpsSupported);
+            TRACE("Writeable MSAA textures %#x.\n", data->WriteableMSAATexturesSupported);
+            TRACE("Independent front and back stencil ref mask %#x.\n", data->IndependentFrontAndBackStencilRefMaskSupported);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
