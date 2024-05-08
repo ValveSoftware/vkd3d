@@ -252,7 +252,7 @@ void main(uint id : SV_GroupIndex)
 }
 
 [test]
-todo dispatch 4 1 1
+dispatch 4 1 1
 probe uav 1 (0) rgba (0.5, 0.25, 1.0, 0.75)
 probe uav 1 (1) rgba (0.25, 0.5, 0.75, 1.0)
 probe uav 1 (2) rgba (1.0, 0.75, 0.25, 0.5)
@@ -293,7 +293,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 }
 
 [test]
-todo draw quad
+draw quad
 probe rtv 0 (0, 0) rgba (0.25, 0.5, 0.75, 1.0)
 probe rtv 0 (1, 0) rgba (0.5, 0.25, 1.0, 0.75)
 probe rtv 0 (0, 1) rgba (0.75, 1.0, 0.5, 0.25)
@@ -317,7 +317,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 }
 
 [test]
-todo draw quad
+draw quad
 probe uav 1 (0) rgba (0.75, 1.0, 0.5, 0.25)
 probe uav 1 (1) rgba (1.0, 0.75, 0.25, 0.5)
 probe uav 1 (2) rgba (0.25, 0.5, 0.75, 1.0)
@@ -337,7 +337,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 }
 
 [test]
-todo draw quad
+draw quad
 probe uav 1 (0) rgba (1.0, 0.75, 0.25, 0.5)
 probe uav 1 (1) rgba (0.75, 1.0, 0.5, 0.25)
 probe uav 1 (2) rgba (0.5, 0.25, 1.0, 0.75)
@@ -360,7 +360,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 }
 
 [test]
-todo draw quad
+draw quad
 probe rtv 0 (0, 0) rgba (1.0, 0.0, 0.0, 1.0)
 probe rtv 0 (1, 0) rgba (1.0, 0.0, 0.0, 1.0)
 probe rtv 0 (0, 1) rgba (0.75, 1.0, 0.5, 0.25)

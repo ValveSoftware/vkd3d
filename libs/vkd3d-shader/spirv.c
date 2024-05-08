@@ -1752,6 +1752,14 @@ static uint32_t vkd3d_spirv_get_op_scope_subgroup(struct vkd3d_spirv_builder *bu
     return vkd3d_spirv_build_once(builder, &builder->scope_subgroup_id, vkd3d_spirv_build_op_scope_subgroup);
 }
 
+static uint32_t vkd3d_spirv_build_op_group_nonuniform_quad_swap(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t val_id, uint32_t op_id)
+{
+    vkd3d_spirv_enable_capability(builder, SpvCapabilityGroupNonUniformQuad);
+    return vkd3d_spirv_build_op_tr3(builder, &builder->function_stream, SpvOpGroupNonUniformQuadSwap, result_type,
+            vkd3d_spirv_get_op_scope_subgroup(builder), val_id, op_id);
+}
+
 static uint32_t vkd3d_spirv_build_op_group_nonuniform_ballot(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t val_id)
 {
@@ -9805,6 +9813,40 @@ static void spirv_compiler_emit_cut_stream(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_end_primitive(builder);
 }
 
+static uint32_t map_quad_read_across_direction(enum vkd3d_shader_opcode opcode)
+{
+    switch (opcode)
+    {
+        case VKD3DSIH_QUAD_READ_ACROSS_X:
+            return 0;
+        case VKD3DSIH_QUAD_READ_ACROSS_Y:
+            return 1;
+        case VKD3DSIH_QUAD_READ_ACROSS_D:
+            return 2;
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void spirv_compiler_emit_quad_read_across(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t type_id, direction_type_id, direction_id, val_id;
+
+    type_id = vkd3d_spirv_get_type_id_for_data_type(builder, dst->reg.data_type,
+            vsir_write_mask_component_count(dst->write_mask));
+    direction_type_id = vkd3d_spirv_get_type_id_for_data_type(builder, VKD3D_DATA_UINT, 1);
+    val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    direction_id = map_quad_read_across_direction(instruction->opcode);
+    direction_id = vkd3d_spirv_get_op_constant(builder, direction_type_id, direction_id);
+    val_id = vkd3d_spirv_build_op_group_nonuniform_quad_swap(builder, type_id, val_id, direction_id);
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
 static SpvOp map_wave_bool_op(enum vkd3d_shader_opcode opcode)
 {
     switch (opcode)
@@ -10334,6 +10376,11 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_CUT:
         case VKD3DSIH_CUT_STREAM:
             spirv_compiler_emit_cut_stream(compiler, instruction);
+            break;
+        case VKD3DSIH_QUAD_READ_ACROSS_D:
+        case VKD3DSIH_QUAD_READ_ACROSS_X:
+        case VKD3DSIH_QUAD_READ_ACROSS_Y:
+            spirv_compiler_emit_quad_read_across(compiler, instruction);
             break;
         case VKD3DSIH_WAVE_ACTIVE_ALL_EQUAL:
         case VKD3DSIH_WAVE_ALL_TRUE:
