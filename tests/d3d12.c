@@ -800,9 +800,11 @@ static void test_check_feature_support(void)
     D3D12_FEATURE_DATA_ROOT_SIGNATURE root_signature;
     D3D_FEATURE_LEVEL max_supported_feature_level;
     D3D12_FEATURE_DATA_ARCHITECTURE architecture;
+    D3D12_FEATURE_DATA_SHADER_MODEL shader_model;
     D3D12_FEATURE_DATA_FORMAT_INFO format_info;
     unsigned int expected_plane_count;
     ID3D12Device *device;
+    D3D_SHADER_MODEL sm;
     DXGI_FORMAT format;
     ULONG refcount;
     bool is_todo;
@@ -988,6 +990,39 @@ static void test_check_feature_support(void)
     trace("GPU virtual address bits per process: %u.\n",
             gpu_virtual_address.MaxGPUVirtualAddressBitsPerProcess);
 
+    /* Shader model */
+    shader_model.HighestShaderModel = D3D_SHADER_MODEL_5_1;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+    ok(hr == S_OK, "Failed to check shader model, hr %#x.\n", hr);
+    todo
+    ok(shader_model.HighestShaderModel <= D3D_SHADER_MODEL_5_1,
+            "Got shader model %#x, expected <= %#x.\n", shader_model.HighestShaderModel, D3D_SHADER_MODEL_5_1);
+    for (sm = D3D_HIGHEST_SHADER_MODEL; sm >= D3D_SHADER_MODEL_6_0; --sm)
+    {
+        shader_model.HighestShaderModel = sm;
+        hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+        ok(hr == S_OK || hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+        if (hr == S_OK)
+            break;
+    }
+    ok(hr == S_OK, "Failed to check shader model, hr %#x.\n", hr);
+    trace("Highest shader model %#x.\n", shader_model.HighestShaderModel);
+    ok(shader_model.HighestShaderModel <= sm,
+            "Got shader model %#x, expected <= %#x.\n", shader_model.HighestShaderModel, sm);
+    shader_model.HighestShaderModel = 0x89;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    shader_model.HighestShaderModel = 0x52;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    shader_model.HighestShaderModel = 0;
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_SHADER_MODEL, &shader_model, sizeof(shader_model));
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* Root signature */
     root_signature.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_ROOT_SIGNATURE,
             &root_signature, sizeof(root_signature));
