@@ -172,6 +172,26 @@ RWBuffer<uint> u1;
     [numthreads(4, 1, 1)]
 void main(uint id : SV_GroupIndex)
 {
+    uint i = u0[id] + u0[id ^ 1];
+    // Non-uniform lane index
+    u1[id] = WaveReadLaneAt(i, (id + 2) & 3);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (18)
+probe uav 1 (1) rui (18)
+probe uav 1 (2) rui (23)
+probe uav 1 (3) rui (23)
+
+
+[compute shader]
+RWBuffer<uint> u0;
+RWBuffer<uint> u1;
+
+    [numthreads(4, 1, 1)]
+void main(uint id : SV_GroupIndex)
+{
     bool b = u0[id] == 8;
     u1[id] = WaveActiveCountBits(b);
 }
