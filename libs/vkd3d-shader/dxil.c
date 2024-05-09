@@ -453,6 +453,7 @@ enum dx_intrinsic_opcode
     DX_WAVE_ALL_TRUE                = 114,
     DX_WAVE_ACTIVE_ALL_EQUAL        = 115,
     DX_WAVE_ACTIVE_BALLOT           = 116,
+    DX_WAVE_READ_LANE_AT            = 117,
     DX_WAVE_ACTIVE_OP               = 119,
     DX_WAVE_ACTIVE_BIT              = 120,
     DX_WAVE_PREFIX_OP               = 121,
@@ -4620,6 +4621,8 @@ static enum vkd3d_shader_opcode map_dx_binary_op(enum dx_intrinsic_opcode op, co
             return VKD3DSIH_UMAX;
         case DX_UMIN:
             return VKD3DSIH_UMIN;
+        case DX_WAVE_READ_LANE_AT:
+            return VKD3DSIH_WAVE_READ_LANE_AT;
         default:
             vkd3d_unreachable();
     }
@@ -6267,6 +6270,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_WAVE_IS_FIRST_LANE            ] = {"1", "",     sm6_parser_emit_dx_void},
     [DX_WAVE_PREFIX_BIT_COUNT         ] = {"i", "1",    sm6_parser_emit_dx_unary},
     [DX_WAVE_PREFIX_OP                ] = {"n", "Rcc",  sm6_parser_emit_dx_wave_op},
+    [DX_WAVE_READ_LANE_AT             ] = {"n", "Ri",   sm6_parser_emit_dx_binary},
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,
