@@ -1013,6 +1013,10 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
                 field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[k]);
             }
         }
+
+        if (hlsl_version_ge(ctx, 5, 1) && field->type->class == HLSL_CLASS_ARRAY && hlsl_type_is_resource(field->type))
+            hlsl_fixme(ctx, &v->loc, "Shader model 5.1+ resource array.");
+
         vkd3d_free(v->arrays.sizes);
         field->loc = v->loc;
         field->name = v->name;
@@ -2317,6 +2321,15 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
             }
             type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
         }
+    }
+
+    if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_ARRAY && hlsl_type_is_resource(type))
+    {
+        /* SM 5.1/6.x descriptor arrays act differently from previous versions.
+         * Not only are they treated as a single object in reflection, but they
+         * act as a single component for the purposes of assignment and
+         * initialization. */
+        hlsl_fixme(ctx, &v->loc, "Shader model 5.1+ resource array.");
     }
 
     if (!(var_name = vkd3d_strdup(v->name)))
@@ -6544,6 +6557,9 @@ parameter:
                 type = hlsl_new_array_type(ctx, type, $4.sizes[i]);
             }
             $$.type = type;
+
+            if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_ARRAY && hlsl_type_is_resource(type))
+                hlsl_fixme(ctx, &@2, "Shader model 5.1+ resource array.");
 
             $$.name = $3;
             $$.semantic = $5.semantic;
