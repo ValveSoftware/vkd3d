@@ -1526,8 +1526,8 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                if ((ret = vkd3d_shader_sm4_parser_create(compile_info, config_flags, &message_context, &parser)) >= 0)
-                    p = parser->program;
+                ret = tpf_parse(compile_info, config_flags, &message_context, &program);
+                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:
@@ -1655,8 +1655,8 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                if ((ret = vkd3d_shader_sm4_parser_create(compile_info, config_flags, &message_context, &parser)) >= 0)
-                    p = parser->program;
+                ret = tpf_parse(compile_info, config_flags, &message_context, &program);
+                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:

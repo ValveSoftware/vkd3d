@@ -719,11 +719,6 @@ static const enum vkd3d_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,
 };
 
-static struct vkd3d_shader_sm4_parser *vkd3d_shader_sm4_parser(struct vkd3d_shader_parser *parser)
-{
-    return CONTAINING_RECORD(parser, struct vkd3d_shader_sm4_parser, p);
-}
-
 static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
 {
     const struct vkd3d_shader_version *version = &sm4->p.program->shader_version;
@@ -1753,11 +1748,6 @@ static enum vkd3d_data_type map_data_type(char t)
 
 static void shader_sm4_destroy(struct vkd3d_shader_parser *parser)
 {
-    struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
-
-    vsir_program_cleanup(parser->program);
-    vkd3d_free(parser->program);
-    vkd3d_free(sm4);
 }
 
 static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
@@ -2511,13 +2501,12 @@ static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
     .parser_destroy = shader_sm4_destroy,
 };
 
-static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code,
-        size_t byte_code_size, const char *source_name,
+static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_program *program,
+        const uint32_t *byte_code, size_t byte_code_size, const char *source_name,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_version version;
     uint32_t version_token, token_count;
-    struct vsir_program *program;
 
     if (byte_code_size / sizeof(*byte_code) < 2)
     {
@@ -2571,14 +2560,9 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
     version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
-    if (!(program = vkd3d_malloc(sizeof(*program))))
-        return false;
     /* Estimate instruction count to avoid reallocation in most shaders. */
     if (!vsir_program_init(program, &version, token_count / 7u + 20))
-    {
-        vkd3d_free(program);
         return false;
-    }
     vkd3d_shader_parser_init(&sm4->p, program, message_context, source_name, &shader_sm4_parser_ops);
     sm4->ptr = sm4->start;
 
@@ -2658,41 +2642,31 @@ static void shader_sm4_validate_default_phase_index_ranges(struct vkd3d_shader_s
     return;
 }
 
-int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
+int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
+        struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
 {
     struct vkd3d_shader_instruction_array *instructions;
-    struct vkd3d_shader_instruction *ins;
-    struct vkd3d_shader_sm4_parser *sm4;
+    struct vkd3d_shader_sm4_parser sm4 = {0};
     struct dxbc_shader_desc dxbc_desc = {0};
-    struct vsir_program *program;
+    struct vkd3d_shader_instruction *ins;
     int ret;
-
-    if (!(sm4 = vkd3d_calloc(1, sizeof(*sm4))))
-    {
-        ERR("Failed to allocate parser.\n");
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-    }
 
     dxbc_desc.is_dxil = false;
     if ((ret = shader_extract_from_dxbc(&compile_info->source,
             message_context, compile_info->source_name, &dxbc_desc)) < 0)
     {
         WARN("Failed to extract shader, vkd3d result %d.\n", ret);
-        vkd3d_free(sm4);
         return ret;
     }
 
-    if (!shader_sm4_init(sm4, dxbc_desc.byte_code, dxbc_desc.byte_code_size,
+    if (!shader_sm4_init(&sm4, program, dxbc_desc.byte_code, dxbc_desc.byte_code_size,
             compile_info->source_name, message_context))
     {
         WARN("Failed to initialise shader parser.\n");
         free_dxbc_shader_desc(&dxbc_desc);
-        vkd3d_free(sm4);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    program = sm4->p.program;
     program->input_signature = dxbc_desc.input_signature;
     program->output_signature = dxbc_desc.output_signature;
     program->patch_constant_signature = dxbc_desc.patch_constant_signature;
@@ -2704,53 +2678,51 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         uninvert_used_masks(&program->patch_constant_signature);
 
-    if (!shader_sm4_parser_validate_signature(sm4, &program->input_signature,
-            sm4->input_register_masks, "Input")
-            || !shader_sm4_parser_validate_signature(sm4, &program->output_signature,
-            sm4->output_register_masks, "Output")
-            || !shader_sm4_parser_validate_signature(sm4, &program->patch_constant_signature,
-            sm4->patch_constant_register_masks, "Patch constant"))
+    if (!shader_sm4_parser_validate_signature(&sm4, &program->input_signature,
+            sm4.input_register_masks, "Input")
+            || !shader_sm4_parser_validate_signature(&sm4, &program->output_signature,
+            sm4.output_register_masks, "Output")
+            || !shader_sm4_parser_validate_signature(&sm4, &program->patch_constant_signature,
+            sm4.patch_constant_register_masks, "Patch constant"))
     {
-        shader_sm4_destroy(&sm4->p);
+        vsir_program_cleanup(program);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
     instructions = &program->instructions;
-    while (sm4->ptr != sm4->end)
+    while (sm4.ptr != sm4.end)
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
         {
             ERR("Failed to allocate instructions.\n");
-            vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
-            shader_sm4_destroy(&sm4->p);
+            vkd3d_shader_parser_error(&sm4.p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
+            vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
         ins = &instructions->elements[instructions->count];
-        shader_sm4_read_instruction(sm4, ins);
+        shader_sm4_read_instruction(&sm4, ins);
 
         if (ins->handler_idx == VKD3DSIH_INVALID)
         {
             WARN("Encountered unrecognized or invalid instruction.\n");
-            shader_sm4_destroy(&sm4->p);
+            vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
         ++instructions->count;
     }
     if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL
-            && !sm4->has_control_point_phase && !sm4->p.failed)
-        shader_sm4_validate_default_phase_index_ranges(sm4);
+            && !sm4.has_control_point_phase && !sm4.p.failed)
+        shader_sm4_validate_default_phase_index_ranges(&sm4);
 
-    if (!sm4->p.failed)
-        vkd3d_shader_parser_validate(&sm4->p, config_flags);
+    if (!sm4.p.failed)
+        vkd3d_shader_parser_validate(&sm4.p, config_flags);
 
-    if (sm4->p.failed)
+    if (sm4.p.failed)
     {
         WARN("Failed to parse shader.\n");
-        shader_sm4_destroy(&sm4->p);
+        vsir_program_cleanup(program);
         return VKD3D_ERROR_INVALID_SHADER;
     }
-
-    *parser = &sm4->p;
 
     return VKD3D_OK;
 }

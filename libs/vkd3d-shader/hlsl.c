@@ -3993,8 +3993,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vkd3d_shader_compile_info info = *compile_info;
-        struct vkd3d_shader_parser *parser;
-        struct vsir_program program, *p;
+        struct vsir_program program;
 
         if (profile->major_version < 4)
         {
@@ -4002,23 +4001,18 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
                 goto done;
             info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
             ret = d3dbc_parse(&info, config_flags, message_context, &program);
-            p = &program;
         }
         else
         {
             if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_DXBC_TPF, &info.source)) < 0)
                 goto done;
             info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
-            if ((ret = vkd3d_shader_sm4_parser_create(&info, config_flags, message_context, &parser)) >= 0)
-                p = parser->program;
+            ret = tpf_parse(&info, config_flags, message_context, &program);
         }
         if (ret >= 0)
         {
-            ret = vsir_program_compile(p, config_flags, &info, out, message_context);
-            if (p == &program)
-                vsir_program_cleanup(&program);
-            else
-                vkd3d_shader_parser_destroy(parser);
+            ret = vsir_program_compile(&program, config_flags, &info, out, message_context);
+            vsir_program_cleanup(&program);
         }
         vkd3d_shader_free_shader_code(&info.source);
     }

@@ -1556,8 +1556,8 @@ void vkd3d_shader_trace_text_(const char *text, size_t size, const char *functio
 
 int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
-int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
+int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
+        struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
 int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
