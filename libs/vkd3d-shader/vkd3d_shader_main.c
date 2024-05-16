@@ -559,13 +559,19 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
         unsigned int instruction_reserve)
 {
+    bool ret;
+
     parser->message_context = message_context;
     parser->location.source_name = source_name;
     parser->location.line = 1;
     parser->location.column = 0;
     parser->ops = ops;
     parser->config_flags = vkd3d_shader_init_config_flags();
-    return vsir_program_init(&parser->program, version, instruction_reserve);
+    if (!(parser->program = vkd3d_calloc(1, sizeof(*parser->program))))
+        return false;
+    if (!(ret = vsir_program_init(parser->program, version, instruction_reserve)))
+        vkd3d_free(parser->program);
+    return ret;
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
@@ -1544,7 +1550,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
         }
         else
         {
-            ret = vsir_program_scan(&parser->program, compile_info, &message_context, NULL);
+            ret = vsir_program_scan(parser->program, compile_info, &message_context, NULL);
             vkd3d_shader_parser_destroy(parser);
         }
     }
@@ -1665,7 +1671,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         }
         else
         {
-            ret = vsir_program_compile(&parser->program, parser->config_flags, compile_info, out, &message_context);
+            ret = vsir_program_compile(parser->program, parser->config_flags, compile_info, out, &message_context);
             vkd3d_shader_parser_destroy(parser);
         }
     }

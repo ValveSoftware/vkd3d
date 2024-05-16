@@ -1392,10 +1392,10 @@ struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_location location;
+    struct vsir_program *program;
     bool failed;
 
     const struct vkd3d_shader_parser_ops *ops;
-    struct vsir_program program;
 
     uint64_t config_flags;
 };
@@ -1421,7 +1421,7 @@ static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parse
 
 static inline enum vkd3d_result vkd3d_shader_parser_validate(struct vkd3d_shader_parser *parser)
 {
-    return vsir_program_validate(&parser->program, parser->config_flags,
+    return vsir_program_validate(parser->program, parser->config_flags,
             parser->location.source_name, parser->message_context);
 }
 

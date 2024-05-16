@@ -4010,7 +4010,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         }
         if (ret >= 0)
         {
-            ret = vsir_program_compile(&parser->program, parser->config_flags, &info, out, message_context);
+            ret = vsir_program_compile(parser->program, parser->config_flags, &info, out, message_context);
             vkd3d_shader_parser_destroy(parser);
         }
         vkd3d_shader_free_shader_code(&info.source);
