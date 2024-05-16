@@ -3991,6 +3991,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
             || target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT
             || target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
+        uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vkd3d_shader_compile_info info = *compile_info;
         struct vkd3d_shader_parser *parser;
 
@@ -3999,18 +4000,18 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
             if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_D3D_BYTECODE, &info.source)) < 0)
                 goto done;
             info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
-            ret = vkd3d_shader_sm1_parser_create(&info, message_context, &parser);
+            ret = vkd3d_shader_sm1_parser_create(&info, config_flags, message_context, &parser);
         }
         else
         {
             if ((ret = hlsl_emit_bytecode(&ctx, entry_func, VKD3D_SHADER_TARGET_DXBC_TPF, &info.source)) < 0)
                 goto done;
             info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
-            ret = vkd3d_shader_sm4_parser_create(&info, message_context, &parser);
+            ret = vkd3d_shader_sm4_parser_create(&info, config_flags, message_context, &parser);
         }
         if (ret >= 0)
         {
-            ret = vsir_program_compile(parser->program, parser->config_flags, &info, out, message_context);
+            ret = vsir_program_compile(parser->program, config_flags, &info, out, message_context);
             vkd3d_shader_parser_destroy(parser);
         }
         vkd3d_shader_free_shader_code(&info.source);

@@ -540,7 +540,7 @@ static const struct vkd3d_debug_option vkd3d_shader_config_options[] =
     {"force_validation", VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION}, /* force validation of internal shader representations */
 };
 
-static uint64_t vkd3d_shader_init_config_flags(void)
+uint64_t vkd3d_shader_init_config_flags(void)
 {
     uint64_t config_flags;
     const char *config;
@@ -563,7 +563,6 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_pr
     parser->location.line = 1;
     parser->location.column = 0;
     parser->ops = ops;
-    parser->config_flags = vkd3d_shader_init_config_flags();
     parser->program = program;
 }
 
@@ -1515,20 +1514,21 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     }
     else
     {
+        uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vkd3d_shader_parser *parser;
 
         switch (compile_info->source_type)
         {
             case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
-                ret = vkd3d_shader_sm1_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm1_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                ret = vkd3d_shader_sm4_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm4_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                ret = vkd3d_shader_sm6_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm6_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             default:
@@ -1636,20 +1636,21 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     }
     else
     {
+        uint64_t config_flags = vkd3d_shader_init_config_flags();
         struct vkd3d_shader_parser *parser;
 
         switch (compile_info->source_type)
         {
             case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
-                ret = vkd3d_shader_sm1_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm1_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
-                ret = vkd3d_shader_sm4_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm4_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                ret = vkd3d_shader_sm6_parser_create(compile_info, &message_context, &parser);
+                ret = vkd3d_shader_sm6_parser_create(compile_info, config_flags, &message_context, &parser);
                 break;
 
             default:
@@ -1664,7 +1665,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         }
         else
         {
-            ret = vsir_program_compile(parser->program, parser->config_flags, compile_info, out, &message_context);
+            ret = vsir_program_compile(parser->program, config_flags, compile_info, out, &message_context);
             vkd3d_shader_parser_destroy(parser);
         }
     }
