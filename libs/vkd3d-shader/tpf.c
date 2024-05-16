@@ -2517,6 +2517,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 {
     struct vkd3d_shader_version version;
     uint32_t version_token, token_count;
+    struct vsir_program *program;
 
     if (byte_code_size / sizeof(*byte_code) < 2)
     {
@@ -2570,10 +2571,15 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
     version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
-    /* Estimate instruction count to avoid reallocation in most shaders. */
-    if (!vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version, &shader_sm4_parser_ops,
-            token_count / 7u + 20))
+    if (!(program = vkd3d_malloc(sizeof(*program))))
         return false;
+    /* Estimate instruction count to avoid reallocation in most shaders. */
+    if (!vsir_program_init(program, &version, token_count / 7u + 20))
+    {
+        vkd3d_free(program);
+        return false;
+    }
+    vkd3d_shader_parser_init(&sm4->p, program, message_context, source_name, &shader_sm4_parser_ops);
     sm4->ptr = sm4->start;
 
     init_sm4_lookup_tables(&sm4->lookup);

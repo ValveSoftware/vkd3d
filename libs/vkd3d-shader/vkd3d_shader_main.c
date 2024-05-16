@@ -554,24 +554,17 @@ static uint64_t vkd3d_shader_init_config_flags(void)
     return config_flags;
 }
 
-bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
+void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
-        unsigned int instruction_reserve)
+        const struct vkd3d_shader_parser_ops *ops)
 {
-    bool ret;
-
     parser->message_context = message_context;
     parser->location.source_name = source_name;
     parser->location.line = 1;
     parser->location.column = 0;
     parser->ops = ops;
     parser->config_flags = vkd3d_shader_init_config_flags();
-    if (!(parser->program = vkd3d_calloc(1, sizeof(*parser->program))))
-        return false;
-    if (!(ret = vsir_program_init(parser->program, version, instruction_reserve)))
-        vkd3d_free(parser->program);
-    return ret;
+    parser->program = program;
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,

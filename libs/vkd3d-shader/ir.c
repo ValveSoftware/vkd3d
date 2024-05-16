@@ -21,6 +21,7 @@
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve)
 {
+    memset(program, 0, sizeof(*program));
     program->shader_version = *version;
     return shader_instruction_array_init(&program->instructions, reserve);
 }

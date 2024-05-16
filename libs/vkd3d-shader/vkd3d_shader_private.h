@@ -1407,10 +1407,9 @@ struct vkd3d_shader_parser_ops
 
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
-bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
+void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
-        unsigned int instruction_reserve);
+        const struct vkd3d_shader_parser_ops *ops);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 

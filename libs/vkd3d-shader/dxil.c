@@ -10250,14 +10250,19 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const char *sou
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    if (!(program = vkd3d_malloc(sizeof(*program))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     /* Estimate instruction count to avoid reallocation in most shaders. */
     count = max(token_count, 400) - 400;
-    vkd3d_shader_parser_init(&sm6->p, message_context, source_name, &version, &sm6_parser_ops,
-            (count + (count >> 2)) / 2u + 10);
+    if (!vsir_program_init(program, &version, (count + (count >> 2)) / 2u + 10))
+    {
+        vkd3d_free(program);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    vkd3d_shader_parser_init(&sm6->p, program, message_context, source_name, &sm6_parser_ops);
     sm6->ptr = &sm6->start[1];
     sm6->bitpos = 2;
 
-    program = sm6->p.program;
     input_signature = &program->input_signature;
     output_signature = &program->output_signature;
     patch_constant_signature = &program->patch_constant_signature;
