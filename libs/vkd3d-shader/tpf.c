@@ -1746,10 +1746,6 @@ static enum vkd3d_data_type map_data_type(char t)
     }
 }
 
-static void shader_sm4_destroy(struct vkd3d_shader_parser *parser)
-{
-}
-
 static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
         const uint32_t *end, uint32_t addressing, struct vkd3d_shader_register_index *reg_idx)
 {
@@ -2496,11 +2492,6 @@ fail:
     return;
 }
 
-static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
-{
-    .parser_destroy = shader_sm4_destroy,
-};
-
 static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_program *program,
         const uint32_t *byte_code, size_t byte_code_size, const char *source_name,
         struct vkd3d_shader_message_context *message_context)
@@ -2563,7 +2554,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, struct vsir_pro
     /* Estimate instruction count to avoid reallocation in most shaders. */
     if (!vsir_program_init(program, &version, token_count / 7u + 20))
         return false;
-    vkd3d_shader_parser_init(&sm4->p, program, message_context, source_name, &shader_sm4_parser_ops);
+    vkd3d_shader_parser_init(&sm4->p, program, message_context, source_name);
     sm4->ptr = sm4->start;
 
     init_sm4_lookup_tables(&sm4->lookup);

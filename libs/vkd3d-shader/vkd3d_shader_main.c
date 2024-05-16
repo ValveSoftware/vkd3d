@@ -555,14 +555,12 @@ uint64_t vkd3d_shader_init_config_flags(void)
 }
 
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_parser_ops *ops)
+        struct vkd3d_shader_message_context *message_context, const char *source_name)
 {
     parser->message_context = message_context;
     parser->location.source_name = source_name;
     parser->location.line = 1;
     parser->location.column = 0;
-    parser->ops = ops;
     parser->program = program;
 }
 
@@ -1515,24 +1513,20 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     else
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
-        struct vkd3d_shader_parser *parser;
-        struct vsir_program program, *p;
+        struct vsir_program program;
 
         switch (compile_info->source_type)
         {
             case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
                 ret = d3dbc_parse(compile_info, config_flags, &message_context, &program);
-                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
                 ret = tpf_parse(compile_info, config_flags, &message_context, &program);
-                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                if ((ret = vkd3d_shader_sm6_parser_create(compile_info, config_flags, &message_context, &parser)) >= 0)
-                    p = parser->program;
+                ret = dxil_parse(compile_info, config_flags, &message_context, &program);
                 break;
 
             default:
@@ -1543,15 +1537,12 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
 
         if (ret < 0)
         {
-            WARN("Failed to create shader parser.\n");
+            WARN("Failed to parse shader.\n");
         }
         else
         {
-            ret = vsir_program_scan(p, compile_info, &message_context, NULL);
-            if (p == &program)
-                vsir_program_cleanup(&program);
-            else
-                vkd3d_shader_parser_destroy(parser);
+            ret = vsir_program_scan(&program, compile_info, &message_context, NULL);
+            vsir_program_cleanup(&program);
         }
     }
 
@@ -1644,24 +1635,20 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     else
     {
         uint64_t config_flags = vkd3d_shader_init_config_flags();
-        struct vkd3d_shader_parser *parser;
-        struct vsir_program program, *p;
+        struct vsir_program program;
 
         switch (compile_info->source_type)
         {
             case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
                 ret = d3dbc_parse(compile_info, config_flags, &message_context, &program);
-                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_TPF:
                 ret = tpf_parse(compile_info, config_flags, &message_context, &program);
-                p = &program;
                 break;
 
             case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-                if ((ret = vkd3d_shader_sm6_parser_create(compile_info, config_flags, &message_context, &parser)) >= 0)
-                    p = parser->program;
+                ret = dxil_parse(compile_info, config_flags, &message_context, &program);
                 break;
 
             default:
@@ -1672,15 +1659,12 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
         if (ret < 0)
         {
-            WARN("Failed to create shader parser.\n");
+            WARN("Failed to parse shader.\n");
         }
         else
         {
-            ret = vsir_program_compile(p, config_flags, compile_info, out, &message_context);
-            if (p == &program)
-                vsir_program_cleanup(&program);
-            else
-                vkd3d_shader_parser_destroy(parser);
+            ret = vsir_program_compile(&program, config_flags, compile_info, out, &message_context);
+            vsir_program_cleanup(&program);
         }
     }
 

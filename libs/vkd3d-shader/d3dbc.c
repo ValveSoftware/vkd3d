@@ -880,10 +880,6 @@ static void shader_sm1_skip_opcode(const struct vkd3d_shader_sm1_parser *sm1, co
     *ptr += (opcode_info->dst_count + opcode_info->src_count);
 }
 
-static void shader_sm1_destroy(struct vkd3d_shader_parser *parser)
-{
-}
-
 static void shader_sm1_read_src_param(struct vkd3d_shader_sm1_parser *sm1, const uint32_t **ptr,
         struct vkd3d_shader_src_param *src_param)
 {
@@ -1220,11 +1216,6 @@ static bool shader_sm1_is_end(struct vkd3d_shader_sm1_parser *sm1)
     return false;
 }
 
-const struct vkd3d_shader_parser_ops shader_sm1_parser_ops =
-{
-    .parser_destroy = shader_sm1_destroy,
-};
-
 static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1, struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
@@ -1283,7 +1274,7 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1, st
     if (!vsir_program_init(program, &version, code_size != ~(size_t)0 ? token_count / 4u + 4 : 16))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    vkd3d_shader_parser_init(&sm1->p, program, message_context, compile_info->source_name, &shader_sm1_parser_ops);
+    vkd3d_shader_parser_init(&sm1->p, program, message_context, compile_info->source_name);
     sm1->ptr = sm1->start;
 
     return VKD3D_OK;

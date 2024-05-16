@@ -1394,27 +1394,14 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_location location;
     struct vsir_program *program;
     bool failed;
-
-    const struct vkd3d_shader_parser_ops *ops;
-};
-
-struct vkd3d_shader_parser_ops
-{
-    void (*parser_destroy)(struct vkd3d_shader_parser *parser);
 };
 
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser, struct vsir_program *program,
-        struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_parser_ops *ops);
+        struct vkd3d_shader_message_context *message_context, const char *source_name);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
-
-static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
-{
-    parser->ops->parser_destroy(parser);
-}
 
 static inline enum vkd3d_result vkd3d_shader_parser_validate(struct vkd3d_shader_parser *parser, uint64_t config_flags)
 {
@@ -1556,10 +1543,10 @@ void vkd3d_shader_trace_text_(const char *text, size_t size, const char *functio
 
 int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
+int dxil_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
+        struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
 int tpf_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
         struct vkd3d_shader_message_context *message_context, struct vsir_program *program);
-int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
 void free_dxbc_shader_desc(struct dxbc_shader_desc *desc);
 
