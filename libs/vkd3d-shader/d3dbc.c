@@ -396,11 +396,6 @@ static const enum vkd3d_shader_resource_type resource_type_table[] =
     /* VKD3D_SM1_RESOURCE_TEXTURE_3D */   VKD3D_SHADER_RESOURCE_TEXTURE_3D,
 };
 
-static struct vkd3d_shader_sm1_parser *vkd3d_shader_sm1_parser(struct vkd3d_shader_parser *parser)
-{
-    return CONTAINING_RECORD(parser, struct vkd3d_shader_sm1_parser, p);
-}
-
 static uint32_t read_u32(const uint32_t **ptr)
 {
     return *(*ptr)++;
@@ -887,11 +882,6 @@ static void shader_sm1_skip_opcode(const struct vkd3d_shader_sm1_parser *sm1, co
 
 static void shader_sm1_destroy(struct vkd3d_shader_parser *parser)
 {
-    struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
-
-    vsir_program_cleanup(parser->program);
-    vkd3d_free(parser->program);
-    vkd3d_free(sm1);
 }
 
 static void shader_sm1_read_src_param(struct vkd3d_shader_sm1_parser *sm1, const uint32_t **ptr,
@@ -1235,14 +1225,13 @@ const struct vkd3d_shader_parser_ops shader_sm1_parser_ops =
     .parser_destroy = shader_sm1_destroy,
 };
 
-static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
+static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1, struct vsir_program *program,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_location location = {.source_name = compile_info->source_name};
     const uint32_t *code = compile_info->source.code;
     size_t code_size = compile_info->source.size;
     struct vkd3d_shader_version version;
-    struct vsir_program *program;
     uint16_t shader_type;
     size_t token_count;
 
@@ -1290,14 +1279,9 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     sm1->start = &code[1];
     sm1->end = &code[token_count];
 
-    if (!(program = vkd3d_malloc(sizeof(*program))))
-        return VKD3D_ERROR_OUT_OF_MEMORY;
     /* Estimate instruction count to avoid reallocation in most shaders. */
     if (!vsir_program_init(program, &version, code_size != ~(size_t)0 ? token_count / 4u + 4 : 16))
-    {
-        vkd3d_free(program);
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    }
 
     vkd3d_shader_parser_init(&sm1->p, program, message_context, compile_info->source_name, &shader_sm1_parser_ops);
     sm1->ptr = sm1->start;
@@ -1322,69 +1306,58 @@ static uint32_t get_external_constant_count(struct vkd3d_shader_sm1_parser *sm1,
     return 0;
 }
 
-int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
+int d3dbc_parse(const struct vkd3d_shader_compile_info *compile_info, uint64_t config_flags,
+        struct vkd3d_shader_message_context *message_context, struct vsir_program *program)
 {
     struct vkd3d_shader_instruction_array *instructions;
+    struct vkd3d_shader_sm1_parser sm1 = {0};
     struct vkd3d_shader_instruction *ins;
-    struct vkd3d_shader_sm1_parser *sm1;
-    struct vsir_program *program;
     unsigned int i;
     int ret;
 
-    if (!(sm1 = vkd3d_calloc(1, sizeof(*sm1))))
-    {
-        ERR("Failed to allocate parser.\n");
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-    }
-
-    if ((ret = shader_sm1_init(sm1, compile_info, message_context)) < 0)
+    if ((ret = shader_sm1_init(&sm1, program, compile_info, message_context)) < 0)
     {
         WARN("Failed to initialise shader parser, ret %d.\n", ret);
-        vkd3d_free(sm1);
         return ret;
     }
 
-    program = sm1->p.program;
     instructions = &program->instructions;
-    while (!shader_sm1_is_end(sm1))
+    while (!shader_sm1_is_end(&sm1))
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
         {
             ERR("Failed to allocate instructions.\n");
-            vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");
-            shader_sm1_destroy(&sm1->p);
+            vkd3d_shader_parser_error(&sm1.p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");
+            vsir_program_cleanup(program);
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
         ins = &instructions->elements[instructions->count];
-        shader_sm1_read_instruction(sm1, ins);
+        shader_sm1_read_instruction(&sm1, ins);
 
         if (ins->handler_idx == VKD3DSIH_INVALID)
         {
             WARN("Encountered unrecognized or invalid instruction.\n");
-            shader_sm1_destroy(&sm1->p);
+            vsir_program_cleanup(program);
             return VKD3D_ERROR_INVALID_SHADER;
         }
         ++instructions->count;
     }
 
     for (i = 0; i < ARRAY_SIZE(program->flat_constant_count); ++i)
-        program->flat_constant_count[i] = get_external_constant_count(sm1, i);
+        program->flat_constant_count[i] = get_external_constant_count(&sm1, i);
 
-    if (!sm1->p.failed)
-        ret = vkd3d_shader_parser_validate(&sm1->p, config_flags);
+    if (!sm1.p.failed)
+        ret = vkd3d_shader_parser_validate(&sm1.p, config_flags);
 
-    if (sm1->p.failed && ret >= 0)
+    if (sm1.p.failed && ret >= 0)
         ret = VKD3D_ERROR_INVALID_SHADER;
 
     if (ret < 0)
     {
         WARN("Failed to parse shader.\n");
-        shader_sm1_destroy(&sm1->p);
+        vsir_program_cleanup(program);
         return ret;
     }
-
-    *parser = &sm1->p;
 
     return ret;
 }
