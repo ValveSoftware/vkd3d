@@ -49,7 +49,7 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *loc);
 RESERVED1               auto|catch|char|class|const_cast|delete|dynamic_cast|enum
 RESERVED2               explicit|friend|goto|long|mutable|new|operator|private|protected|public
 RESERVED3               reinterpret_cast|short|signed|sizeof|static_cast|template|this|throw|try
-RESERVED4               typename|union|unsigned|using|virtual
+RESERVED4               typename|union|using|virtual
 
 WS                      [ \t]
 NEWLINE                 (\n)|(\r\n)
@@ -164,6 +164,7 @@ textureCUBE             {return KW_TEXTURECUBE;         }
 TextureCubeArray        {return KW_TEXTURECUBEARRAY;    }
 true                    {return KW_TRUE;                }
 typedef                 {return KW_TYPEDEF;             }
+unsigned                {return KW_UNSIGNED;            }
 uniform                 {return KW_UNIFORM;             }
 vector                  {return KW_VECTOR;              }
 VertexShader            {return KW_VERTEXSHADER;        }

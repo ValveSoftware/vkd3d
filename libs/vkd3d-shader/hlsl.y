@@ -5566,6 +5566,7 @@ static bool state_block_add_entry(struct hlsl_state_block *state_block, struct h
 %token KW_TEXTURECUBEARRAY
 %token KW_TRUE
 %token KW_TYPEDEF
+%token KW_UNSIGNED
 %token KW_UNIFORM
 %token KW_VECTOR
 %token KW_VERTEXSHADER
@@ -6712,6 +6713,26 @@ type_no_void:
                 }
             }
             vkd3d_free($1);
+        }
+    | KW_UNSIGNED TYPE_IDENTIFIER
+        {
+            struct hlsl_type *type = hlsl_get_type(ctx->cur_scope, $2, true, true);
+
+            if (hlsl_is_numeric_type(type) && type->e.numeric.type == HLSL_TYPE_INT)
+            {
+                if (!(type = hlsl_type_clone(ctx, type, 0, 0)))
+                    YYABORT;
+                vkd3d_free((void *)type->name);
+                type->name = NULL;
+                type->e.numeric.type = HLSL_TYPE_UINT;
+            }
+            else
+            {
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "The 'unsigned' keyword can't be used with type %s.", $2);
+            }
+
+            $$ = type;
         }
     | KW_STRUCT TYPE_IDENTIFIER
         {

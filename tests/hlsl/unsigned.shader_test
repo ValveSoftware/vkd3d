@@ -1,0 +1,66 @@
+[pixel shader]
+unsigned int var1;
+unsigned int2x2 var2;
+unsigned int2 var3;
+unsigned int var4[2];
+
+typedef int Int;
+typedef int2x2 Int2x2;
+typedef int2 Int2;
+
+unsigned Int var5;
+unsigned Int2x2 var6;
+unsigned Int2 var7;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+unsigned uint var;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+unsigned uint2 var;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+unsigned uint2x2 var;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+Texture2D<unsigned int> t;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+shader model < 6.0
+
+[pixel shader fail]
+// crashes with dxc
+typedef int Int[2];
+unsigned Int var;
+
+float4 main() : sv_target
+{
+    return 0;
+}

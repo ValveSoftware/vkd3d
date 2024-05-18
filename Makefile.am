@@ -234,6 +234,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/uav-rwstructuredbuffer.shader_test \
 	tests/hlsl/uav-rwtexture.shader_test \
 	tests/hlsl/unbounded-array-5.1.shader_test \
+	tests/hlsl/unsigned.shader_test \
 	tests/hlsl/uniform-parameters.shader_test \
 	tests/hlsl/uniform-semantics.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
