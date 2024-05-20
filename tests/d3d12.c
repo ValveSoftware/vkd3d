@@ -23962,6 +23962,7 @@ static void test_graphics_uav_counters(void)
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &gpu_heap);
     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 0,
             ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(gpu_heap));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
