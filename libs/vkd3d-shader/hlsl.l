@@ -191,7 +191,7 @@ while                   {return KW_WHILE;               }
 %=                      {return OP_MODASSIGN;           }
 &=                      {return OP_ANDASSIGN;           }
 \|=                     {return OP_ORASSIGN;            }
-^=                      {return OP_XORASSIGN;           }
+\^=                     {return OP_XORASSIGN;           }
 
 {IDENTIFIER}            {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);

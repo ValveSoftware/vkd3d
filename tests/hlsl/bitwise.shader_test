@@ -96,7 +96,7 @@ float4 main() : SV_TARGET
 todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 main() : SV_TARGET
 {
     int a = 0;
@@ -113,7 +113,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-todo(glsl|sm<6) draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
 
 [pixel shader]
