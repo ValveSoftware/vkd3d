@@ -1334,11 +1334,11 @@ static void vkd3d_trace_physical_device_features(const struct vkd3d_physical_dev
 
     fragment_shader_interlock_features = &info->fragment_shader_interlock_features;
     TRACE("  VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT:\n");
-    TRACE("    fragmentShaderSampleInterlock: %#x.\n.",
+    TRACE("    fragmentShaderSampleInterlock: %#x.\n",
             fragment_shader_interlock_features->fragmentShaderSampleInterlock);
-    TRACE("    fragmentShaderPixelInterlock: %#x\n.",
+    TRACE("    fragmentShaderPixelInterlock: %#x.\n",
             fragment_shader_interlock_features->fragmentShaderPixelInterlock);
-    TRACE("    fragmentShaderShadingRateInterlock: %#x\n.",
+    TRACE("    fragmentShaderShadingRateInterlock: %#x.\n",
             fragment_shader_interlock_features->fragmentShaderShadingRateInterlock);
 
     demote_features = &info->demote_features;
