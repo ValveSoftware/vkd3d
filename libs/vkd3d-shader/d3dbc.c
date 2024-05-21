@@ -2602,6 +2602,11 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
             sm1_instr.opcode |= VKD3DSI_TEXLD_PROJECT << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
+            sm1_instr.opcode = D3DSIO_TEX;
+            sm1_instr.opcode |= VKD3DSI_TEXLD_BIAS << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
+            break;
+
         default:
             hlsl_fixme(ctx, &instr->loc, "Resource load type %u.", load->load_type);
             return;
