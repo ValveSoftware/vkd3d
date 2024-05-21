@@ -4168,11 +4168,15 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
         hlsl_release_string_buffer(ctx, string);
     }
 
-    if (!strcmp(name, "tex2Dlod"))
+    if (!strcmp(name, "tex2Dbias")
+            || !strcmp(name, "tex2Dlod"))
     {
         struct hlsl_ir_node *lod, *c;
 
-        load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
+        if (!strcmp(name, "tex2Dlod"))
+            load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
+        else
+            load_params.type = HLSL_RESOURCE_SAMPLE_LOD_BIAS;
 
         if (!(c = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), hlsl_sampler_dim_count(dim), params->args[1], loc)))
             return false;
@@ -4292,6 +4296,12 @@ static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     return intrinsic_tex(ctx, params, loc, "tex2D", HLSL_SAMPLER_DIM_2D);
+}
+
+static bool intrinsic_tex2Dbias(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex2Dbias", HLSL_SAMPLER_DIM_2D);
 }
 
 static bool intrinsic_tex2Dlod(struct hlsl_ctx *ctx,
@@ -4514,6 +4524,7 @@ intrinsic_functions[] =
     {"tanh",                                1, true,  intrinsic_tanh},
     {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
+    {"tex2Dbias",                           2, false, intrinsic_tex2Dbias},
     {"tex2Dlod",                            2, false, intrinsic_tex2Dlod},
     {"tex2Dproj",                           2, false, intrinsic_tex2Dproj},
     {"tex3D",                              -1, false, intrinsic_tex3D},

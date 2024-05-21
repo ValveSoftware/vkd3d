@@ -42,3 +42,31 @@ probe all rgba (4.0, 0.0, 10.0, 0.0)
 uniform 0 float4 8.5 0.0 0.0 0.0
 todo(sm<4 | glsl) draw quad
 probe all rgba (0.0, 0.0, 10.0, 0.0)
+
+[require]
+shader model >= 3.0
+options: backcompat
+
+[pixel shader todo(sm<4) fail(sm>=6)]
+sampler s;
+float bias;
+
+float4 main(float2 coord : texcoord) : sv_target
+{
+    /* Choice of initial mipmap level is hardware-dependent, and in practice
+     * varies too much to be reasonably covered by ULPS. Quantize instead. */
+    return floor(tex2Dbias(s, float4(coord, 0, bias)) * 10);
+}
+
+[test]
+uniform 0 float4 6.5 0.0 0.0 0.0
+todo(sm<4 | glsl) draw quad
+probe all rgba (10.0, 0.0, 10.0, 0.0)
+
+uniform 0 float4 7.5 0.0 0.0 0.0
+todo(sm<4 | glsl) draw quad
+probe all rgba (4.0, 0.0, 10.0, 0.0)
+
+uniform 0 float4 8.5 0.0 0.0 0.0
+todo(sm<4 | glsl) draw quad
+probe all rgba (0.0, 0.0, 10.0, 0.0)
