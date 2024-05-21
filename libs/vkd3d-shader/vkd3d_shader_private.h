@@ -809,6 +809,7 @@ enum vkd3d_tessellator_domain
 
 #define VKD3DSI_NONE                    0x0
 #define VKD3DSI_TEXLD_PROJECT           0x1
+#define VKD3DSI_TEXLD_BIAS              0x2
 #define VKD3DSI_INDEXED_DYNAMIC         0x4
 #define VKD3DSI_RESINFO_RCP_FLOAT       0x1
 #define VKD3DSI_RESINFO_UINT            0x2
