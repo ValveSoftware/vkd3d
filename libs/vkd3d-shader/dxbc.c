@@ -360,7 +360,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     uint32_t count, header_size;
     struct signature_element *e;
     const char *ptr = data;
-    unsigned int i;
+    unsigned int i, j;
 
     if (!require_space(0, 2, sizeof(uint32_t), section->data.size))
     {
@@ -403,6 +403,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     for (i = 0; i < count; ++i)
     {
         size_t name_offset;
+        const char *name;
         uint32_t mask;
 
         e[i].sort_index = i;
@@ -413,9 +414,14 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
             e[i].stream_index = 0;
 
         name_offset = read_u32(&ptr);
-        if (!(e[i].semantic_name = shader_get_string(data, section->data.size, name_offset)))
+        if (!(name = shader_get_string(data, section->data.size, name_offset))
+                || !(e[i].semantic_name = vkd3d_strdup(name)))
         {
             WARN("Invalid name offset %#zx (data size %#zx).\n", name_offset, section->data.size);
+            for (j = 0; j < i; ++j)
+            {
+                vkd3d_free((void *)e[j].semantic_name);
+            }
             vkd3d_free(e);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }

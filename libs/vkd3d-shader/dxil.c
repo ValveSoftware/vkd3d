@@ -9445,7 +9445,22 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
         }
     }
 
-    vkd3d_free(s->elements);
+    for (i = 0; i < operand_count; ++i)
+    {
+        if ((elements[i].semantic_name = vkd3d_strdup(elements[i].semantic_name)))
+            continue;
+
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Failed to allocate signature element semantic name.");
+        for (j = 0; j < i; ++j)
+        {
+            vkd3d_free((void *)elements[j].semantic_name);
+        }
+        vkd3d_free(elements);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    shader_signature_cleanup(s);
     s->elements = elements;
     s->element_count = operand_count;
 

@@ -559,7 +559,8 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     element = &signature->elements[signature->element_count++];
 
     memset(element, 0, sizeof(*element));
-    element->semantic_name = name;
+    if (!(element->semantic_name = vkd3d_strdup(name)))
+        return false;
     element->semantic_index = index;
     element->sysval_semantic = sysval;
     element->component_type = VKD3D_SHADER_COMPONENT_FLOAT;

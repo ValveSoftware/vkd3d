@@ -657,7 +657,15 @@ static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_sig
         struct vkd3d_shader_signature_element *d = &signature->elements[i];
         struct signature_element *e = &src->elements[i];
 
-        d->semantic_name = e->semantic_name;
+        if (!(d->semantic_name = vkd3d_strdup(e->semantic_name)))
+        {
+            for (unsigned int j = 0; j < i; ++j)
+            {
+                vkd3d_free((void *)signature->elements[j].semantic_name);
+            }
+            vkd3d_free(signature->elements);
+            return false;
+        }
         d->semantic_index = e->semantic_index;
         d->stream_index = e->stream_index;
         d->sysval_semantic = e->sysval_semantic;
@@ -1763,6 +1771,10 @@ void vkd3d_shader_free_root_signature(struct vkd3d_shader_versioned_root_signatu
 
 void shader_signature_cleanup(struct shader_signature *signature)
 {
+    for (unsigned int i = 0; i < signature->element_count; ++i)
+    {
+        vkd3d_free((void *)signature->elements[i].semantic_name);
+    }
     vkd3d_free(signature->elements);
     signature->elements = NULL;
 }
@@ -1820,6 +1832,10 @@ void vkd3d_shader_free_shader_signature(struct vkd3d_shader_signature *signature
 {
     TRACE("signature %p.\n", signature);
 
+    for (unsigned int i = 0; i < signature->element_count; ++i)
+    {
+        vkd3d_free((void *)signature->elements[i].semantic_name);
+    }
     vkd3d_free(signature->elements);
     signature->elements = NULL;
 }
