@@ -379,6 +379,18 @@ static void test_preprocess(void)
             "pass",
             "fail",
         },
+
+        /* CRs are treated as whitespace. */
+        {
+            "#define\rKEY(a,\rb)\ra##b\r\n"
+            "KEY(pa,\rss)\r\n"
+            "#ifndef\rKEY\r\n"
+            "fail\r\n"
+            "#endif\r\n",
+
+            "pass",
+            "fail",
+        }
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
