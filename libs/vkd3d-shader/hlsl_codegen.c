@@ -2988,7 +2988,7 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
 
     if (cond->data_type->class > HLSL_CLASS_VECTOR || instr->data_type->class > HLSL_CLASS_VECTOR)
     {
-        hlsl_fixme(ctx, &instr->loc, "Lower ternary of type other than scalar or vector.\n");
+        hlsl_fixme(ctx, &instr->loc, "Lower ternary of type other than scalar or vector.");
         return false;
     }
 

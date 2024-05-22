@@ -2051,7 +2051,7 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         case HLSL_TYPE_BOOL:
             /* Casts to bool should have already been lowered. */
         default:
-            hlsl_fixme(ctx, &expr->node.loc, "SM1 cast from %s to %s.\n",
+            hlsl_fixme(ctx, &expr->node.loc, "SM1 cast from %s to %s.",
                 debug_hlsl_type(ctx, src_type), debug_hlsl_type(ctx, dst_type));
             break;
     }
@@ -2459,7 +2459,7 @@ static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         }
 
         default:
-            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.\n", hlsl_jump_type_to_string(jump->type));
+            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
     }
 }
 
@@ -2547,7 +2547,7 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
             break;
 
         default:
-            hlsl_fixme(ctx, &instr->loc, "Resource load type %u\n", load->load_type);
+            hlsl_fixme(ctx, &instr->loc, "Resource load type %u.", load->load_type);
             return;
     }
 
@@ -2579,7 +2579,7 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
     if (store->lhs.var->data_type->class == HLSL_CLASS_MATRIX)
     {
-        hlsl_fixme(ctx, &instr->loc, "Lower matrix writemasks.\n");
+        hlsl_fixme(ctx, &instr->loc, "Lower matrix writemasks.");
         return;
     }
 
