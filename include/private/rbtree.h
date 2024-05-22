@@ -126,34 +126,17 @@ static inline struct rb_entry *rb_postorder_next(struct rb_entry *iter)
     return rb_postorder_head(iter->parent->right);
 }
 
-/* iterate through the tree */
-#define RB_FOR_EACH(cursor, tree) \
-    for ((cursor) = rb_head((tree)->root); (cursor); (cursor) = rb_next(cursor))
-
-/* iterate through the tree using a tree entry */
-#define RB_FOR_EACH_ENTRY(elem, tree, type, field) \
-    for ((elem) = RB_ENTRY_VALUE(rb_head((tree)->root), type, field); \
-         (elem) != RB_ENTRY_VALUE(0, type, field); \
-         (elem) = RB_ENTRY_VALUE(rb_next(&elem->field), type, field))
-
-/* iterate through the tree using using postorder, making it safe to free the entry */
-#define RB_FOR_EACH_DESTRUCTOR(cursor, cursor2, tree) \
-    for ((cursor) = rb_postorder_head((tree)->root); \
-         (cursor) && (((cursor2) = rb_postorder_next(cursor)) || 1); \
-         (cursor) = (cursor2))
-
-/* iterate through the tree using a tree entry and postorder, making it safe to free the entry */
-#define RB_FOR_EACH_ENTRY_DESTRUCTOR(elem, elem2, tree, type, field) \
-    for ((elem) = RB_ENTRY_VALUE(rb_postorder_head((tree)->root), type, field); \
-         (elem) != WINE_RB_ENTRY_VALUE(0, type, field) \
-             && (((elem2) = RB_ENTRY_VALUE(rb_postorder_next(&(elem)->field), type, field)) || 1); \
-         (elem) = (elem2))
-
-
 static inline void rb_postorder(struct rb_tree *tree, rb_traverse_func *callback, void *context)
 {
-    struct rb_entry *iter, *next;
-    RB_FOR_EACH_DESTRUCTOR(iter, next, tree) callback(iter, context);
+    struct rb_entry *entry = rb_postorder_head(tree->root);
+    struct rb_entry *next;
+
+    while (entry)
+    {
+        next = rb_postorder_next(entry);
+        callback(entry, context);
+        entry = next;
+    }
 }
 
 static inline void rb_init(struct rb_tree *tree, rb_compare_func compare)
@@ -164,8 +147,13 @@ static inline void rb_init(struct rb_tree *tree, rb_compare_func compare)
 
 static inline void rb_for_each_entry(struct rb_tree *tree, rb_traverse_func *callback, void *context)
 {
-    struct rb_entry *iter;
-    RB_FOR_EACH(iter, tree) callback(iter, context);
+    struct rb_entry *entry = rb_head(tree->root);
+
+    while (entry)
+    {
+        callback(entry, context);
+        entry = rb_next(entry);
+    }
 }
 
 static inline void rb_clear(struct rb_tree *tree, rb_traverse_func *callback, void *context)
