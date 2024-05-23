@@ -1537,6 +1537,7 @@ static void test_create_committed_resource(void)
     D3D12_RESOURCE_DESC1 resource_desc1;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
+    HRESULT hr, unaligned_expected_hr;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
     ID3D12Resource2 *resource2;
@@ -1546,7 +1547,6 @@ static void test_create_committed_resource(void)
     ID3D12Device4 *device4;
     unsigned int i;
     ULONG refcount;
-    HRESULT hr;
 
     static const struct
     {
@@ -1705,11 +1705,13 @@ static void test_create_committed_resource(void)
     ok(hr == S_OK, "Failed to create committed resource, hr %#x.\n", hr);
     ID3D12Resource_Release(resource);
 
+    unaligned_expected_hr = are_unaligned_block_textures_supported(device) ? S_OK : E_INVALIDARG;
+
     resource_desc.Height = 31;
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
             &IID_ID3D12Resource, (void **)&resource);
-    ok(hr == E_INVALIDARG || broken(test_options.use_warp_device), "Got unexpected hr %#x.\n", hr);
+    ok(hr == unaligned_expected_hr, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12Resource_Release(resource);
 
@@ -1718,7 +1720,7 @@ static void test_create_committed_resource(void)
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
             &IID_ID3D12Resource, (void **)&resource);
-    ok(hr == E_INVALIDARG || broken(test_options.use_warp_device), "Got unexpected hr %#x.\n", hr);
+    ok(hr == unaligned_expected_hr, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12Resource_Release(resource);
 
@@ -1727,7 +1729,7 @@ static void test_create_committed_resource(void)
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
             &IID_ID3D12Resource, (void **)&resource);
-    ok(hr == E_INVALIDARG || broken(test_options.use_warp_device), "Got unexpected hr %#x.\n", hr);
+    ok(hr == unaligned_expected_hr, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12Resource_Release(resource);
 
@@ -1736,7 +1738,7 @@ static void test_create_committed_resource(void)
     hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
             &IID_ID3D12Resource, (void **)&resource);
-    ok(hr == E_INVALIDARG || broken(test_options.use_warp_device), "Got unexpected hr %#x.\n", hr);
+    ok(hr == unaligned_expected_hr, "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12Resource_Release(resource);
 
