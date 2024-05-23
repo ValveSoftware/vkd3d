@@ -3806,7 +3806,8 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
                 return E_INVALIDARG;
             }
 
-            data->UnalignedBlockTexturesSupported = FALSE;
+            /* Vulkan does not restrict block texture alignment. */
+            data->UnalignedBlockTexturesSupported = TRUE;
 
             TRACE("Unaligned block texture support %#x.\n", data->UnalignedBlockTexturesSupported);
             return S_OK;

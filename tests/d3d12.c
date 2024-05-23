@@ -20519,7 +20519,6 @@ static void test_get_copyable_footprints(void)
             {
                 resource_desc.Width = align(resource_desc.Width, 4);
                 resource_desc.Height = align(resource_desc.Height, 4);
-                todo
                 check_copyable_footprints(&resource_desc, 0, invalid_descs[i].sub_resource_count, 0,
                         layouts, row_counts, row_sizes, &total_size);
             }
