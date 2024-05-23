@@ -4284,12 +4284,14 @@ static HRESULT d3d12_descriptor_heap_create_descriptor_set(struct d3d12_descript
     VkDescriptorSetVariableDescriptorCountAllocateInfoEXT set_size;
     VkDescriptorSetAllocateInfo set_desc;
     VkResult vr;
+    HRESULT hr;
 
     if (!device->vk_descriptor_heap_layouts[set].vk_set_layout)
     {
         /* Set 0 uses mutable descriptors, and this set is unused. */
-        if (!descriptor_heap->vk_descriptor_sets[0].vk_set)
-            d3d12_descriptor_heap_create_descriptor_set(descriptor_heap, device, 0);
+        if (!descriptor_heap->vk_descriptor_sets[0].vk_set
+                && FAILED(hr = d3d12_descriptor_heap_create_descriptor_set(descriptor_heap, device, 0)))
+            return hr;
         descriptor_set->vk_set = descriptor_heap->vk_descriptor_sets[0].vk_set;
         descriptor_set->vk_type = device->vk_descriptor_heap_layouts[set].type;
         return S_OK;
