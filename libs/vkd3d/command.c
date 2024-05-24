@@ -4814,15 +4814,9 @@ static void STDMETHODCALLTYPE d3d12_command_list_IASetVertexBuffers(ID3D12Graphi
         return;
     }
 
-    if (!views)
-    {
-        WARN("NULL \"views\" pointer specified.\n");
-        return;
-    }
-
     for (i = 0; i < view_count; ++i)
     {
-        if (views[i].BufferLocation)
+        if (views && views[i].BufferLocation)
         {
             resource = vkd3d_gpu_va_allocator_dereference(gpu_va_allocator, views[i].BufferLocation);
             buffers[i] = resource->u.vk_buffer;
