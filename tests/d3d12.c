@@ -20137,6 +20137,30 @@ static void test_null_vbv(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     todo
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0x00000000, 0);
+    reset_command_list(command_list, context.allocator);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
+    /* A NULL "views" pointer can apply to multiple view slots. */
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, NULL);
+
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 4, 0, 0);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    todo
+    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffffff, 0);
 
     ID3D12Resource_Release(vb);
     destroy_test_context(&context);
