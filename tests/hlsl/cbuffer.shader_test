@@ -860,3 +860,92 @@ uniform 12 float4 12.0 13.0 14.0 15.0
 uniform 16 float4 16.0 17.0 18.0 19.0
 todo(glsl) draw quad
 probe all rgba (124.0, 135.0, 146.0, 150.5)
+
+[require]
+shader model >= 5.1
+
+[pixel shader fail todo]
+float4 ConstantBuffer;
+
+float4 main() : sv_target
+{
+    return ConstantBuffer;
+}
+
+[pixel shader fail]
+struct s
+{
+    float4 m;
+};
+
+float4 cb;
+ConstantBuffer<s> cb;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail(sm>=6) todo]
+struct s
+{
+    float4 m;
+};
+
+float4 main() : sv_target
+{
+    // Local variable do not create resource definitions,
+    // acting like a constant
+    ConstantBuffer<s> cb = (s)1;
+    float4 var = 0.1f;
+    var += cb.m;
+    return var;
+}
+
+[test]
+todo draw quad
+probe all rgba (1.1, 1.1, 1.1, 1.1)
+
+[pixel shader fail]
+struct s
+{
+    float4 m;
+};
+
+float4 main() : sv_target
+{
+    ConstantBuffer<s> cb = (s)0;
+    cb.m = 1.0f;
+    return cb.m;
+}
+
+[pixel shader todo]
+struct s
+{
+    float4 m;
+};
+
+float4 var;
+
+ConstantBuffer<s> cb[2][3] : register(b1);
+cbuffer cb
+{
+    float4 m2;
+};
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+shader model >= 2.0
+shader model < 5.1
+
+[pixel shader]
+float4 ConstantBuffer;
+
+float4 main() : sv_target
+{
+    return ConstantBuffer;
+}
