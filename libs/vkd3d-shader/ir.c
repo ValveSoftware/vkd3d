@@ -1886,6 +1886,7 @@ static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_pr
                 srcs[1].reg.idx[1] = ins->src[1].reg.idx[0];
                 srcs[1].reg.idx_count = 2;
                 srcs[1].reg.data_type = VKD3D_DATA_RESOURCE;
+                srcs[1].reg.dimension = VSIR_DIMENSION_VEC4;
                 srcs[1].swizzle = VKD3D_SHADER_NO_SWIZZLE;
 
                 srcs[2].reg.type = VKD3DSPR_SAMPLER;
