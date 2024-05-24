@@ -135,8 +135,8 @@ vkd3d_shader_tests = \
 	tests/hlsl/initializer-objects.shader_test \
 	tests/hlsl/initializer-static-array.shader_test \
 	tests/hlsl/initializer-struct.shader_test \
-	tests/hlsl/intrinsic-override.shader_test \
 	tests/hlsl/instance-id.shader_test \
+	tests/hlsl/intrinsic-override.shader_test \
 	tests/hlsl/invalid.shader_test \
 	tests/hlsl/inverse-trig.shader_test \
 	tests/hlsl/is-front-face.shader_test \
@@ -194,8 +194,8 @@ vkd3d_shader_tests = \
 	tests/hlsl/side-effects.shader_test \
 	tests/hlsl/sign.shader_test \
 	tests/hlsl/single-numeric-initializer.shader_test \
-	tests/hlsl/sm1-const-folding.shader_test \
 	tests/hlsl/sm1-const-allocation.shader_test \
+	tests/hlsl/sm1-const-folding.shader_test \
 	tests/hlsl/sm6-ternary.shader_test \
 	tests/hlsl/sm6-uav-rwtexture.shader_test \
 	tests/hlsl/smoothstep.shader_test \
