@@ -35625,6 +35625,13 @@ static void test_conditional_rendering(void)
 
     for (i = 0; i < 2; ++i)
     {
+        if (i == 0 && is_nvidia_device(context.device))
+        {
+            /* I can reproduce that on an NVIDIA Quadro P2000, driver version 535.161.08. */
+            skip("Triggers a GPU freeze on NVIDIA.\n");
+            continue;
+        }
+
         ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
         ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
         ID3D12GraphicsCommandList_SetComputeRootConstantBufferView(command_list,
