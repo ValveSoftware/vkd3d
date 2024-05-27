@@ -41,7 +41,7 @@ enum vkd3d_result
 {
     /** Success. */
     VKD3D_OK = 0,
-    /** Success as a result of there being nothing to do. */
+    /** Success as a result of there being nothing to do. \since 1.12 */
     VKD3D_FALSE = 1,
     /** An unspecified failure occurred. */
     VKD3D_ERROR = -1,
