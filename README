@@ -86,6 +86,9 @@ commas or semicolons.
    platform controls the behavior of todo(), todo_if(), bug_if() and broken()
    conditions in tests.
 
+ * VKD3D_TEST_SKIP_DXC - when set, tests requiring the dxcompiler library will
+   be skipped.
+
  * VKD3D_TEST_BUG - set to 0 to disable bug_if() conditions in tests.
 
 If the configuration defines 'DXCOMPILER_LIBS=-L/path/to/dxcompiler', Shader

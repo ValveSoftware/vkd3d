@@ -2158,7 +2158,7 @@ static IDxcCompiler3 *dxcompiler_create(void)
     HRESULT hr;
     void *dll;
 
-    if ((skip_dxc = getenv("VKD3D_TESTS_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
+    if ((skip_dxc = getenv("VKD3D_TEST_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
         return NULL;
 
 #ifdef VKD3D_CROSSTEST
