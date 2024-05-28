@@ -162,6 +162,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/nointerpolation.shader_test \
 	tests/hlsl/non-const-indexing.shader_test \
 	tests/hlsl/normalize.shader_test \
+	tests/hlsl/null.shader_test \
 	tests/hlsl/numeric-constructor-truncation.shader_test \
 	tests/hlsl/numeric-types.shader_test \
 	tests/hlsl/numthreads.shader_test \

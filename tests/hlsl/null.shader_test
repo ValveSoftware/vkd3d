@@ -1,0 +1,81 @@
+[pixel shader fail]
+float4 var = NULL;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+float4x4 var = NULL;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    float4 f;
+};
+
+float4 main() : sv_target
+{
+    s var = (s)NULL;
+    return s.f;
+}
+
+[pixel shader fail(sm<6)]
+Texture var = null;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader todo]
+SamplerState s
+{
+    UnknownField = NULL;
+};
+
+Texture t = NULL;
+PixelShader ps = NULL;
+VertexShader vs = NULL;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+shader model >= 4.0
+
+[pixel shader fail(sm>=6) todo]
+Texture2DMS<float4> t = NULL;
+
+RWTexture1D<float4> u1 = NULL;
+RWTexture2D<float4> u2 = NULL;
+RWTexture3D<float4> u3 = NULL;
+
+RWTexture1DArray<float4> ua1 = NULL;
+RWTexture2DArray<float4> ua2 = NULL;
+
+RWBuffer<float4> b1 = NULL;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+shader model >= 5.0
+
+[pixel shader fail(sm>=6) todo]
+RasterizerOrderedTexture2D<uint4> t1 = NULL;
+
+float4 main() : sv_target
+{
+    return 0;
+}
