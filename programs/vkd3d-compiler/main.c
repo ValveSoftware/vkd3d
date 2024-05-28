@@ -853,7 +853,7 @@ int main(int argc, char **argv)
     if (!options.explicit_colour && !getenv("NO_COLOUR") && !getenv("NO_COLOR") && has_colour(output))
         options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
-    add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_11);
+    add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_12);
     if (options.target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
             || options.target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT)
         add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FEATURE,

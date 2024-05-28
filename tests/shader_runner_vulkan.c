@@ -483,7 +483,7 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     option = &options[info.option_count++];
     option->name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
-    option->value = VKD3D_SHADER_API_VERSION_1_11;
+    option->value = VKD3D_SHADER_API_VERSION_1_12;
 
     compile_options = runner->r.compile_options;
     if (compile_options)

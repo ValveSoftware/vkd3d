@@ -1,3 +1,156 @@
+# What's new in vkd3d 1.12 (28 May 2024)
+
+### libvkd3d
+
+  - When the VK_EXT_fragment_shader_interlock extension is available, libvkd3d
+    supports rasteriser-ordered views.
+
+  - Compute pipeline state objects can be created from compute shaders with
+    embedded root signatures.
+
+  - When supported by the underlying Vulkan implementation, libvkd3d supports
+    the DXGI_FORMAT_B5G6R5_UNORM, DXGI_FORMAT_B5G5R5A1_UNORM, and
+    DXGI_FORMAT_B4G4R4A4_UNORM formats.
+
+  - The ID3D12ShaderCacheSession interface is supported.
+
+  - The ID3D12Device9 interface is supported.
+
+  - The CreateCommittedResource2(), CreatePlacedResource1(),
+    GetCopyableFootprints1(), and GetResourceAllocationInfo2() methods of the
+    ID3D12Device8 interface are implemented.
+
+  - Several new feature queries are supported:
+    - D3D12_FEATURE_D3D12_OPTIONS14
+    - D3D12_FEATURE_D3D12_OPTIONS15
+    - D3D12_FEATURE_D3D12_OPTIONS16
+    - D3D12_FEATURE_D3D12_OPTIONS17
+    - D3D12_FEATURE_D3D12_OPTIONS18
+
+### libvkd3d-shader
+
+  - The experimental DXIL source type supports the majority of Direct3D shader
+    model 6.0 instructions and features. Note that this is currently still an
+    unsupported feature, enabled by building vkd3d with the
+    ‘-DVKD3D_SHADER_UNSUPPORTED_DXIL’ preprocessor option. No API or ABI
+    stability guarantees are provided for experimental features.
+
+  - New features for the HLSL source type:
+    - Support for compiling directly to Direct3D shader assembly and SPIR-V
+      target types. This is primarily a convenience feature, as targeting
+      these could previously be achieved by going through either the ‘Legacy
+      Direct3D byte-code’ or ‘Tokenized Program Format’ formats as
+      intermediates.
+    - Improved support for shader model 1-3 profiles. In particular:
+      - The ternary, comparison, and logical operators are now supported for
+        these profiles.
+      - Support for integer and Boolean types has been improved.
+      - Shader constants are allocated in an order compatible with the
+        Microsoft implementation.
+    - More complex array size expressions. For example, matrix and vector
+      swizzles are allowed, as well as (constant) array dereferences.
+    - The following intrinsic functions are supported:
+      - cosh()
+      - determinant()
+      - refract()
+      - sinh()
+      - tanh()
+    - Reflection data for ‘Tokenized Program Format’ targets more accurately
+      reflects the source shader.
+    - Constant folding of expressions like ‘x + 0’ and ‘x * 1’.
+    - Support for the ‘single’ qualifier on constant buffer declarations.
+    - Parser support for annotations on constant buffer declarations.
+    - Parser support for effect state objects.
+
+  - When the SPV_EXT_fragment_shader_interlock extension is supported, SPIR-V
+    targets support rasteriser-ordered views.
+
+  - New interfaces:
+    - The VKD3D_SHADER_PARSE_DXBC_IGNORE_CHECKSUM flag indicates that
+      vkd3d_shader_parse_dxbc() should skip validating the checksum of the
+      DXBC blob. This allows otherwise valid blobs with a missing or invalid
+      checksum to be parsed.
+    - The VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1 enumeration value
+      specifies the Vulkan 1.1 environment for SPIR-V targets. Most notably,
+      the Vulkan 1.1 environment implies support for SPIR-V 1.3, which is a
+      requirement for supporting Direct3D shader model 6 wave operations on
+      SPIR-V targets.
+    - The VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK
+      enumeration value indicates support for the
+      SPV_EXT_fragment_shader_interlock extension in the SPIR-V target
+      environment.
+    - The VKD3D_SHADER_COMPILE_OPTION_FEATURE_WAVE_OPS flag indicates support
+      for Direct3D shader model 6 wave operations in the SPIR-V target
+      environment.
+    - The VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES flag indicates
+      that vkd3d_shader_compile() should include information about input,
+      output, and patch constant shader signatures when targeting Direct3D
+      shader assembly. Note that this is a libvkd3d-shader extension, and
+      potentially makes the output incompatible with other implementations.
+    - The VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT compile option specifies
+      whether libvkd3d-shader should produce child effects for ‘fx_4_0’ and
+      ‘fx_4_1’ HLSL target profiles.
+    - The VKD3D_SHADER_COMPILE_OPTION_INCLUDE_EMPTY_BUFFERS_IN_EFFECTS compile
+      option specifies whether empty constant buffer descriptions should be
+      included in the output for ‘fx_4_0’ and ‘fx_4_1’ HLSL target profiles.
+    - The VKD3D_SHADER_COMPILE_OPTION_WARN_IMPLICIT_TRUNCATION compile option
+      specifies whether the HLSL compiler should emit warnings for vector and
+      matrix truncation in implicit type conversions.
+
+### libvkd3d-utils
+
+  - D3D12CreateDeviceVKD3D() and D3D12CreateDevice() no longer require the
+    VK_KHR_surface and VK_KHR_swapchain extensions to be available. This
+    allows them to be used in environments with a windowing system, for
+    example for off-screen rendering and compute tasks.
+
+  - The GetConstantBufferByIndex() and GetResourceBindingDesc() methods of the
+    ID3D12ShaderReflection interface are implemented.
+
+  - The GetVariableByIndex() method of the
+    ID3D12ShaderReflectionConstantBuffer interface is implemented.
+
+  - The GetMemberTypeByIndex() method of the ID3D12ShaderReflectionType
+    interface is implemented.
+
+  - The GetType() method of the ID3D12ShaderReflectionVariable interface is
+    implemented.
+
+### vkd3d-compiler
+
+  - The ‘+signatures’ flag for the ‘--formatting’ option can be used to
+    specify that vkd3d-compiler should include information about input,
+    output, and patch constant shader signatures when outputting Direct3D
+    shader assembly. Note that this is a vkd3d-compiler extension, and
+    potentially makes the output incompatible with other implementations.
+
+  - The ‘--child-effect’ option can be used to specify that vkd3d-compiler
+    should produce child effects for ‘fx_4_0’ and ‘fx_4_1’ HLSL target
+    profiles.
+
+  - The ‘--fx-include-empty-buffers’ option can be used to specify that
+    vkd3d-compiler should include empty constant buffer descriptions in the
+    output for ‘fx_4_0’ and ‘fx_4_1’ HLSL target profiles.
+
+### vkd3d-dxbc
+
+  - The ‘--ignore-checksum’ option can be used to specify that vkd3d-dxbc
+    should skip validating the checksum of the DXBC input blob. This allows
+    vkd3d-dxbc to operate on otherwise valid blobs with missing or invalid
+    checksums.
+
+  - The ‘--emit’ option can be used to indicate that vkd3d-dxbc should output
+    a new DXBC blob.
+
+  - The ‘--extract’ option can be used to specify a section to extract out of
+    the input blob. For example, ‘vkd3d-dxbc -x t:PRIV blob.dxbc > priv.bin’
+    would extract the private data section of ‘blob.dxbc’ to ‘priv.bin’, and
+    ‘vkd3d-dxbc -x t:RTS0 blob.dxbc > root_signature.bin’ would extract the
+    root signature to ‘root_signature.bin’.
+
+  - The ‘--output’ option can be used to specify where vkd3d-dxbc should write
+    its output for the ‘--emit’ and ‘--extract’ options.
+
 # What's new in vkd3d 1.11 (5 Mar 2024)
 
 ### libvkd3d
