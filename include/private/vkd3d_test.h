@@ -412,7 +412,7 @@ static inline void vkd3d_test_push_context(const char *fmt, ...)
     {
         va_start(args, fmt);
         vsnprintf(vkd3d_test_state.context[vkd3d_test_state.context_count],
-                sizeof(vkd3d_test_state.context), fmt, args);
+                sizeof(*vkd3d_test_state.context), fmt, args);
         va_end(args);
         vkd3d_test_state.context[vkd3d_test_state.context_count][sizeof(vkd3d_test_state.context[0]) - 1] = '\0';
     }
