@@ -155,7 +155,7 @@ todo(glsl) draw quad
 probe (0, 0) rgba (40.0, 40.0, 40.0, 40.0)
 
 
-[pixel shader todo]
+[pixel shader]
 float3 a;
 
 float4 main() : sv_target
@@ -169,11 +169,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 20 30 40 -1
-todo(sm<6) draw quad
-todo(sm<6) probe (0,0) rgba (10.0, 20.0, 30.0, 40.0)
+todo(glsl) draw quad
+probe (0,0) rgba (10.0, 20.0, 30.0, 40.0)
 
 
-[pixel shader todo]
+[pixel shader]
 float3 a;
 
 float4 main() : sv_target
@@ -187,12 +187,12 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 20 30 80 -1
-todo(sm<6) draw quad
-todo(sm<6) probe (0,0) rgba (80.0, 30.0, 20.0, 10.0)
+todo(glsl) draw quad
+probe (0,0) rgba (80.0, 30.0, 20.0, 10.0)
 
 
 % Cannot repeat components when assigning to a swizzle.
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float2x2 mat = {1, 2, 3, 4};
