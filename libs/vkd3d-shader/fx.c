@@ -1464,6 +1464,9 @@ static void write_buffers(struct fx_write_context *fx, bool shared)
 {
     struct hlsl_buffer *buffer;
 
+    if (shared && !fx->child_effect)
+        return;
+
     LIST_FOR_EACH_ENTRY(buffer, &fx->ctx->buffers, struct hlsl_buffer, entry)
     {
         if (!buffer->size && !fx->include_empty_buffers)
