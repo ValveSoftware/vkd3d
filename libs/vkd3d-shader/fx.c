@@ -494,7 +494,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             uint32_t semantic_offset, field_type_offset;
 
             name_offset = write_string(field->name, fx);
-            semantic_offset = write_string(field->semantic.name, fx);
+            semantic_offset = write_string(field->semantic.raw_name, fx);
             field_type_offset = write_type(field->type, fx);
 
             put_u32_unaligned(buffer, name_offset);
@@ -683,7 +683,7 @@ static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *n
     }
 
     name_offset = write_string(name, fx);
-    semantic_offset = write_string(semantic->name, fx);
+    semantic_offset = write_string(semantic->raw_name, fx);
 
     offset = put_u32(buffer, hlsl_sm1_base_type(type));
     put_u32(buffer, hlsl_sm1_class(type));
@@ -995,7 +995,7 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
 
     type_offset = write_type(var->data_type, fx);
     name_offset = write_string(var->name, fx);
-    semantic_offset = write_string(var->semantic.name, fx);
+    semantic_offset = write_string(var->semantic.raw_name, fx);
 
     put_u32(buffer, name_offset);
     put_u32(buffer, type_offset);
@@ -1349,7 +1349,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
 
     type_offset = write_type(var->data_type, fx);
     name_offset = write_string(var->name, fx);
-    semantic_offset = write_string(var->semantic.name, fx);
+    semantic_offset = write_string(var->semantic.raw_name, fx);
 
     put_u32(buffer, name_offset);
     put_u32(buffer, type_offset);
