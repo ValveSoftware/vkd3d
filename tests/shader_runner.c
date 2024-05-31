@@ -374,6 +374,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
         {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
         {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
         {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
+        {"r32 typeless",        TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_TYPELESS},
     };
     unsigned int i;
 
@@ -510,6 +511,12 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         {
             resource->dimension = RESOURCE_DIMENSION_BUFFER;
             resource->height = 1;
+        }
+        else if (sscanf(line, "( raw_buffer , %u ) ", &resource->width) == 1)
+        {
+            resource->dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->height = 1;
+            resource->is_raw = true;
         }
         else if (sscanf(line, "( counter_buffer , %u ) ", &resource->width) == 1)
         {

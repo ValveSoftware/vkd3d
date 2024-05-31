@@ -2,8 +2,8 @@
 shader model >= 5.0
 
 [uav 1]
-format r32 uint
-size (buffer, 4)
+format r32 typeless
+size (raw_buffer, 4)
 
 1 0 0 0
 
@@ -32,8 +32,8 @@ probe uav 1 (3) rui (99)
 
 
 [uav 1]
-format r32 sint
-size (buffer, 4)
+format r32 typeless
+size (raw_buffer, 4)
 
 1 0 0 0
 
@@ -136,8 +136,8 @@ probe uav 2 (7)  ri (4)
 
 
 [uav 1]
-format r32 uint
-size (buffer, 1)
+format r32 typeless
+size (raw_buffer, 1)
 
 0
 

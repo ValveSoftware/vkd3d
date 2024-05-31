@@ -341,6 +341,7 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool i
         {DXGI_FORMAT_D32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
         {DXGI_FORMAT_R32_UINT,           1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
         {DXGI_FORMAT_R32_SINT,           1, true,  false, GL_R32I,               GL_RED_INTEGER,     GL_INT},
+        {DXGI_FORMAT_R32_TYPELESS,       1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
     };
 
     for (i = 0; i < ARRAY_SIZE(format_info); ++i)

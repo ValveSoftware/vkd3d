@@ -92,6 +92,7 @@ struct resource_params
 
     DXGI_FORMAT format;
     bool is_shadow;
+    bool is_raw;
     bool is_uav_counter;
     enum texture_data_type data_type;
     unsigned int texel_size;

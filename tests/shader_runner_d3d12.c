@@ -230,6 +230,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
                 uav_desc.Buffer.NumElements = params->width * params->height;
                 uav_desc.Buffer.StructureByteStride = params->stride;
+                uav_desc.Buffer.Flags = params->is_raw ? D3D12_BUFFER_UAV_FLAG_RAW : 0;
 
                 ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
                         params->is_uav_counter ? resource->resource : NULL, &uav_desc,

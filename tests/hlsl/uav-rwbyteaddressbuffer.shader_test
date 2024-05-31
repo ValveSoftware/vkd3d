@@ -2,10 +2,10 @@
 shader model >= 5.0
 
 [uav 1]
-format r32 float
-size (buffer, 4)
+format r32 typeless
+size (raw_buffer, 4)
 
-0.1 0.2 0.3 0.4
+1 2 3 4
 
 [pixel shader todo]
 RWByteAddressBuffer u : register(u1);
