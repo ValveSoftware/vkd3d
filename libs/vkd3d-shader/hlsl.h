@@ -222,6 +222,8 @@ struct hlsl_semantic
     const char *name;
     uint32_t index;
 
+    /* Name exactly as it appears in the sources. */
+    const char *raw_name;
     /* If the variable or field that stores this hlsl_semantic has already reported that it is missing. */
     bool reported_missing;
     /* In case the variable or field that stores this semantic has already reported to use a
@@ -1284,7 +1286,9 @@ bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *d
 bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struct hlsl_deref *other);
 
 void hlsl_cleanup_deref(struct hlsl_deref *deref);
+
 void hlsl_cleanup_semantic(struct hlsl_semantic *semantic);
+bool hlsl_clone_semantic(struct hlsl_ctx *ctx, struct hlsl_semantic *dst, const struct hlsl_semantic *src);
 
 void hlsl_cleanup_ir_switch_cases(struct list *cases);
 void hlsl_free_ir_switch_case(struct hlsl_ir_switch_case *c);

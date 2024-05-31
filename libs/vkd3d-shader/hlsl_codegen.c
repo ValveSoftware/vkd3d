@@ -320,7 +320,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
         }
     }
 
-    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
+    if (!(hlsl_clone_semantic(ctx, &new_semantic, semantic)))
     {
         vkd3d_free(new_name);
         return NULL;

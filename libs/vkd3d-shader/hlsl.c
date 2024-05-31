@@ -3352,7 +3352,23 @@ void hlsl_free_attribute(struct hlsl_attribute *attr)
 void hlsl_cleanup_semantic(struct hlsl_semantic *semantic)
 {
     vkd3d_free((void *)semantic->name);
+    vkd3d_free((void *)semantic->raw_name);
     memset(semantic, 0, sizeof(*semantic));
+}
+
+bool hlsl_clone_semantic(struct hlsl_ctx *ctx, struct hlsl_semantic *dst, const struct hlsl_semantic *src)
+{
+    *dst = *src;
+    dst->name = dst->raw_name = NULL;
+    if (src->name && !(dst->name = hlsl_strdup(ctx, src->name)))
+        return false;
+    if (src->raw_name && !(dst->raw_name = hlsl_strdup(ctx, src->raw_name)))
+    {
+        hlsl_cleanup_semantic(dst);
+        return false;
+    }
+
+    return true;
 }
 
 static void free_function_decl(struct hlsl_ir_function_decl *decl)

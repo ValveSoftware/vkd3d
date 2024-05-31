@@ -2335,14 +2335,10 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     if (!(var_name = vkd3d_strdup(v->name)))
         return;
 
-    new_semantic = v->semantic;
-    if (v->semantic.name)
+    if (!hlsl_clone_semantic(ctx, &new_semantic, &v->semantic))
     {
-        if (!(new_semantic.name = vkd3d_strdup(v->semantic.name)))
-        {
-            vkd3d_free(var_name);
-            return;
-        }
+        vkd3d_free(var_name);
+        return;
     }
 
     if (!(var = hlsl_new_var(ctx, var_name, type, &v->loc, &new_semantic, modifiers, &v->reg_reservation)))
@@ -6432,6 +6428,9 @@ semantic:
       ':' any_identifier
         {
             char *p;
+
+            if (!($$.raw_name = hlsl_strdup(ctx, $2)))
+                YYABORT;
 
             for (p = $2 + strlen($2); p > $2 && isdigit(p[-1]); --p)
                 ;
