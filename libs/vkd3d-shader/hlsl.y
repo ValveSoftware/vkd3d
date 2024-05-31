@@ -7296,6 +7296,8 @@ var_modifiers:
         }
     | var_identifier var_modifiers
         {
+            $$ = $2;
+
             if (!strcmp($1, "precise"))
                 $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, &@1);
             else if (!strcmp($1, "single"))
