@@ -492,6 +492,7 @@ struct hlsl_ir_var
     uint32_t is_param : 1;
     uint32_t is_separated_resource : 1;
     uint32_t is_synthetic : 1;
+    uint32_t has_explicit_bind_point : 1;
 };
 
 /* This struct is used to represent assignments in state block entries:

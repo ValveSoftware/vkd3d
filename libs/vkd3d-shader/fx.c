@@ -989,8 +989,7 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     };
     struct hlsl_ctx *ctx = fx->ctx;
 
-    /* Explicit bind point. */
-    if (var->reg_reservation.reg_type)
+    if (var->has_explicit_bind_point)
         flags |= HAS_EXPLICIT_BIND_POINT;
 
     type_offset = write_type(var->data_type, fx);

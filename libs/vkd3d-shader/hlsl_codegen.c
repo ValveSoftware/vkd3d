@@ -4791,6 +4791,7 @@ static void hlsl_calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_va
     if (register_reservation)
     {
         var->buffer_offset = 4 * var->reg_reservation.reg_index;
+        var->has_explicit_bind_point = 1;
     }
     else
     {
@@ -4823,6 +4824,7 @@ static void hlsl_calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_va
                 }
             }
             var->buffer_offset = var->reg_reservation.offset_index;
+            var->has_explicit_bind_point = 1;
         }
         else
         {
