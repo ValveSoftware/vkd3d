@@ -1000,7 +1000,7 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, bool shared, st
     put_u32(buffer, type_offset);
 
     semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
-    put_u32(buffer, var->buffer_offset); /* Offset in the constant buffer */
+    put_u32(buffer, var->buffer_offset * 4); /* Offset in the constant buffer, in bytes. */
     value_offset = put_u32(buffer, 0); /* Default value offset */
     put_u32(buffer, flags); /* Flags */
 
