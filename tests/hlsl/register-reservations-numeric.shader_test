@@ -10,7 +10,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 // Overlapping reservations when both variables are unused.
 float4 a : register(c3);
 float4 b : register(c3);
@@ -20,7 +20,7 @@ float4 main() : sv_target
     return 42;
 }
 
-[pixel shader fail(sm>=4 & sm<6) todo(sm<4)]
+[pixel shader fail(sm>=4 & sm<6)]
 // Overlapping reservations when only one variable is used.
 float4 a : register(c3);
 float4 b : register(c3);
@@ -31,7 +31,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail(sm>=4 & sm<6) todo(sm<4)]
+[pixel shader fail(sm>=4 & sm<6)]
 // Overlapping reservations when both variables are used, but their bind_count (used size) doesn't
 // cause an overlap.
 float4 a[2] : register(c3); // bind count: 1
