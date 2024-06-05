@@ -765,7 +765,8 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .release_readback = d3d12_runner_release_readback,
 };
 
-static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
+static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner,
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
     ID3D12Device *device = runner->test_context.device;
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
@@ -782,8 +783,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
 #else
     runner->caps.runner = "vkd3d";
 #endif
-    runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
-    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
+    runner->caps.minimum_shader_model = minimum_shader_model;
+    runner->caps.maximum_shader_model = maximum_shader_model;
     runner->caps.float64 = options.DoublePrecisionFloatShaderOps;
     runner->caps.int64 = options1.Int64ShaderOps;
     runner->caps.rov = options.ROVsSupported;
@@ -800,7 +801,8 @@ static bool device_supports_shader_model_6_0(ID3D12Device *device)
     return sm.HighestShaderModel >= D3D_SHADER_MODEL_6_0;
 }
 
-void run_shader_tests_d3d12(void *dxc_compiler)
+static void run_shader_tests_for_model_range(void *dxc_compiler,
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
     static const struct test_context_desc desc =
     {
@@ -813,13 +815,18 @@ void run_shader_tests_d3d12(void *dxc_compiler)
     ID3D12Device *device;
     HRESULT hr;
 
-    enable_d3d12_debug_layer();
-    init_adapter_info();
     if (!init_test_context(&runner.test_context, &desc))
         return;
-    d3d12_runner_init_caps(&runner);
-
     device = runner.test_context.device;
+
+    if (minimum_shader_model >= SHADER_MODEL_6_0 && !device_supports_shader_model_6_0(device))
+    {
+        trace("Device does not support shader model 6.0.\n");
+        destroy_test_context(&runner.test_context);
+        return;
+    }
+
+    d3d12_runner_init_caps(&runner, minimum_shader_model, maximum_shader_model);
 
     runner.dxc_compiler = dxc_compiler;
 
@@ -834,17 +841,7 @@ void run_shader_tests_d3d12(void *dxc_compiler)
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, NULL);
-    if (dxc_compiler)
-    {
-        runner.caps.minimum_shader_model = SHADER_MODEL_6_0;
-        runner.caps.maximum_shader_model = SHADER_MODEL_6_0;
-
-        if (device_supports_shader_model_6_0(device))
-            run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
-        else
-            trace("Device does not support shader model 6.0.\n");
-    }
+    run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
     ID3D12CommandAllocator_Release(runner.compute_allocator);
@@ -856,4 +853,15 @@ void run_shader_tests_d3d12(void *dxc_compiler)
     if (runner.dsv_heap)
         ID3D12DescriptorHeap_Release(runner.dsv_heap);
     destroy_test_context(&runner.test_context);
+}
+
+void run_shader_tests_d3d12(void *dxc_compiler)
+{
+    enable_d3d12_debug_layer();
+    init_adapter_info();
+
+    run_shader_tests_for_model_range(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+
+    if (dxc_compiler)
+        run_shader_tests_for_model_range(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
 }
