@@ -10,6 +10,39 @@ float4 main() : sv_target
 }
 
 
+[pixel shader todo(sm<4)]
+// Overlapping reservations when both variables are unused.
+float4 a : register(c3);
+float4 b : register(c3);
+
+float4 main() : sv_target
+{
+    return 42;
+}
+
+[pixel shader fail(sm>=4 & sm<6) todo(sm<4)]
+// Overlapping reservations when only one variable is used.
+float4 a : register(c3);
+float4 b : register(c3);
+
+float4 main() : sv_target
+{
+    return b;
+}
+
+
+[pixel shader fail(sm>=4 & sm<6) todo(sm<4)]
+// Overlapping reservations when both variables are used, but their bind_count (used size) doesn't
+// cause an overlap.
+float4 a[2] : register(c3); // bind count: 1
+float4 b : register(c4);
+
+float4 main() : sv_target
+{
+    return a[0] + b;
+}
+
+
 [pixel shader]
 // It is not required to provide a register(cX) for all elements in the $Globals buffer.
 float4 a; // will get register(c1)
