@@ -10,7 +10,7 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-if ../configure CFLAGS="-g -O2 -Wno-implicit-fallthrough -Werror" && \
+if ../configure CFLAGS="-I/opt/homebrew/opt/vulkan-headers/include -I/opt/homebrew/opt/spirv-headers/include -g -O2 -Wno-implicit-fallthrough -Wno-ignored-attributes -Wno-unknown-attributes -Wno-unused-but-set-variable -Werror" VULKAN_LIBS=-L/opt/homebrew/opt/vulkan-loader/lib --with-spirv-tools && \
         make -j$(sysctl -n hw.ncpu) ; then
     make -j$(sysctl -n hw.ncpu) AM_COLOR_TESTS=always check || \
         touch ../tests_failed

@@ -137,9 +137,11 @@ build-mac:
   stage: build
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  allow_failure:
-    exit_codes:
-      - 2
+  image: winehq-sonoma-pristine
+  variables:
+    TART_EXECUTOR_SSH_USERNAME: "gitlab"
+    TART_EXECUTOR_SSH_PASSWORD: "gitlab"
+  allow_failure: true
   interruptible: true
   needs:
     - job: image-mac
@@ -148,28 +150,26 @@ build-mac:
   tags:
     - mac
   script:
+    - brew install vulkan-tools libtool spirv-headers vulkan-loader
     - git config --global --add safe.directory $CI_PROJECT_DIR
     - git clean -fdx
     - git reset --hard
     - rm -fr .git/rebase-merge
-    # We use a custom ICD which is not marked as a portability driver,
-    # so that test programs are not confused.
-    - ./gitlab/patch_moltenvk_icd.sh
-    - export VK_DRIVER_FILES="$PWD/gitlab/MoltenVK_icd.json"
+    - curl -o image.zip https://gitlab.winehq.org/api/v4/projects/giomasce%2Fvkd3d/jobs/artifacts/ci-image/download?job=image-mac
+    - unzip image.zip
     - mkdir artifacts
+    - export PATH="/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/flex/bin:$PWD/image/bin:$PATH"
+    - export VK_DRIVER_FILES="$PWD/image/moltenvk/MoltenVK_icd.json"
     - system_profiler SPSoftwareDataType SPHardwareDataType > artifacts/systeminfo.txt
     - vulkaninfo > artifacts/vulkaninfo.txt
-    - export PATH="/usr/local/opt/bison/bin:/usr/local/opt/flex/bin:$PATH"
-    - curl -o image.zip https://gitlab.winehq.org/api/v4/projects/wine%2Fvkd3d/jobs/artifacts/master/download?job=image-mac
-    - unzip image.zip
-    - export PATH="$PWD/image/bin:$PATH"
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-mac
     - if [ -f build_failed ] ; then exit 1 ; fi
     - if [ -f tests_failed ] ; then exit 2 ; fi
   variables:
     VKD3D_DISABLE_EXTENSIONS: "VK_EXT_descriptor_indexing"
     VKD3D_SHADER_CONFIG: 'force_validation'
-    MVK_CONFIG_LOG_LEVEL: 1
+    MVK_CONFIG_LOG_LEVEL: 2
+    SONAME_LIBVULKAN: "/opt/homebrew/opt/vulkan-loader/lib/libvulkan.1.dylib"
   artifacts:
     when: always
     paths:

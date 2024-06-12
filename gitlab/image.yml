@@ -31,24 +31,38 @@ image-mac:
         - .gitlab-ci.yml
         - gitlab/image.yml
         - gitlab/image.docker
+  image: winehq-sonoma-pristine
+  variables:
+    TART_EXECUTOR_SSH_USERNAME: "gitlab"
+    TART_EXECUTOR_SSH_PASSWORD: "gitlab"
   interruptible: true
   tags:
     - mac
   script:
     - mkdir image
-    - cd image
-    - mkdir bin
+    - mkdir image/bin
+    - mkdir image/moltenvk
     - export PATH="/usr/local/opt/bison/bin:/usr/local/opt/flex/bin:$PATH"
+
+    - git clone --depth 1 --branch v1.2.9 https://github.com/KhronosGroup/MoltenVK.git
+    - cd MoltenVK
+    - ./fetchDependencies --macos
+    - make macos
+    # Do not mark MoltenVK as a portability driver, otherwise it will be harder for vkd3d to find
+    # it. Since editing JSON properly is hard, we just rename the key.
+    - 'sed -i -e "s|is_portability_driver|_is_portability_driver|g" Package/Release/MoltenVK/dylib/macOS/MoltenVK_icd.json'
+    - cd ..
+    - cp MoltenVK/Package/Release/MoltenVK/dylib/macOS/MoltenVK_icd.json image/moltenvk
+    - cp MoltenVK/Package/Release/MoltenVK/dylib/macOS/libMoltenVK.dylib image/moltenvk
+
     - git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git
     - cd wine
     - mkdir build
     - cd build
-    - ../configure --enable-win64 --without-x --without-freetype
-    - make tools/widl/widl
+    - arch -x86_64 ../configure --enable-win64 --without-x --without-freetype
+    - arch -x86_64 make tools/widl/widl
     - cd ../..
-    - cp wine/build/tools/widl/widl bin
-    - rm -fr wine
-    - cd ..
+    - cp wine/build/tools/widl/widl image/bin
   artifacts:
     paths:
       - image
