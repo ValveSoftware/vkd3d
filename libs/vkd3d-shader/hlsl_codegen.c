@@ -4188,8 +4188,10 @@ static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx,
 {
     unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
+    /* FIXME: We could potentially pack structs or arrays more efficiently... */
+
     if (type->class <= HLSL_CLASS_VECTOR)
-        return allocate_register(ctx, allocator, first_write, last_read, reg_size, type->dimx);
+        return allocate_register(ctx, allocator, first_write, last_read, type->dimx, type->dimx);
     else
         return allocate_range(ctx, allocator, first_write, last_read, reg_size);
 }
