@@ -2582,7 +2582,7 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
         .srcs[0].type = D3DSPR_TEMP,
         .srcs[0].reg = coords->reg.id,
-        .srcs[0].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL),
+        .srcs[0].swizzle = hlsl_swizzle_from_writemask(coords->reg.writemask),
 
         .srcs[1].type = D3DSPR_SAMPLER,
         .srcs[1].reg = reg_id,
