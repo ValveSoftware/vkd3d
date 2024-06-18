@@ -16,8 +16,9 @@ filter linear linear linear
 address clamp clamp clamp
 
 [srv 0]
-size (2d, 1, 1)
-0.0 0.0 0.0 1.0
+size (2d, 2, 2)
+0.0 0.0 0.0 1.0  0.0 1.0 0.0 1.0
+0.0 0.0 1.0 1.0  1.0 0.0 0.0 1.0
 
 [srv 1]
 size (2d, 1, 1)
@@ -46,6 +47,22 @@ float4 main() : sv_target
 [test]
 todo(glsl) draw quad
 probe (0, 0) rgba (0, 0, 0, 1)
+
+
+[pixel shader]
+sampler sam;
+
+float v;
+
+float4 main() : sv_target
+{
+    return tex2D(sam, float2(0, 0)) + v;
+}
+
+[test]
+uniform 0 float4 0.5 0.0 0.0 0.0
+todo(glsl) draw quad
+probe (0, 0) rgba (0.5, 0.5, 0.5, 1.5)
 
 
 % On sm4, textures for new separated samplers are allocated before regular textures.
