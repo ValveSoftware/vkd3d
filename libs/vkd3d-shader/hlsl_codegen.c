@@ -5623,7 +5623,8 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     size = deref->var->data_type->reg_size[regset];
     if (*offset >= size)
     {
-        hlsl_error(ctx, &offset_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+        /* FIXME: Report a more specific location for the constant deref. */
+        hlsl_error(ctx, &deref->var->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
                 "Dereference is out of bounds. %u/%u", *offset, size);
         return false;
     }
@@ -5638,8 +5639,9 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
     if (hlsl_offset_from_deref(ctx, deref, &offset))
         return offset;
 
-    hlsl_fixme(ctx, &deref->rel_offset.node->loc, "Dereference with non-constant offset of type %s.",
-            hlsl_node_type_to_string(deref->rel_offset.node->type));
+    if (deref->rel_offset.node)
+        hlsl_fixme(ctx, &deref->rel_offset.node->loc, "Dereference with non-constant offset of type %s.",
+                hlsl_node_type_to_string(deref->rel_offset.node->type));
 
     return 0;
 }
