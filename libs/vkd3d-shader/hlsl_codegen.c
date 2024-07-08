@@ -2633,6 +2633,115 @@ static bool validate_nonconstant_vector_store_derefs(struct hlsl_ctx *ctx, struc
     return false;
 }
 
+/* This pass flattens array loads that include the indexing of a non-constant index into multiple
+ * constant loads, where the value of only one of them ends up in the resulting node.
+ * This is achieved through a synthetic variable. The non-constant index is compared for equality
+ * with every possible value it can have within the array bounds, and the ternary operator is used
+ * to update the value of the synthetic var when the equality check passes. */
+static bool lower_nonconstant_array_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
+        struct hlsl_block *block)
+{
+    struct hlsl_constant_value zero_value = {0};
+    struct hlsl_ir_node *cut_index, *zero, *store;
+    const struct hlsl_deref *deref;
+    struct hlsl_type *cut_type;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_var *var;
+    unsigned int i, i_cut;
+
+    if (instr->type != HLSL_IR_LOAD)
+        return false;
+    load = hlsl_ir_load(instr);
+    deref = &load->src;
+
+    if (deref->path_len == 0)
+        return false;
+
+    for (i = deref->path_len - 1; ; --i)
+    {
+        if (deref->path[i].node->type != HLSL_IR_CONSTANT)
+        {
+            i_cut = i;
+            break;
+        }
+
+        if (i == 0)
+            return false;
+    }
+
+    cut_index = deref->path[i_cut].node;
+    cut_type = deref->var->data_type;
+    for (i = 0; i < i_cut; ++i)
+        cut_type = hlsl_get_element_type_from_path_index(ctx, cut_type, deref->path[i].node);
+
+    if (cut_type->class != HLSL_CLASS_ARRAY)
+    {
+        WARN("Unexpected non-array non-constant index dereference (class %u)\n", cut_type->class);
+        return false;
+    }
+
+    if (!(var = hlsl_new_synthetic_var(ctx, "array_load", instr->data_type, &instr->loc)))
+        return false;
+
+    if (!(zero = hlsl_new_constant(ctx, instr->data_type, &zero_value, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, zero);
+
+    if (!(store = hlsl_new_simple_store(ctx, var, zero)))
+        return false;
+    hlsl_block_add_instr(block, store);
+
+    TRACE("Lowering non-constant array load on variable '%s'.\n", deref->var->name);
+    for (i = 0; i < cut_type->e.array.elements_count; ++i)
+    {
+        struct hlsl_type *btype = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+        struct hlsl_ir_node *const_i, *equals, *ternary, *var_store;
+        struct hlsl_ir_load *var_load, *specific_load;
+
+        if (!(const_i = hlsl_new_uint_constant(ctx, i, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, const_i);
+
+        operands[0] = cut_index;
+        operands[1] = const_i;
+        if (!(equals = hlsl_new_expr(ctx, HLSL_OP2_EQUAL, operands, btype, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, equals);
+
+        if (!(equals = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), var->data_type->dimx, equals, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, equals);
+
+        if (!(var_load = hlsl_new_var_load(ctx, var, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, &var_load->node);
+
+        if (!(specific_load = hlsl_new_load_index(ctx, deref, NULL, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, &specific_load->node);
+
+        hlsl_src_remove(&specific_load->src.path[i_cut]);
+        hlsl_src_from_node(&specific_load->src.path[i_cut], const_i);
+
+        operands[0] = equals;
+        operands[1] = &specific_load->node;
+        operands[2] = &var_load->node;
+        if (!(ternary = hlsl_new_expr(ctx, HLSL_OP3_TERNARY, operands, instr->data_type, &cut_index->loc)))
+            return false;
+        hlsl_block_add_instr(block, ternary);
+
+        if (!(var_store = hlsl_new_simple_store(ctx, var, ternary)))
+            return false;
+        hlsl_block_add_instr(block, var_store);
+    }
+
+    if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, &load->node);
+
+    return true;
+}
 /* Lower combined samples and sampler variables to synthesized separated textures and samplers.
  * That is, translate SM1-style samples in the source to SM4-style samples in the bytecode. */
 static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -6241,6 +6350,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (profile->major_version < 4)
     {
+        while (lower_ir(ctx, lower_nonconstant_array_loads, body));
+
         lower_ir(ctx, lower_ternary, body);
 
         lower_ir(ctx, lower_nonfloat_exprs, body);
