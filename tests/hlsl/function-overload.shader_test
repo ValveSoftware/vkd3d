@@ -58,7 +58,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 float func(int arg)
 {
     return 1.0;
@@ -78,8 +78,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
-todo(sm<6) probe (0,0) rgba (1.0, 2.0, 2.0, 2.0)
+draw quad
+probe (0,0) rgba (1.0, 2.0, 2.0, 2.0)
 
 
 % float and float1 can be defined separately...
